@@ -12,6 +12,7 @@ import {Position} from "./Position.sol";
 import {IFactory} from "./interfaces/IFactory.sol";
 import {IPosition} from "./interfaces/IPosition.sol";
 import {IIsHealthy} from "./interfaces/IIsHealthy.sol";
+import {IInterestRateModel} from "./interfaces/IInterestRateModel.sol";
 
 /*
 ██╗██████╗░██████╗░░█████╗░███╗░░██╗
@@ -48,9 +49,7 @@ contract LendingPool is ReentrancyGuard {
     event BorrowDebtCrosschain(
         address user, uint256 amount, uint256 shares, uint256 chainId, uint256 addExecutorLzReceiveOption
     );
-    event InterestRateModelUpdated(
-        uint256 baseRate, uint256 slope1, uint256 slope2, uint256 optimalUtilization
-    );
+    event InterestRateModelSet(address indexed oldModel, address indexed newModel);
 
     uint256 public totalSupplyAssets;
     uint256 public totalSupplyShares;
@@ -64,27 +63,23 @@ contract LendingPool is ReentrancyGuard {
     address public collateralToken;
     address public borrowToken;
     address public factory;
+    address public interestRateModel;
 
     uint256 public lastAccrued;
     uint256 public ltv;
-    
-    // Interest Rate Model Parameters (in basis points, 1% = 100)
-    uint256 public baseRate;           // Base interest rate (minimum rate)
-    uint256 public slope1;             // Rate increase when utilization is below optimal
-    uint256 public slope2;             // Steep rate increase when utilization is above optimal
-    uint256 public optimalUtilization; // Target utilization rate
 
-    constructor(address _collateralToken, address _borrowToken, address _factory, uint256 _ltv) {
+    constructor(
+        address _collateralToken,
+        address _borrowToken,
+        address _factory,
+        uint256 _ltv,
+        address _interestRateModel
+    ) {
         collateralToken = _collateralToken;
         borrowToken = _borrowToken;
         factory = _factory;
         ltv = _ltv;
-        
-        // Set default interest rate model parameters (similar to Aave)
-        baseRate = 200;           // 2% base rate
-        slope1 = 800;             // 8% slope below optimal
-        slope2 = 6000;            // 60% slope above optimal
-        optimalUtilization = 8000; // 80% optimal utilization
+        interestRateModel = _interestRateModel;
     }
 
     modifier positionRequired() {
@@ -196,52 +191,6 @@ contract LendingPool is ReentrancyGuard {
     }
 
     /**
-     * @notice Calculate the current utilization rate of the pool.
-     * @dev Utilization = totalBorrowAssets / totalSupplyAssets
-     * @return utilizationRate The current utilization rate in basis points (10000 = 100%)
-     */
-    function getUtilizationRate() public view returns (uint256 utilizationRate) {
-        if (totalSupplyAssets == 0) {
-            return 0;
-        }
-        return (totalBorrowAssets * 10000) / totalSupplyAssets;
-    }
-    
-    /**
-     * @notice Calculate the current borrow interest rate based on utilization.
-     * @dev Uses Aave-like interest rate model with base rate, slope1, and slope2
-     * @return borrowRate The current borrow interest rate in basis points per year
-     */
-    function getBorrowRate() public view returns (uint256 borrowRate) {
-        uint256 utilizationRate = getUtilizationRate();
-        
-        if (utilizationRate <= optimalUtilization) {
-            // Rate = baseRate + (utilization / optimal) * slope1
-            return baseRate + (utilizationRate * slope1) / optimalUtilization;
-        } else {
-            // Rate = baseRate + slope1 + ((utilization - optimal) / (1 - optimal)) * slope2
-            uint256 excessUtilization = utilizationRate - optimalUtilization;
-            uint256 excessUtilizationRate = (excessUtilization * 10000) / (10000 - optimalUtilization);
-            return baseRate + slope1 + (excessUtilizationRate * slope2) / 10000;
-        }
-    }
-    
-    /**
-     * @notice Calculate the current supply interest rate.
-     * @dev Supply rate = borrow rate * utilization * (1 - reserve factor)
-     * @return supplyRate The current supply interest rate in basis points per year
-     */
-    function getSupplyRate() public view returns (uint256 supplyRate) {
-        uint256 borrowRate = getBorrowRate();
-        uint256 utilizationRate = getUtilizationRate();
-        
-        // Assuming 10% reserve factor (1000 basis points)
-        uint256 reserveFactor = 1000;
-        
-        return (borrowRate * utilizationRate * (10000 - reserveFactor)) / (10000 * 10000);
-    }
-    
-    /**
      * @notice Internal function to calculate and apply accrued interest to the protocol.
      * @dev Uses dynamic interest rate model based on utilization. Updates total supply and borrow assets and last accrued timestamp.
      */
@@ -250,70 +199,38 @@ contract LendingPool is ReentrancyGuard {
             lastAccrued = block.timestamp;
             return;
         }
-        
+
         if (totalBorrowAssets == 0) {
             lastAccrued = block.timestamp;
             return;
         }
-        
-        uint256 borrowRate = getBorrowRate();
+
+        IInterestRateModel(interestRateModel).autoAdjustInterestRateModel(totalSupplyAssets, totalBorrowAssets);
+
+        uint256 borrowRate = IInterestRateModel(interestRateModel).getBorrowRate(totalSupplyAssets, totalBorrowAssets);
         uint256 elapsedTime = block.timestamp - lastAccrued;
-        
+
         // Convert annual rate to the actual interest for the elapsed time
         // borrowRate is in basis points per year, so divide by 10000 for percentage
         uint256 interestPerYear = (totalBorrowAssets * borrowRate) / 10000;
         uint256 interest = (interestPerYear * elapsedTime) / 365 days;
-        
+
         totalSupplyAssets += interest;
         totalBorrowAssets += interest;
         lastAccrued = block.timestamp;
     }
-    
+
     /**
-     * @notice Update the interest rate model parameters.
-     * @dev Only the factory owner can update these parameters.
-     * @param _baseRate New base interest rate in basis points
-     * @param _slope1 New slope1 parameter in basis points
-     * @param _slope2 New slope2 parameter in basis points
-     * @param _optimalUtilization New optimal utilization rate in basis points
+     * @notice Set a new interest rate model contract.
+     * @dev Only the factory owner can update the interest rate model.
+     * @param _newInterestRateModel Address of the new interest rate model contract
      */
-    function updateInterestRateModel(
-        uint256 _baseRate,
-        uint256 _slope1,
-        uint256 _slope2,
-        uint256 _optimalUtilization
-    ) external {
+    function setInterestRateModel(address _newInterestRateModel) external {
         address owner = IFactory(factory).owner();
         if (msg.sender != owner) revert NotOperator();
-        
-        // Validate parameters
-        if (_optimalUtilization > 10000) revert InvalidParameter(); // Max 100%
-        if (_baseRate > 5000) revert InvalidParameter(); // Max 50% base rate
-        if (_slope1 > 10000) revert InvalidParameter(); // Max 100% slope1
-        if (_slope2 > 20000) revert InvalidParameter(); // Max 200% slope2
-        
-        baseRate = _baseRate;
-        slope1 = _slope1;
-        slope2 = _slope2;
-        optimalUtilization = _optimalUtilization;
-        
-        emit InterestRateModelUpdated(_baseRate, _slope1, _slope2, _optimalUtilization);
-    }
-    
-    /**
-     * @notice Get current interest rate model parameters.
-     * @return _baseRate Current base rate in basis points
-     * @return _slope1 Current slope1 in basis points
-     * @return _slope2 Current slope2 in basis points
-     * @return _optimalUtilization Current optimal utilization in basis points
-     */
-    function getInterestRateModel() external view returns (
-        uint256 _baseRate,
-        uint256 _slope1,
-        uint256 _slope2,
-        uint256 _optimalUtilization
-    ) {
-        return (baseRate, slope1, slope2, optimalUtilization);
+        address oldModel = interestRateModel;
+        interestRateModel = _newInterestRateModel;
+        emit InterestRateModelSet(oldModel, _newInterestRateModel);
     }
 
     /**

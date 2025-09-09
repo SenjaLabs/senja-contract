@@ -81,4 +81,11 @@ interface IFactory {
      * @return Address of the helper contract
      */
     function helper() external view returns (address);
+    
+    /**
+     * @dev Returns the interest rate model address for a specific lending pool
+     * @param lendingPool Address of the lending pool
+     * @return Address of the interest rate model contract
+     */
+    function getInterestRateModel(address lendingPool) external view returns (address);
 }
