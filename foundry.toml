@@ -2,5 +2,32 @@
 src = "src"
 out = "out"
 libs = ["lib"]
+remappings = [
+    '@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/',
+    '@openzeppelin/contracts-upgradeable/=node_modules/@openzeppelin/contracts-upgradeable/',
+    '@openzeppelin/contracts-upgradeable/=node_modules/@openzeppelin/contracts-upgradeable/',
+    '@openzeppelin/contracts-upgradeable/=node_modules/@openzeppelin/contracts-upgradeable/',
+    '@layerzerolabs/lz-evm-messagelib-v2/=lib/layerzero-v2/packages/layerzero-v2/evm/messagelib',
+    '@layerzerolabs/lz-evm-protocol-v2/=lib/layerzero-v2/packages/layerzero-v2/evm/protocol',
+    '@layerzero-v2/=lib/LayerZero-v2/packages/layerzero-v2/',
+    '@layerzerolabs/oft-evm/=lib/devtools/packages/oft-evm/',
+    '@layerzerolabs/oapp-evm/=lib/devtools/packages/oapp-evm/',
+    '@layerzero-devtools/=lib/devtools/packages/',
+    'solidity-bytes-utils/=lib/solidity-bytes-utils/',
+    'forge-std/=lib/forge-std/src/'
+]
+
+[rpc_endpoints]
+arb_sepolia = "https://sepolia-rollup.arbitrum.io/rpc"
+base_sepolia= "https://sepolia.base.org"
+arb_mainnet = "https://arb1.arbitrum.io/rpc"
+base_mainnet = "https://base.drpc.org"
+bsc_mainnet = "https://bsc.drpc.org"
+kaia_mainnet = "https://go.getblock.io/d7094dbd80ab474ba7042603fe912332"
+pol_mainnet = "https://polygon.drpc.org"
+gnosis_mainnet = "wss://gnosis-rpc.publicnode.com"
+
+[lint]
+exclude_lints = ["mixed-case-variable", "mixed-case-function", "unsafe-typecast"]
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options

@@ -1,0 +1,39 @@
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity ^0.8.22;
+
+import {IMintableBurnable} from "../interfaces/IMintableBurnable.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+contract ElevatedMinterBurner is Ownable {
+    address public immutable TOKEN;
+    mapping(address => bool) public operators;
+
+    modifier onlyOperators() {
+        _onlyOperators();
+        _;
+    }
+
+    function _onlyOperators() internal view {
+        require(operators[msg.sender] || msg.sender == owner(), "Not authorized");
+    }
+
+    constructor(address _token, address _owner) Ownable(_owner) {
+        TOKEN = _token;
+    }
+
+    function setOperator(address _operator, bool _status) external onlyOwner {
+        operators[_operator] = _status;
+    }
+
+    function burn(address _from, uint256 _amount) external onlyOperators returns (bool) {
+        IERC20(TOKEN).approve(address(this), _amount);
+        IMintableBurnable(TOKEN).burnFrom(_from, _amount);
+        return true;
+    }
+
+    function mint(address _to, uint256 _amount) external onlyOperators returns (bool) {
+        IMintableBurnable(TOKEN).mint(_to, _amount);
+        return true;
+    }
+}
