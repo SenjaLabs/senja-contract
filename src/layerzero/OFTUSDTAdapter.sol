@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
@@ -21,6 +21,7 @@ contract OFTUSDTAdapter is OFTAdapter, ReentrancyGuard {
         address _lzEndpoint, // Local LayerZero endpoint
         address _owner // Contract owner
     ) OFTAdapter(_token, _lzEndpoint, _owner) Ownable(_owner) {
+        tokenOFT = _token;
         elevatedMinterBurner = _elevatedMinterBurner;
     }
 

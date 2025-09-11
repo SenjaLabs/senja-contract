@@ -22,8 +22,8 @@ import {MyOApp} from "../src/layerzero/MyOApp.sol";
 import {EnforcedOptionParam} from "@layerzerolabs/oapp-evm/contracts/oapp/libs/OAppOptionsType3.sol";
 import {OptionsBuilder} from "@layerzerolabs/oapp-evm/contracts/oapp/libs/OptionsBuilder.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IPosition} from "../src/interfaces/IPosition.sol";
 import {HelperUtils} from "../src/HelperUtils.sol";
+import {IFactory} from "../src/interfaces/IFactory.sol";
 
 interface IOrakl {
     function latestRoundData() external view returns (uint80, int256, uint256);
@@ -40,8 +40,8 @@ contract SenjaTest is Test, Helper {
     Protocol public protocol;
     LendingPoolFactory public lendingPoolFactory;
     Oracle public oracle;
-    OFTKAIAAdapter public oftkaiaadapter;
     OFTUSDTAdapter public oftusdtadapter;
+    OFTKAIAAdapter public oftkaiaadapter;
     ElevatedMinterBurner public elevatedminterburner;
     HelperUtils public helperUtils;
 
@@ -71,7 +71,6 @@ contract SenjaTest is Test, Helper {
 
     address public kaia_oftkaia_adapter;
     address public kaia_oftusdt_adapter;
-
     // LayerZero
     uint32 dstEid0 = BASE_EID; // Destination chain EID
     uint32 dstEid1 = KAIA_EID; // Destination chain EID
@@ -109,6 +108,7 @@ contract SenjaTest is Test, Helper {
         helperUtils = new HelperUtils(address(lendingPoolFactory));
         lendingPool = lendingPoolFactory.createLendingPool(KAIA, USDT, 8e17);
         lendingPool2 = lendingPoolFactory.createLendingPool(USDT, KAIA, 8e17);
+        _setOFTAddress();
         deal(USDT, alice, 100_000e6);
         vm.deal(alice, 100_000 ether);
         vm.stopPrank();
@@ -142,14 +142,18 @@ contract SenjaTest is Test, Helper {
         }
     }
 
-    function _deployOFT() public {
+    function _deployOFT() internal {
         elevatedminterburner = new ElevatedMinterBurner(USDT, owner);
         oftusdtadapter = new OFTUSDTAdapter(USDT, address(elevatedminterburner), KAIA_LZ_ENDPOINT, owner);
         kaia_oftusdt_adapter = address(oftusdtadapter);
         oapp = address(oftusdtadapter);
+
+        elevatedminterburner = new ElevatedMinterBurner(KAIA, owner);
+        oftkaiaadapter = new OFTKAIAAdapter(KAIA, address(elevatedminterburner), KAIA_LZ_ENDPOINT, owner);
+        kaia_oftkaia_adapter = address(oftkaiaadapter);
     }
 
-    function _setLibraries() public {
+    function _setLibraries() internal {
         _getUtils();
         ILayerZeroEndpointV2(endpoint).setSendLibrary(
             oapp, // OApp address
@@ -170,7 +174,7 @@ contract SenjaTest is Test, Helper {
         );
     }
 
-    function _setSendConfig() public {
+    function _setSendConfig() internal {
         _getUtils();
         UlnConfig memory uln;
         uln = UlnConfig({
@@ -193,7 +197,7 @@ contract SenjaTest is Test, Helper {
         ILayerZeroEndpointV2(endpoint).setConfig(oapp, sendLib, params);
     }
 
-    function _setReceiveConfig() public {
+    function _setReceiveConfig() internal {
         uint32 RECEIVE_CONFIG_TYPE = 2;
         _getUtils();
 
@@ -215,16 +219,29 @@ contract SenjaTest is Test, Helper {
         ILayerZeroEndpointV2(endpoint).setConfig(oapp, receiveLib, params); // Set config for messages received on B from A
     }
 
-    function _setPeers() public {
-        (uint32 peer_eid1, bytes32 peer1) = (BASE_EID, bytes32(uint256(uint160(BASE_OAPP))));
-        // (uint32 peer_eid2, bytes32 peer2) = (KAIA_EID, bytes32(uint256(uint160(KAIA_OAPP))));
-        (uint32 peer_eid2, bytes32 peer2) = (KAIA_EID, bytes32(uint256(uint160(oapp))));
+    function _setPeers() internal {
+        // For the test environment, we'll use the same OFTUSDTAdapter address as peer
+        // This simulates having the same contract deployed on both chains
+        bytes32 oftPeer = bytes32(uint256(uint160(address(oftusdtadapter))));
 
-        MyOApp(oapp).setPeer(peer_eid1, peer1);
-        MyOApp(oapp).setPeer(peer_eid2, peer2);
+        // Set up peers for the OFTUSDTAdapter (this is what's used for cross-chain transfers)
+        OFTUSDTAdapter(oftusdtadapter).setPeer(BASE_EID, oftPeer);
+        OFTUSDTAdapter(oftusdtadapter).setPeer(KAIA_EID, oftPeer);
+
+        // Also set up peers for MyOApp if needed
+        // (uint32 peer_eid1, bytes32 peer1) = (BASE_EID, bytes32(uint256(uint160(oapp))));
+        // (uint32 peer_eid2, bytes32 peer2) = (KAIA_EID, bytes32(uint256(uint160(oapp))));
+        // MyOApp(oapp).setPeer(peer_eid1, peer1);
+        // MyOApp(oapp).setPeer(peer_eid2, peer2);
+
+        bytes32 oftPeer2 = bytes32(uint256(uint160(address(oftkaiaadapter))));
+
+        // Set up peers for the OFTUSDTAdapter (this is what's used for cross-chain transfers)
+        OFTKAIAAdapter(oftkaiaadapter).setPeer(BASE_EID, oftPeer2);
+        OFTKAIAAdapter(oftkaiaadapter).setPeer(KAIA_EID, oftPeer2);
     }
 
-    function _setEnforcedOptions() public {
+    function _setEnforcedOptions() internal {
         uint16 SEND = 1; // Message type for sendString function
 
         // Destination chain configurations
@@ -244,7 +261,7 @@ contract SenjaTest is Test, Helper {
         MyOApp(oapp).setEnforcedOptions(enforcedOptions);
     }
 
-    function _deployOracleAdapter() public {
+    function _deployOracleAdapter() internal {
         oracle = new Oracle(usdt_usd);
         usdt_usd_adapter = address(oracle);
         oracle = new Oracle(kaia_usdt);
@@ -257,7 +274,7 @@ contract SenjaTest is Test, Helper {
         btc_usdt_adapter = address(oracle);
     }
 
-    function _deployFactory() public {
+    function _deployFactory() internal {
         isHealthy = new IsHealthy();
         lendingPoolDeployer = new LendingPoolDeployer();
         protocol = new Protocol();
@@ -271,6 +288,11 @@ contract SenjaTest is Test, Helper {
         // lendingPoolFactory.addTokenDataStream(BTC, btc_usdt_adapter); // token unavailable
     }
 
+    function _setOFTAddress() internal {
+        lendingPoolFactory.setOftAddress(KAIA, kaia_oftkaia_adapter);
+        lendingPoolFactory.setOftAddress(USDT, kaia_oftusdt_adapter);
+    }
+
     // RUN
     // forge test --match-test test_lendingpool_utilities -vvv
     function test_lendingpool_utilities() public view {
@@ -280,6 +302,13 @@ contract SenjaTest is Test, Helper {
         assertEq(ILPRouter(router).collateralToken(), KAIA);
         assertEq(ILPRouter(router).borrowToken(), USDT);
         assertEq(ILPRouter(router).ltv(), 8e17);
+    }
+
+    // RUN
+    // forge test --match-test test_oftaddress -vvv
+    function test_oftaddress() public view {
+        assertEq(IFactory(address(lendingPoolFactory)).oftAddress(KAIA), kaia_oftkaia_adapter);
+        assertEq(IFactory(address(lendingPoolFactory)).oftAddress(USDT), kaia_oftusdt_adapter);
     }
 
     // RUN
@@ -396,8 +425,8 @@ contract SenjaTest is Test, Helper {
     function test_repay_debt() public {
         test_borrow_debt();
         vm.startPrank(alice);
-        IERC20(USDT).approve(lendingPool, 120e6);
-        ILendingPool(lendingPool).repayWithSelectedToken(120e6, USDT, false, alice);
+        IERC20(USDT).approve(lendingPool, 10e6);
+        ILendingPool(lendingPool).repayWithSelectedToken(10e6, USDT, false, alice);
         ILendingPool(lendingPool2).repayWithSelectedToken(50 ether, KAIA, false, alice);
         vm.stopPrank();
 
@@ -407,6 +436,26 @@ contract SenjaTest is Test, Helper {
         assertEq(ILPRouter(_router(lendingPool2)).totalBorrowAssets(), 0);
         assertEq(ILPRouter(_router(lendingPool)).totalBorrowShares(), 0);
         assertEq(ILPRouter(_router(lendingPool2)).totalBorrowShares(), 0);
+    }
+
+    // RUN
+    // forge test --match-test test_borrow_crosschain -vvv
+    function test_borrow_crosschain() public {
+        test_supply_liquidity();
+        test_supply_collateral();
+
+        // Provide enough ETH for LayerZero cross-chain fees
+        vm.deal(alice, 10 ether);
+
+        vm.startPrank(alice);
+
+        // Test cross-chain borrowing of USDT tokens
+        ILendingPool(lendingPool).borrowDebt{value: 1 ether}(10e6, 8453, BASE_EID, 65000);
+
+        // Test cross-chain borrowing of native ETH (from ETH lending pool)
+        // ILendingPool(lendingPool2).borrowDebt{value: 1 ether}(0.1 ether, 8453, BASE_EID, 65000);
+
+        vm.stopPrank();
     }
 
     function _addressPosition(address _lendingPool, address _user) internal view returns (address) {

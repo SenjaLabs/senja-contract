@@ -208,9 +208,13 @@ contract LendingPool is ReentrancyGuard {
                 composeMsg: "",
                 oftCmd: ""
             });
-
+            IERC20(_borrowToken()).safeTransfer(IFactory(_factory()).protocol(), protocolFee);
             address oftAddress = IFactory(_factory()).oftAddress(_borrowToken());
             OFTAdapter oft = OFTAdapter(oftAddress);
+            
+            // Approve the OFT adapter to spend tokens for cross-chain transfer
+            IERC20(_borrowToken()).approve(oftAddress, userAmount);
+            
             MessagingFee memory fee = oft.quoteSend(sendParam, false);
             oft.send{value: fee.nativeFee}(sendParam, fee, msg.sender);
         } else {
