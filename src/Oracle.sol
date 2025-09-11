@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {IPriceFeed} from "./interfaces/IPriceFeed.sol";
+import {IOrakl} from "./interfaces/IOrakl.sol";
 
 /*
 ██╗██████╗░██████╗░░█████╗░███╗░░██╗
@@ -57,7 +57,6 @@ contract Oracle is Ownable {
     /**
      * @dev Number of decimal places for the price
      */
-    uint8 public decimals = 18;
 
     /**
      * @dev Constructor for the Pricefeed contract
@@ -75,15 +74,18 @@ contract Oracle is Ownable {
     /**
      * @dev Returns the latest round data in Chainlink format
      * @return idRound The round ID
-     * @return price The current price
-     * @return started Timestamp when the round started
+     * @return priceAnswer The current priceAnswer
+     * @return startedAt Timestamp when the round started
      * @return updated Timestamp when the price was last updated
-     * @return answeredRound The round ID in which the answer was computed
+     * @return answeredInRound The round ID in which the answer was computed
      * @notice This function mimics Chainlink's latestRoundData interface
      */
     function latestRoundData() public view returns (uint80, uint256, uint256, uint256, uint80) {
-        (uint80 idRound, int256 answer, uint256 started, uint256 updated, uint80 answeredRound) =
-            IPriceFeed(oracle).latestRoundData();
-        return (idRound, uint256(answer), started, updated, answeredRound);
+        (uint80 idRound, int256 priceAnswer, uint updated) = IOrakl(oracle).latestRoundData();
+        return (idRound, uint256(priceAnswer), startedAt, updated, answeredInRound);
+    }
+
+    function decimals() public view returns (uint8) {
+        return IOrakl(oracle).decimals();
     }
 }

@@ -5,8 +5,10 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import {IPriceFeed} from "./interfaces/IPriceFeed.sol";
+import {IOracle} from "./interfaces/IOracle.sol";
 import {IFactory} from "./interfaces/IFactory.sol";
+import {ILendingPool} from "./interfaces/ILendingPool.sol";
+import {ILPRouter} from "./interfaces/ILPRouter.sol";
 
 /**
  * @title Position
@@ -42,17 +44,8 @@ contract Position is ReentrancyGuard {
     error TransferFailed();
     /// @notice The collateral token address for this position
 
-    address public collateralAssets;
-    /// @notice The borrow token address for this position
-    address public borrowAssets;
-    /// @notice The owner of this position
     address public owner;
-    /// @notice The lending pool address that manages this position
     address public lpAddress;
-    /// @notice The factory contract address
-    address public factory;
-
-    /// @notice Counter for tracking unique token IDs in the position's token list
     uint256 public counter;
 
     /// @notice Mapping from token ID to token address
@@ -85,22 +78,22 @@ contract Position is ReentrancyGuard {
 
     /**
      * @notice Constructor to initialize a new position
-     * @param _collateral The address of the collateral token
-     * @param _borrow The address of the borrow token
      * @param _lpAddress The address of the lending pool
-     * @param _factory The address of the factory contract
      * @dev Sets up the initial position with collateral and borrow assets
      */
-    constructor(address _collateral, address _borrow, address _lpAddress, address _factory) {
-        collateralAssets = _collateral;
-        borrowAssets = _borrow;
+    constructor(address _lpAddress) {
         lpAddress = _lpAddress;
-        factory = _factory;
         owner = msg.sender;
         ++counter;
-        tokenLists[counter] = _collateral;
-        tokenListsId[_collateral] = counter;
+        tokenLists[counter] = _collateralToken();
+        tokenListsId[_collateralToken()] = counter;
     }
+
+    /**
+     * @notice Allows the contract to receive native tokens
+     * @dev Required for native token collateral functionality
+     */
+    receive() external payable {}
 
     /**
      * @notice Modifier to check and register tokens in the position's token list
@@ -129,11 +122,11 @@ contract Position is ReentrancyGuard {
      */
     function withdrawCollateral(uint256 amount, address _user) public {
         if (msg.sender != lpAddress) revert NotForWithdraw();
-        if (collateralAssets == address(0)) {
+        if (_collateralToken() == address(1)) {
             (bool sent,) = _user.call{value: amount}("");
             if (!sent) revert TransferFailed();
         } else {
-            IERC20(collateralAssets).safeTransfer(_user, amount);
+            IERC20(_collateralToken()).safeTransfer(_user, amount);
         }
         emit WithdrawCollateral(_user, amount);
     }
@@ -145,7 +138,7 @@ contract Position is ReentrancyGuard {
      * @param amountIn The amount of input tokens to swap
      * @return amountOut The amount of output tokens received
      * @dev Only the lending pool can call this function
-     * @dev Uses PriceFeedIPriceFeed price feeds to calculate exchange rates
+     * @dev Uses PriceFeedIOracle price feeds to calculate exchange rates
      * @dev Burns input tokens and mints output tokens
      */
     function swapTokenByPosition(address _tokenIn, address _tokenOut, uint256 amountIn)
@@ -175,24 +168,24 @@ contract Position is ReentrancyGuard {
     function repayWithSelectedToken(uint256 amount, address _token) public payable {
         if (msg.sender != lpAddress) revert NotForWithdraw();
         uint256 balance = IERC20(_token).balanceOf(address(this));
-        if (_token != borrowAssets) {
-            uint256 amountOut = swapTokenByPosition(_token, borrowAssets, balance);
+        if (_token != _borrowToken()) {
+            uint256 amountOut = swapTokenByPosition(_token, _borrowToken(), balance);
             IERC20(_token).approve(lpAddress, amount);
-            if (borrowAssets == address(0)) {
+            if (_borrowToken() == address(1)) {
                 // transfer native token
                 (bool sent,) = lpAddress.call{value: amount}("");
                 if (!sent) revert TransferFailed();
             } else {
-                IERC20(borrowAssets).safeTransfer(lpAddress, amount);
+                IERC20(_borrowToken()).safeTransfer(lpAddress, amount);
             }
-            if (amountOut - amount != 0) swapTokenByPosition(borrowAssets, _token, (amountOut - amount));
+            if (amountOut - amount != 0) swapTokenByPosition(_borrowToken(), _token, (amountOut - amount));
         } else {
-            if (borrowAssets == address(0)) {
+            if (_borrowToken() == address(1)) {
                 // transfer native token
                 (bool sent,) = lpAddress.call{value: amount}("");
                 if (!sent) revert TransferFailed();
             } else {
-                IERC20(borrowAssets).safeTransfer(lpAddress, amount);
+                IERC20(_borrowToken()).safeTransfer(lpAddress, amount);
             }
         }
     }
@@ -205,7 +198,7 @@ contract Position is ReentrancyGuard {
      * @param _tokenInPrice The address of the input token's price feed
      * @param _tokenOutPrice The address of the output token's price feed
      * @return The calculated output amount
-     * @dev Uses PriceFeedIPriceFeed price feeds to determine exchange rates
+     * @dev Uses PriceFeedIOracle price feeds to determine exchange rates
      * @dev Handles different token decimals automatically
      */
     function tokenCalculator(
@@ -215,10 +208,10 @@ contract Position is ReentrancyGuard {
         address _tokenInPrice,
         address _tokenOutPrice
     ) public view returns (uint256) {
-        uint256 tokenInDecimal = IERC20Metadata(_tokenIn).decimals();
-        uint256 tokenOutDecimal = IERC20Metadata(_tokenOut).decimals();
-        (, int256 quotePrice,,,) = IPriceFeed(_tokenInPrice).latestRoundData();
-        (, int256 basePrice,,,) = IPriceFeed(_tokenOutPrice).latestRoundData();
+        uint256 tokenInDecimal = _tokenIn == address(1) ? 18 : IERC20Metadata(_tokenIn).decimals();
+        uint256 tokenOutDecimal = _tokenOut == address(1) ? 18 : IERC20Metadata(_tokenOut).decimals();
+        (, uint256 quotePrice,,,) = IOracle(_tokenInPrice).latestRoundData();
+        (, uint256 basePrice,,,) = IOracle(_tokenOutPrice).latestRoundData();
 
         uint256 amountOut =
             (_amountIn * ((uint256(quotePrice) * (10 ** tokenOutDecimal)) / uint256(basePrice))) / 10 ** tokenInDecimal;
@@ -230,20 +223,51 @@ contract Position is ReentrancyGuard {
      * @notice Calculates the USD value of a token balance in the position
      * @param token The address of the token to calculate value for
      * @return The USD value of the token balance (in 18 decimals)
-     * @dev Uses PriceFeedIPriceFeed price feeds to get current token prices
+     * @dev Uses PriceFeedIOracle price feeds to get current token prices
      * @dev Returns value normalized to 18 decimals for consistency
      */
     function tokenValue(address token) public view returns (uint256) {
-        uint256 tokenBalance = IERC20(token).balanceOf(address(this));
-        uint256 tokenDecimals = IERC20Metadata(token).decimals();
-
-        address tokenDataStream = IFactory(factory).tokenDataStream(token);
-
-        (, int256 tokenPrice,,,) = IPriceFeed(tokenDataStream).latestRoundData();
-
-        uint256 tokenAdjustedPrice = uint256(tokenPrice) * 1e18 / 1e8; // token standarize to 18 decimal, and divide by price decimals
+        uint256 tokenBalance;
+        uint256 tokenDecimals;
+        
+        if (token == address(1)) {
+            // Native token
+            tokenBalance = address(this).balance;
+            tokenDecimals = 18; // KAIA uses 18 decimals
+        } else {
+            // ERC20 token
+            tokenBalance = IERC20(token).balanceOf(address(this));
+            tokenDecimals = IERC20Metadata(token).decimals();
+        }
+        
+        (, uint256 tokenPrice,,,) = IOracle(_tokenDataStream(token)).latestRoundData();
+        uint256 tokenAdjustedPrice = uint256(tokenPrice) * 1e18 / (10 ** _oracleDecimal(token)); // token standarize to 18 decimal, and divide by price decimals
         uint256 value = (tokenBalance * tokenAdjustedPrice) / (10 ** tokenDecimals);
 
         return value;
+    }
+
+    function _router() internal view returns (address) {
+        return ILendingPool(lpAddress).router();
+    }
+
+    function _factory() internal view returns (address) {
+        return ILPRouter(_router()).factory();
+    }
+
+    function _collateralToken() internal view returns (address) {
+        return ILPRouter(_router()).collateralToken();
+    }
+
+    function _borrowToken() internal view returns (address) {
+        return ILPRouter(_router()).borrowToken();
+    }
+
+    function _oracleDecimal(address _token) internal view returns (uint256) {
+        return IOracle(_tokenDataStream(_token)).decimals();
+    }
+
+    function _tokenDataStream(address _token) internal view returns (address) {
+        return IFactory(_factory()).tokenDataStream(_token);
     }
 }

@@ -55,31 +55,24 @@ contract LendingPoolDeployer {
 
     /**
      * @notice Deploys a new LendingPool contract with specified parameters
-     * @param _collateralToken The address of the collateral token (e.g., WETH, WBTC)
-     * @param _borrowToken The address of the borrow token (e.g., USDC, USDT)
-     * @param _ltv The loan-to-value ratio as a percentage (e.g., 8e17 for 80%)
-     * @param _interestRateModel The address of the interest rate model contract
+     * @param _router The address of the router contract
      * @return The address of the newly deployed LendingPool contract
      *
      * @dev This function creates a new LendingPool instance with the provided parameters.
-     * The ltv parameter should be provided as a basis point value (e.g., 8e17 = 80%).
      * Only the factory contract should call this function to ensure proper pool management.
      *
      * Requirements:
-     * - _collateralToken must be a valid ERC20 token address
-     * - _borrowToken must be a valid ERC20 token address
-     * - _ltv must be greater than 0 and less than or equal to 1e18 (100%)
-     * - _interestRateModel must be a valid InterestRateModel contract address
+     * - _router must be a valid router contract address
      *
      * @custom:security This function should only be called by the factory contract
      */
-    function deployLendingPool(address _collateralToken, address _borrowToken, uint256 _ltv, address _interestRateModel)
+    function deployLendingPool(address _router)
         public
         onlyFactory
         returns (address)
     {
-        // Deploy the LendingPool with the provided InterestRateModel
-        LendingPool lendingPool = new LendingPool(_collateralToken, _borrowToken, factory, _ltv, _interestRateModel);
+        // Deploy the LendingPool with the provided router
+        LendingPool lendingPool = new LendingPool(_router);
         
         return address(lendingPool);
     }

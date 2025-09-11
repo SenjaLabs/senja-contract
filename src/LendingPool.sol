@@ -8,20 +8,10 @@ import {OptionsBuilder} from "@layerzerolabs/oapp-evm/contracts/oapp/libs/Option
 import {SendParam} from "@layerzerolabs/oft-evm/contracts/interfaces/IOFT.sol";
 import {MessagingFee} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
 import {OFTAdapter} from "./layerzero/OFTAdapter.sol";
-import {Position} from "./Position.sol";
 import {IFactory} from "./interfaces/IFactory.sol";
 import {IPosition} from "./interfaces/IPosition.sol";
 import {IIsHealthy} from "./interfaces/IIsHealthy.sol";
-import {IInterestRateModel} from "./interfaces/IInterestRateModel.sol";
-
-/*
-██╗██████╗░██████╗░░█████╗░███╗░░██╗
-██║██╔══██╗██╔══██╗██╔══██╗████╗░██║
-██║██████╦╝██████╔╝███████║██╔██╗██║
-██║██╔══██╗██╔══██╗██╔══██║██║╚████║
-██║██████╦╝██║░░██║██║░░██║██║░╚███║
-╚═╝╚═════╝░╚═╝░░╚═╝╚═╝░░╚═╝╚═╝░░╚══╝
-*/
+import {ILPRouter} from "./interfaces/ILPRouter.sol";
 
 contract LendingPool is ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -51,39 +41,14 @@ contract LendingPool is ReentrancyGuard {
     );
     event InterestRateModelSet(address indexed oldModel, address indexed newModel);
 
-    uint256 public totalSupplyAssets;
-    uint256 public totalSupplyShares;
-    uint256 public totalBorrowAssets;
-    uint256 public totalBorrowShares;
+    address public router;
 
-    mapping(address => uint256) public userSupplyShares;
-    mapping(address => uint256) public userBorrowShares;
-    mapping(address => address) public addressPositions;
-
-    address public collateralToken;
-    address public borrowToken;
-    address public factory;
-    address public interestRateModel;
-
-    uint256 public lastAccrued;
-    uint256 public ltv;
-
-    constructor(
-        address _collateralToken,
-        address _borrowToken,
-        address _factory,
-        uint256 _ltv,
-        address _interestRateModel
-    ) {
-        collateralToken = _collateralToken;
-        borrowToken = _borrowToken;
-        factory = _factory;
-        ltv = _ltv;
-        interestRateModel = _interestRateModel;
+    constructor(address _router) {
+        router = _router;
     }
 
-    modifier positionRequired() {
-        _positionRequired();
+    modifier positionRequired(address _user) {
+        _positionRequired(_user);
         _;
     }
 
@@ -92,68 +57,23 @@ contract LendingPool is ReentrancyGuard {
         _;
     }
 
-    function _accessControl(address _user) internal view {
-        // not operator && user -> authorized -> user supply for himself
-        // operator && not user -> authorized -> operator supply for user
-        // not operator && not sender -> not authorized -> not authorized
-        if (!IFactory(factory).operator(msg.sender)) {
-            if (msg.sender != _user) revert NotAuthorized(msg.sender);
-        }
-    }
-
-    function _positionRequired() internal {
-        if (addressPositions[msg.sender] == address(0)) {
-            _createPosition();
-        }
-    }
-
-    /**
-     * @notice Creates a new Position contract for the caller if one does not already exist.
-     * @dev Each user can have only one Position contract. The Position contract manages collateral and borrowed assets for the user.
-     * @custom:throws PositionAlreadyCreated if the caller already has a Position contract.
-     * @custom:emits CreatePosition when a new Position is created.
-     */
-    function _createPosition() internal {
-        if (addressPositions[msg.sender] != address(0)) revert PositionAlreadyCreated();
-        Position position = new Position(collateralToken, borrowToken, address(this), factory);
-        addressPositions[msg.sender] = address(position);
-        emit CreatePosition(msg.sender, address(position));
-    }
-
     /**
      * @notice Supply liquidity to the lending pool by depositing borrow tokens.
      * @dev Users receive shares proportional to their deposit. Shares represent ownership in the pool. Accrues interest before deposit.
      * @param _user The address of the user to supply liquidity.
-     * @param amount The amount of borrow tokens to supply as liquidity.
+     * @param _amount The amount of borrow tokens to supply as liquidity.
      * @custom:throws ZeroAmount if amount is 0.
      * @custom:emits SupplyLiquidity when liquidity is supplied.
      */
-    function supplyLiquidity(address _user, uint256 amount) public payable nonReentrant accessControl(_user) {
-        if (amount == 0) revert ZeroAmount();
-
-        accrueInterest();
-        uint256 shares = 0;
-
-        if (totalSupplyAssets == 0) {
-            shares = amount;
+    function supplyLiquidity(address _user, uint256 _amount) public payable nonReentrant accessControl(_user) {
+        uint256 shares = _supplyLiquidity(_amount, _user);
+        _accrueInterest();
+        if (_borrowToken() == address(1)) {
+            if (msg.value != _amount) revert InsufficientCollateral();
         } else {
-            shares = (amount * totalSupplyShares) / totalSupplyAssets;
+            IERC20(_borrowToken()).safeTransferFrom(_user, address(this), _amount);
         }
-
-        userSupplyShares[_user] += shares;
-        totalSupplyShares += shares;
-        totalSupplyAssets += amount;
-
-        if (borrowToken == address(0)) {
-            // transfer native token
-            if (msg.value != amount) revert InsufficientCollateral();
-            (bool sent,) = _user.call{value: amount}("");
-            if (!sent) revert TransferFailed();
-        } else {
-            IERC20(borrowToken).safeTransferFrom(_user, address(this), amount);
-        }
-
-        emit SupplyLiquidity(_user, amount, shares);
+        emit SupplyLiquidity(_user, _amount, shares);
     }
 
     /**
@@ -166,26 +86,12 @@ contract LendingPool is ReentrancyGuard {
      * @custom:emits WithdrawLiquidity when liquidity is withdrawn.
      */
     function withdrawLiquidity(uint256 _shares) public payable nonReentrant {
-        if (_shares == 0) revert ZeroAmount();
-        if (_shares > userSupplyShares[msg.sender]) revert InsufficientShares();
-
-        accrueInterest();
-
-        uint256 amount = ((_shares * totalSupplyAssets) / totalSupplyShares);
-
-        userSupplyShares[msg.sender] -= _shares;
-        totalSupplyShares -= _shares;
-        totalSupplyAssets -= amount;
-
-        if (totalSupplyAssets < totalBorrowAssets) {
-            revert InsufficientLiquidity();
-        }
-        if (borrowToken == address(0)) {
-            // transfer native token
+        uint256 amount = _withdrawLiquidity(_shares);
+        if (_borrowToken() == address(1)) {
             (bool sent,) = msg.sender.call{value: amount}("");
             if (!sent) revert TransferFailed();
         } else {
-            IERC20(borrowToken).safeTransfer(msg.sender, amount);
+            IERC20(_borrowToken()).safeTransfer(msg.sender, amount);
         }
         emit WithdrawLiquidity(msg.sender, amount, _shares);
     }
@@ -194,68 +100,33 @@ contract LendingPool is ReentrancyGuard {
      * @notice Internal function to calculate and apply accrued interest to the protocol.
      * @dev Uses dynamic interest rate model based on utilization. Updates total supply and borrow assets and last accrued timestamp.
      */
-    function accrueInterest() public {
-        if (lastAccrued == 0) {
-            lastAccrued = block.timestamp;
-            return;
-        }
-
-        if (totalBorrowAssets == 0) {
-            lastAccrued = block.timestamp;
-            return;
-        }
-
-        IInterestRateModel(interestRateModel).autoAdjustInterestRateModel(totalSupplyAssets, totalBorrowAssets);
-
-        uint256 borrowRate = IInterestRateModel(interestRateModel).getBorrowRate(totalSupplyAssets, totalBorrowAssets);
-        uint256 elapsedTime = block.timestamp - lastAccrued;
-
-        // Convert annual rate to the actual interest for the elapsed time
-        // borrowRate is in basis points per year, so divide by 10000 for percentage
-        uint256 interestPerYear = (totalBorrowAssets * borrowRate) / 10000;
-        uint256 interest = (interestPerYear * elapsedTime) / 365 days;
-
-        totalSupplyAssets += interest;
-        totalBorrowAssets += interest;
-        lastAccrued = block.timestamp;
-    }
-
-    /**
-     * @notice Set a new interest rate model contract.
-     * @dev Only the factory owner can update the interest rate model.
-     * @param _newInterestRateModel Address of the new interest rate model contract
-     */
-    function setInterestRateModel(address _newInterestRateModel) external {
-        address owner = IFactory(factory).owner();
-        if (msg.sender != owner) revert NotOperator();
-        address oldModel = interestRateModel;
-        interestRateModel = _newInterestRateModel;
-        emit InterestRateModelSet(oldModel, _newInterestRateModel);
+    function _accrueInterest() internal {
+        ILPRouter(router).accrueInterest();
     }
 
     /**
      * @notice Supply collateral tokens to the user's position in the lending pool.
      * @dev Transfers collateral tokens from user to their Position contract. Accrues interest before deposit.
      * @param _amount The amount of collateral tokens to supply.
+     * @param _user The address of the user to supply collateral.
      * @custom:throws ZeroAmount if amount is 0.
      * @custom:emits SupplyCollateral when collateral is supplied.
      */
     function supplyCollateral(uint256 _amount, address _user)
         public
         payable
-        positionRequired
+        positionRequired(_user)
         nonReentrant
         accessControl(_user)
     {
         if (_amount == 0) revert ZeroAmount();
-        if (msg.value != _amount) revert InsufficientCollateral();
-        accrueInterest();
-        if (collateralToken == address(0)) {
-            // transfer native token
-            (bool sent,) = addressPositions[_user].call{value: _amount}("");
+        _accrueInterest();
+        if (_collateralToken() == address(1)) {
+            if (msg.value != _amount) revert InsufficientCollateral();
+            (bool sent,) = _addressPositions(_user).call{value: _amount}("");
             if (!sent) revert TransferFailed();
         } else {
-            IERC20(collateralToken).safeTransferFrom(_user, addressPositions[_user], _amount);
+            IERC20(_collateralToken()).safeTransferFrom(_user, _addressPositions(_user), _amount);
         }
 
         emit SupplyCollateral(_user, _amount);
@@ -268,29 +139,41 @@ contract LendingPool is ReentrancyGuard {
      * @custom:throws ZeroAmount if amount is 0.
      * @custom:throws InsufficientCollateral if user has insufficient collateral balance.
      */
-    function withdrawCollateral(uint256 _amount) public payable positionRequired nonReentrant {
+    function withdrawCollateral(uint256 _amount)
+        public
+        positionRequired(msg.sender)
+        nonReentrant
+        accessControl(msg.sender)
+    {
         if (_amount == 0) revert ZeroAmount();
-        if (_amount > IERC20(collateralToken).balanceOf(addressPositions[msg.sender])) revert InsufficientCollateral();
-        accrueInterest();
-        address isHealthy = IFactory(factory).isHealthy();
-        if (collateralToken == address(0)) {
-            // transfer native token
-            if (msg.value != _amount) revert InsufficientCollateral();
-            (bool sent,) = addressPositions[msg.sender].call{value: _amount}("");
-            if (!sent) revert TransferFailed();
+        
+        uint256 userCollateralBalance;
+        if (_collateralToken() == address(1)) {
+            // For native tokens, check the balance of the position contract
+            userCollateralBalance = _addressPositions(msg.sender).balance;
         } else {
-            IPosition(addressPositions[msg.sender]).withdrawCollateral(_amount, msg.sender);
+            // For ERC20 tokens, check the token balance
+            userCollateralBalance = IERC20(_collateralToken()).balanceOf(_addressPositions(msg.sender));
         }
+        
+        if (_amount > userCollateralBalance) {
+            revert InsufficientCollateral();
+        }
+        _accrueInterest();
+        address isHealthy = IFactory(_factory()).isHealthy();
+        
+        // For both native tokens and ERC20 tokens, call the Position's withdrawCollateral function
+        IPosition(_addressPositions(msg.sender)).withdrawCollateral(_amount, msg.sender);
 
-        if (userBorrowShares[msg.sender] > 0) {
+        if (_userBorrowShares(msg.sender) > 0) {
             IIsHealthy(isHealthy)._isHealthy(
-                borrowToken,
-                factory,
-                addressPositions[msg.sender],
-                ltv,
-                totalBorrowAssets,
-                totalBorrowShares,
-                userBorrowShares[msg.sender]
+                _borrowToken(),
+                _factory(),
+                _addressPositions(msg.sender),
+                _ltv(),
+                _totalBorrowAssets(),
+                _totalBorrowShares(),
+                _userBorrowShares(msg.sender)
             );
         }
     }
@@ -308,34 +191,10 @@ contract LendingPool is ReentrancyGuard {
         payable
         nonReentrant
     {
-        accrueInterest();
-        uint256 shares = 0;
-        if (totalBorrowShares == 0) {
-            shares = _amount;
-        } else {
-            shares = ((_amount * totalBorrowShares) / totalBorrowAssets);
-        }
-        userBorrowShares[msg.sender] += shares;
-        totalBorrowShares += shares;
-        totalBorrowAssets += _amount;
+        _accrueInterest();
 
-        uint256 protocolFee = (_amount * 1e15) / 1e18; // 0.1%
-        uint256 userAmount = _amount - protocolFee;
-        address protocol = IFactory(factory).protocol();
+        (uint256 protocolFee, uint256 userAmount, uint256 shares) = _borrowDebt(_amount, msg.sender);
 
-        if (totalBorrowAssets > totalSupplyAssets) {
-            revert InsufficientLiquidity();
-        }
-        address isHealthy = IFactory(factory).isHealthy();
-        IIsHealthy(isHealthy)._isHealthy(
-            borrowToken,
-            factory,
-            addressPositions[msg.sender],
-            ltv,
-            totalBorrowAssets,
-            totalBorrowShares,
-            userBorrowShares[msg.sender]
-        );
         if (_chainId != block.chainid) {
             // LAYERZERO IMPLEMENTATION
             bytes memory extraOptions =
@@ -349,19 +208,19 @@ contract LendingPool is ReentrancyGuard {
                 composeMsg: "",
                 oftCmd: ""
             });
-            address oftAddress = IFactory(factory).oftAddress(borrowToken);
+
+            address oftAddress = IFactory(_factory()).oftAddress(_borrowToken());
             OFTAdapter oft = OFTAdapter(oftAddress);
             MessagingFee memory fee = oft.quoteSend(sendParam, false);
             oft.send{value: fee.nativeFee}(sendParam, fee, msg.sender);
         } else {
-            if (borrowToken == address(0)) {
-                // transfer native token
-                (bool sentNative,) = protocol.call{value: protocolFee}("");
+            if (_borrowToken() == address(1)) {
+                (bool sentNative,) = (IFactory(_factory()).protocol()).call{value: protocolFee}("");
                 (bool sentToken,) = msg.sender.call{value: userAmount}("");
                 if (!sentToken || !sentNative) revert TransferFailed();
             } else {
-                IERC20(borrowToken).safeTransfer(protocol, protocolFee);
-                IERC20(borrowToken).safeTransfer(msg.sender, userAmount);
+                IERC20(_borrowToken()).safeTransfer(IFactory(_factory()).protocol(), protocolFee);
+                IERC20(_borrowToken()).safeTransfer(msg.sender, userAmount);
             }
         }
         emit BorrowDebtCrosschain(msg.sender, _amount, shares, _chainId, _addExecutorLzReceiveOption);
@@ -379,30 +238,104 @@ contract LendingPool is ReentrancyGuard {
      */
     function repayWithSelectedToken(uint256 shares, address _token, bool _fromPosition, address _user)
         public
-        positionRequired
+        positionRequired(_user)
         nonReentrant
         accessControl(_user)
     {
         if (shares == 0) revert ZeroAmount();
-        if (shares > userBorrowShares[_user]) revert amountSharesInvalid();
+        if (shares > _userBorrowShares(_user)) revert amountSharesInvalid();
 
-        accrueInterest();
-        uint256 borrowAmount = ((shares * totalBorrowAssets) / totalBorrowShares);
-        userBorrowShares[_user] -= shares;
-        totalBorrowShares -= shares;
-        totalBorrowAssets -= borrowAmount;
-        if (_token == borrowToken && !_fromPosition) {
-            if (borrowToken == address(0)) {
-                // transfer native token
+        _accrueInterest();
+        (uint256 borrowAmount,,,) = _repayWithSelectedToken(shares, _user);
+
+        if (_token == _borrowToken() && !_fromPosition) {
+            if (_borrowToken() == address(1)) {
                 (bool sent,) = address(this).call{value: borrowAmount}("");
                 if (!sent) revert TransferFailed();
             } else {
-                IERC20(borrowToken).safeTransferFrom(_user, address(this), borrowAmount);
+                IERC20(_borrowToken()).safeTransferFrom(_user, address(this), borrowAmount);
             }
         } else {
-            IPosition(addressPositions[_user]).repayWithSelectedToken(borrowAmount, _token);
+            IPosition(_addressPositions(_user)).repayWithSelectedToken(borrowAmount, _token);
         }
 
         emit RepayWithCollateralByPosition(_user, borrowAmount, shares);
     }
+
+    function _accessControl(address _user) internal view {
+        if (!IFactory(_factory()).operator(msg.sender)) {
+            if (msg.sender != _user) revert NotAuthorized(msg.sender);
+        }
+    }
+
+    function _positionRequired(address _user) internal {
+        if (_addressPositions(_user) == address(0)) {
+            _createPosition(_user);
+        }
+    }
+
+    /**
+     * @notice Creates a new Position contract for the caller if one does not already exist.
+     * @dev Each user can have only one Position contract. The Position contract manages collateral and borrowed assets for the user.
+     * @custom:throws PositionAlreadyCreated if the caller already has a Position contract.
+     * @custom:emits CreatePosition when a new Position is created.
+     */
+    function _createPosition(address _user) internal {
+        if (_addressPositions(_user) != address(0)) revert PositionAlreadyCreated();
+        ILPRouter(router).createPosition(_user);
+        emit CreatePosition(_user, _addressPositions(_user));
+    }
+
+    function _borrowToken() internal view returns (address) {
+        return ILPRouter(router).borrowToken();
+    }
+
+    function _collateralToken() internal view returns (address) {
+        return ILPRouter(router).collateralToken();
+    }
+
+    function _ltv() internal view returns (uint256) {
+        return ILPRouter(router).ltv();
+    }
+
+    function _userBorrowShares(address _user) internal view returns (uint256) {
+        return ILPRouter(router).userBorrowShares(_user);
+    }
+
+    function _addressPositions(address _user) internal view returns (address) {
+        return ILPRouter(router).addressPositions(_user);
+    }
+
+    function _supplyLiquidity(uint256 _amount, address _user) internal returns (uint256) {
+        return ILPRouter(router).supplyLiquidity(_amount, _user);
+    }
+
+    function _withdrawLiquidity(uint256 _shares) internal returns (uint256) {
+        return ILPRouter(router).withdrawLiquidity(_shares, msg.sender);
+    }
+
+    function _borrowDebt(uint256 _amount, address _user) internal returns (uint256, uint256, uint256) {
+        return ILPRouter(router).borrowDebt(_amount, _user);
+    }
+
+    function _repayWithSelectedToken(uint256 _shares, address _user)
+        internal
+        returns (uint256, uint256, uint256, uint256)
+    {
+        return ILPRouter(router).repayWithSelectedToken(_shares, _user);
+    }
+
+    function _totalBorrowAssets() internal view returns (uint256) {
+        return ILPRouter(router).totalBorrowAssets();
+    }
+
+    function _totalBorrowShares() internal view returns (uint256) {
+        return ILPRouter(router).totalBorrowShares();
+    }
+
+    function _factory() internal view returns (address) {
+        return ILPRouter(router).factory();
+    }
+
+    receive() external payable {}
 }

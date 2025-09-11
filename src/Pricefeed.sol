@@ -56,7 +56,7 @@ contract Pricefeed is Ownable {
     /**
      * @dev Number of decimal places for the price
      */
-    uint8 public decimals = 18;
+    uint8 public decimals = 8;
 
     /**
      * @dev Constructor for the Pricefeed contract

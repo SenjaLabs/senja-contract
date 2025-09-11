@@ -20,16 +20,13 @@ pragma solidity ^0.8.13;
  */
 interface ILPDeployer {
     /**
-     * @dev Deploys a new lending pool with specified parameters
-     * @param collateralToken Address of the collateral token
-     * @param borrowToken Address of the borrow token
-     * @param ltv Loan-to-value ratio for the lending pool
-     * @param interestRateModel Address of the interest rate model contract
+     * @dev Deploys a new lending pool with specified parametersen
+     * @param router Address of the router contract
      * @return Address of the newly deployed lending pool
      * @notice This function creates a new lending pool instance
      * @custom:security Only authorized addresses should be able to call this function
      */
-    function deployLendingPool(address collateralToken, address borrowToken, uint256 ltv, address interestRateModel) external returns (address);
+    function deployLendingPool(address router) external returns (address);
     
     /**
      * @dev Sets the factory address for the deployer

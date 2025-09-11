@@ -2,8 +2,7 @@
 pragma solidity ^0.8.13;
 
 import {ILPDeployer} from "./interfaces/ILPDeployer.sol";
-import {InterestRateModel} from "./InterestRateModel.sol";
-import {IInterestRateModel} from "./interfaces/IInterestRateModel.sol";
+import {LendingPoolRouter} from "./LendingPoolRouter.sol";
 
 /*
 ██╗██████╗░██████╗░░█████╗░███╗░░██╗
@@ -49,13 +48,6 @@ contract LendingPoolFactory {
     event OftAddressSet(address indexed token, address indexed oftAddress);
 
     /**
-     * @notice Emitted when an interest rate model is deployed
-     * @param lendingPool The address of the lending pool
-     * @param interestRateModel The address of the interest rate model
-     */
-    event InterestRateModelDeployed(address indexed lendingPool, address indexed interestRateModel);
-
-    /**
      * @notice Emitted when a token data stream is added
      * @param token The address of the token
      * @param dataStream The address of the data stream contract
@@ -89,9 +81,6 @@ contract LendingPoolFactory {
 
     /// @notice Mapping from token address to its data stream address
     mapping(address => address) public tokenDataStream;
-    
-    /// @notice Mapping from lending pool to its interest rate model
-    mapping(address => address) public poolInterestRateModel;
 
     mapping(address => bool) public operator;
 
@@ -134,28 +123,21 @@ contract LendingPoolFactory {
      * @param ltv The Loan-to-Value ratio for the pool (in basis points)
      * @return The address of the newly created lending pool
      * @dev This function deploys a new lending pool using the lending pool deployer
-     * and adds it to the pools registry. It also deploys a dedicated InterestRateModel
-     * and configures the lending pool address in the InterestRateModel.
      */
     function createLendingPool(address collateralToken, address borrowToken, uint256 ltv) public returns (address) {
-        // Deploy a new InterestRateModel for this pool
-        InterestRateModel interestRateModel = new InterestRateModel(owner);
+        // Deploy a new router for this pool
+        LendingPoolRouter router = new LendingPoolRouter(address(0), address(this), collateralToken, borrowToken, ltv);
+        // Deploy the LendingPool
+        address lendingPool = ILPDeployer(lendingPoolDeployer).deployLendingPool(address(router));
         
-        // Deploy the LendingPool with the InterestRateModel
-        address lendingPool = ILPDeployer(lendingPoolDeployer).deployLendingPool(collateralToken, borrowToken, ltv, address(interestRateModel));
-        
-        // Configure the lending pool address in the InterestRateModel
+        // Configure the lending pool address in the router
         // This allows only the lending pool to update its own interest rate parameters
-        IInterestRateModel(address(interestRateModel)).setLendingPool(lendingPool);
-        
-        // Store the relationship
-        poolInterestRateModel[lendingPool] = address(interestRateModel);
+        router.setLendingPool(address(lendingPool));
         
         pools.push(Pool(collateralToken, borrowToken, address(lendingPool)));
         poolCount++;
         
         emit LendingPoolCreated(collateralToken, borrowToken, address(lendingPool), ltv);
-        emit InterestRateModelDeployed(lendingPool, address(interestRateModel));
         
         return address(lendingPool);
     }
@@ -179,14 +161,5 @@ contract LendingPoolFactory {
     function setOftAddress(address _token, address _oftAddress) public onlyOwner {
         oftAddress[_token] = _oftAddress;
         emit OftAddressSet(_token, _oftAddress);
-    }
-
-    /**
-     * @notice Get the interest rate model address for a specific lending pool
-     * @param _lendingPool The address of the lending pool
-     * @return The address of the interest rate model
-     */
-    function getInterestRateModel(address _lendingPool) public view returns (address) {
-        return poolInterestRateModel[_lendingPool];
     }
 }

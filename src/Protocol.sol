@@ -42,16 +42,32 @@ contract Protocol is ReentrancyGuard, Ownable {
     constructor() Ownable(msg.sender) {}
 
     /**
+     * @dev Allows the contract to receive native tokens (KAIA)
+     * @notice Required for protocol fee collection in native tokens
+     */
+    receive() external payable {}
+
+    /**
      * @dev Withdraws tokens from the protocol contract
-     * @param token Address of the token to withdraw
+     * @param token Address of the token to withdraw (address(1) for native KAIA)
      * @param amount Amount of tokens to withdraw
      * @notice This function allows the owner to withdraw accumulated protocol fees
      * @custom:security Only the owner can withdraw tokens
      */
     function withdraw(address token, uint256 amount) public nonReentrant onlyOwner {
-        if (IERC20(token).balanceOf(address(this)) < amount) {
-            revert InsufficientBalance(token, amount);
+        if (token == address(1)) {
+            // Handle native token (KAIA) withdrawal
+            if (address(this).balance < amount) {
+                revert InsufficientBalance(token, amount);
+            }
+            (bool sent,) = msg.sender.call{value: amount}("");
+            require(sent, "Failed to send native token");
+        } else {
+            // Handle ERC20 token withdrawal
+            if (IERC20(token).balanceOf(address(this)) < amount) {
+                revert InsufficientBalance(token, amount);
+            }
+            IERC20(token).safeTransfer(msg.sender, amount);
         }
-        IERC20(token).safeTransfer(msg.sender, amount);
     }
 }

@@ -28,7 +28,7 @@ contract ElevatedMinterBurner is Ownable {
 
     function burn(address _from, uint256 _amount) external onlyOperators returns (bool) {
         IERC20(TOKEN).approve(address(this), _amount);
-        IMintableBurnable(TOKEN).burnFrom(_from, _amount);
+        IMintableBurnable(TOKEN).burn(_from, _amount);
         return true;
     }
 

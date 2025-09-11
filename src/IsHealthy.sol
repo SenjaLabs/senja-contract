@@ -2,7 +2,7 @@
 pragma solidity ^0.8.13;
 
 import {IFactory} from "./interfaces/IFactory.sol";
-import {IPriceFeed} from "./interfaces/IPriceFeed.sol";
+import {IOracle} from "./interfaces/IOracle.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {IPosition} from "./interfaces/IPosition.sol";
 
@@ -69,31 +69,18 @@ contract IsHealthy {
         uint256 totalBorrowShares,
         uint256 userBorrowShares
     ) public view {
-        // Get the Chainlink price feed address for the borrowed token
-        address borrowTokenDataStream = IFactory(factory).tokenDataStream(borrowToken);
-
-        // Fetch the latest price data from Chainlink
-        (, int256 borrowPrice,,,) = IPriceFeed(borrowTokenDataStream).latestRoundData();
-        uint8 borrowPriceDecimals = IPriceFeed(borrowTokenDataStream).decimals();
-        uint8 borrowDecimals = IERC20Metadata(borrowToken).decimals();
-
-        // Calculate total collateral value from all user positions
+        (, uint256 borrowPrice,,,) = IOracle(_tokenDataStream(factory, borrowToken)).latestRoundData();
         uint256 collateralValue = 0;
-        uint256 counter = IPosition(addressPositions).counter();
-        for (uint256 i = 1; i <= counter; i++) {
+        for (uint256 i = 1; i <= _counter(addressPositions); i++) {
             address token = IPosition(addressPositions).tokenLists(i);
-            if (token != address(0)) {
-                collateralValue += IPosition(addressPositions).tokenValue(token);
+            if (token != address(0)) {  // Include all tokens, including KAIA (address(1))
+                collateralValue += _tokenValue(addressPositions, token);
             }
         }
-
-        // Calculate the user's actual borrowed amount
         uint256 borrowed = 0;
         borrowed = (userBorrowShares * totalBorrowAssets) / totalBorrowShares;
-
-        // Convert borrowed amount to USD value for comparison
-        uint256 borrowAdjustedPrice = uint256(borrowPrice) * 1e18 / 10 ** borrowPriceDecimals;
-        uint256 borrowValue = (borrowed * borrowAdjustedPrice) / (10 ** borrowDecimals);
+        uint256 borrowAdjustedPrice = uint256(borrowPrice) * 1e18 / 10 ** _oracleDecimal(factory, borrowToken);
+        uint256 borrowValue = (borrowed * borrowAdjustedPrice) / (10 ** _tokenDecimals(borrowToken));
 
         // Calculate maximum allowed borrow based on LTV ratio
         uint256 maxBorrow = (collateralValue * ltv) / 1e18;
@@ -101,5 +88,25 @@ contract IsHealthy {
         // Validate position health
         if (borrowValue > collateralValue) revert InsufficientCollateral();
         if (borrowValue > maxBorrow) revert InsufficientCollateral();
+    }
+
+    function _tokenDecimals(address _token) internal view returns (uint8) {
+        return _token == address(1) ? 18 : IERC20Metadata(_token).decimals();
+    }
+
+    function _oracleDecimal(address factory, address _token) internal view returns (uint8) {
+        return IOracle(_tokenDataStream(factory, _token)).decimals();
+    }
+
+    function _tokenDataStream(address factory, address _token) internal view returns (address) {
+        return IFactory(factory).tokenDataStream(_token);
+    }
+
+    function _counter(address addressPositions) internal view returns (uint256) {
+        return IPosition(addressPositions).counter();
+    }
+
+    function _tokenValue(address addressPositions, address token) internal view returns (uint256) {
+        return IPosition(addressPositions).tokenValue(token);
     }
 }
