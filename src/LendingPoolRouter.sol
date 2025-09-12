@@ -269,7 +269,7 @@ contract LendingPoolRouter {
     function createPosition(address _user) public onlyLendingPool returns (address) {
         if (addressPositions[_user] != address(0)) revert PositionAlreadyCreated();
         // TODO: change to use position deployer
-        Position position = new Position(lendingPool);
+        Position position = new Position(lendingPool, _user);
         addressPositions[_user] = address(position);
         return address(position);
     }
