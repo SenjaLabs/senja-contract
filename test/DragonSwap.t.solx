@@ -5,8 +5,6 @@ import {Test, console} from "forge-std/Test.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {LendingPool} from "../src/LendingPool.sol";
 import {Position} from "../src/Position.sol";
-import {IDragonSwap} from "../src/interfaces/IDragonSwap.sol";
-import {ILPRouter} from "../src/interfaces/ILPRouter.sol";
 import {LendingPoolRouter} from "../src/LendingPoolRouter.sol";
 import {LendingPoolFactory} from "../src/LendingPoolFactory.sol";
 import {LendingPoolDeployer} from "../src/LendingPoolDeployer.sol";

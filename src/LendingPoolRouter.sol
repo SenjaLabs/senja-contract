@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 import {IFactory} from "./Interfaces/IFactory.sol";
 import {IIsHealthy} from "./Interfaces/IIsHealthy.sol";
-import {Position} from "./Position.sol";
+import {IPositionDeployer} from "./interfaces/IPositionDeployer.sol";
 
 contract LendingPoolRouter {
     error ZeroAmount();
@@ -268,9 +268,89 @@ contract LendingPoolRouter {
 
     function createPosition(address _user) public onlyLendingPool returns (address) {
         if (addressPositions[_user] != address(0)) revert PositionAlreadyCreated();
-        // TODO: change to use position deployer
-        Position position = new Position(lendingPool, _user);
-        addressPositions[_user] = address(position);
-        return address(position);
+        address position = IPositionDeployer(_positionDeployer()).deployPosition(lendingPool, _user);
+        addressPositions[_user] = position;
+        return position;
     }
+
+    function _positionDeployer() internal view returns (address) {
+        return IFactory(factory).positionDeployer();
+    }
+
+    /**
+     * @notice Liquidates a user's position and resets borrow/collateral state
+     * @param _user The address of the user being liquidated
+     * @param _repayAmount The amount of debt being repaid
+     * @dev This function resets user's borrow shares, collateral, and related variables
+     * @dev User liquidity shares remain untouched as they're not related to borrowing
+     */
+    function liquidatePosition(address _user, uint256 _repayAmount) external {
+        // Only allow calls from IsHealthy contract or authorized liquidators
+        address isHealthyContract = IFactory(factory).isHealthy();
+        require(msg.sender == isHealthyContract, "Not authorized");
+
+        // Calculate shares to remove based on repay amount
+        uint256 sharesToRemove = 0;
+        if (totalBorrowAssets > 0 && totalBorrowShares > 0) {
+            sharesToRemove = (_repayAmount * totalBorrowShares) / totalBorrowAssets;
+            
+            // Ensure we don't remove more shares than the user has
+            if (sharesToRemove > userBorrowShares[_user]) {
+                sharesToRemove = userBorrowShares[_user];
+            }
+        } else {
+            // If no total borrow assets/shares, remove all user shares
+            sharesToRemove = userBorrowShares[_user];
+        }
+
+        // Update user's borrow state
+        userBorrowShares[_user] -= sharesToRemove;
+        
+        // Update total borrow state
+        totalBorrowShares -= sharesToRemove;
+        totalBorrowAssets -= _repayAmount;
+
+        // Clear user's collateral (it's been seized in liquidation)
+        userCollateral[_user] = 0;
+
+        // Note: userSupplyShares[_user] is NOT touched - liquidity provision is separate from borrowing
+        
+        // Emit liquidation event (optional - can be handled by IsHealthy contract)
+        emit PositionLiquidated(_user, sharesToRemove, _repayAmount);
+    }
+
+    /**
+     * @notice Emergency function to completely reset a user's position
+     * @param _user The address of the user whose position to reset
+     * @dev Only callable by factory owner in emergency situations
+     * @dev This resets ALL user state including liquidity (use with caution)
+     */
+    function emergencyResetPosition(address _user) external onlyFactory {
+        userBorrowShares[_user] = 0;
+        userCollateral[_user] = 0;
+        // In emergency, also reset supply shares if needed
+        // userSupplyShares[_user] = 0; // Uncomment if needed
+        
+        emit EmergencyPositionReset(_user);
+    }
+
+    /**
+     * @notice Allows position contract to reduce user collateral during liquidation
+     * @param _user The user whose collateral is being reduced
+     * @param _amount The amount of collateral being removed
+     * @dev Called by Position contract during collateral withdrawal for liquidation
+     */
+    function reduceUserCollateral(address _user, uint256 _amount) external {
+        require(msg.sender == addressPositions[_user], "Not user's position");
+        
+        if (_amount > userCollateral[_user]) {
+            userCollateral[_user] = 0;
+        } else {
+            userCollateral[_user] -= _amount;
+        }
+    }
+
+    // Events for liquidation tracking
+    event PositionLiquidated(address indexed user, uint256 sharesRemoved, uint256 debtRepaid);
+    event EmergencyPositionReset(address indexed user);
 }

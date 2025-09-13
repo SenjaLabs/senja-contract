@@ -8,8 +8,14 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {IOracle} from "./interfaces/IOracle.sol";
 import {ILPRouter} from "./interfaces/ILPRouter.sol";
+import {OFTAdapter} from "./layerzero/OFTAdapter.sol";
+import {OptionsBuilder} from "@layerzerolabs/oapp-evm/contracts/oapp/libs/OptionsBuilder.sol";
+import {SendParam} from "@layerzerolabs/oft-evm/contracts/interfaces/IOFT.sol";
+import {MessagingFee} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
 
 contract HelperUtils {
+    using OptionsBuilder for bytes;
+
     address public factory;
 
     constructor(address _factory) {
@@ -23,15 +29,15 @@ contract HelperUtils {
     function getMaxBorrowAmount(address _lendingPool, address _user) public view returns (uint256) {
         address borrowToken = _borrowToken(_lendingPool);
         uint256 totalLiquidity;
-        
-        if (borrowToken == address(1)) {
-            // Handle native KAIA token
-            totalLiquidity = _lendingPool.balance;
+
+        if (borrowToken == _WKAIA()) {
+            // Handle WKAIA token
+            totalLiquidity = IERC20(_WKAIA()).balanceOf(_lendingPool);
         } else {
             // Handle ERC20 tokens
             totalLiquidity = IERC20(borrowToken).balanceOf(_lendingPool);
         }
-        
+
         uint256 tokenValue = _calculateCollateralValue(_lendingPool, _user);
         uint256 borrowAmount = _calculateCurrentBorrowAmount(_lendingPool, _user);
         uint256 maxBorrowAmount = ((tokenValue * _ltv(_lendingPool)) / 1e18) - borrowAmount;
@@ -79,25 +85,26 @@ contract HelperUtils {
             address token = IPosition(userPosition).tokenLists(i);
             uint256 tokenBalance;
             uint256 tokenDecimals;
-            
-            if (token == address(1)) {
-                // Handle native KAIA token
-                tokenBalance = userPosition.balance;
-                tokenDecimals = 18; // KAIA uses 18 decimals
+
+            if (token == _WKAIA()) {
+                // Handle WKAIA token
+                tokenBalance = IERC20(_WKAIA()).balanceOf(userPosition);
+                tokenDecimals = 18; // WKAIA uses 18 decimals
             } else {
                 // Handle ERC20 tokens
                 tokenBalance = IERC20(token).balanceOf(userPosition);
                 tokenDecimals = IERC20Metadata(token).decimals();
             }
-            
-            if (token != address(0)) { // Include all tokens including KAIA (address(1))
+
+            if (token != address(0)) {
+                // Include all tokens including WKAIA
                 collateralValue += (getTokenValue(token) * tokenBalance / 10 ** tokenDecimals);
             }
         }
 
         // Calculate borrowed value
         uint256 borrowAssets = ((userBorrowShares * totalBorrowAssets) / totalBorrowShares);
-        uint256 borrowDecimals = borrowToken == address(1) ? 18 : IERC20Metadata(borrowToken).decimals();
+        uint256 borrowDecimals = borrowToken == _WKAIA() ? 18 : IERC20Metadata(borrowToken).decimals();
         uint256 borrowValue = getTokenValue(borrowToken) * borrowAssets / 10 ** borrowDecimals;
         // Health Factor = (Collateral Value * LTV) / Borrowed Value
         uint256 ltv = _ltv(_lendingPool);
@@ -114,9 +121,9 @@ contract HelperUtils {
         address _tokenOutPrice = _tokenDataStream(borrowToken);
 
         uint256 collateralBalance;
-        if (collateralToken == address(1)) {
-            // Handle native KAIA token
-            collateralBalance = addressPosition.balance;
+        if (collateralToken == _WKAIA()) {
+            // Handle WKAIA token
+            collateralBalance = IERC20(_WKAIA()).balanceOf(addressPosition);
         } else {
             // Handle ERC20 tokens
             collateralBalance = IERC20(collateralToken).balanceOf(addressPosition);
@@ -168,5 +175,37 @@ contract HelperUtils {
 
     function _tokenDataStream(address _token) internal view returns (address) {
         return IFactory(factory).tokenDataStream(_token);
+    }
+
+    function _addressToBytes32(address _address) internal pure returns (bytes32) {
+        return bytes32(uint256(uint160(_address)));
+    }
+
+    function _WKAIA() internal view returns (address) {
+        return IFactory(factory).WKAIA();
+    }
+
+    function getFee(address _oftAddress, uint32 _dstEid, address _toAddress, uint256 _tokensToSend)
+        public
+        view
+        returns (uint256)
+    {
+        OFTAdapter oft = OFTAdapter(_oftAddress);
+        // Build send parameters
+        bytes memory extraOptions = OptionsBuilder.newOptions().addExecutorLzReceiveOption(65000, 0);
+        SendParam memory sendParam = SendParam({
+            dstEid: _dstEid,
+            to: _addressToBytes32(_toAddress),
+            amountLD: _tokensToSend,
+            minAmountLD: _tokensToSend, // 0% slippage tolerance
+            extraOptions: extraOptions,
+            composeMsg: "",
+            oftCmd: ""
+        });
+
+        // Get fee quote
+        MessagingFee memory fee = oft.quoteSend(sendParam, false);
+
+        return fee.nativeFee;
     }
 }

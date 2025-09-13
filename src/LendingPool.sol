@@ -8,10 +8,13 @@ import {OptionsBuilder} from "@layerzerolabs/oapp-evm/contracts/oapp/libs/Option
 import {SendParam} from "@layerzerolabs/oft-evm/contracts/interfaces/IOFT.sol";
 import {MessagingFee} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
 import {OFTAdapter} from "./layerzero/OFTAdapter.sol";
+import {OFTKAIAAdapter} from "./layerzero/OFTKAIAAdapter.sol";
 import {IFactory} from "./interfaces/IFactory.sol";
 import {IPosition} from "./interfaces/IPosition.sol";
 import {IIsHealthy} from "./interfaces/IIsHealthy.sol";
 import {ILPRouter} from "./interfaces/ILPRouter.sol";
+import {IWKAIA} from "./interfaces/IWKAIA.sol";
+import {ILiquidator} from "./interfaces/ILiquidator.sol";
 
 contract LendingPool is ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -30,11 +33,12 @@ contract LendingPool is ReentrancyGuard {
     error NotAuthorized(address executor);
     error TransferFailed();
     error InvalidParameter();
+    error InsufficientContractBalance();
 
     event SupplyLiquidity(address user, uint256 amount, uint256 shares);
     event WithdrawLiquidity(address user, uint256 amount, uint256 shares);
     event SupplyCollateral(address user, uint256 amount);
-    event RepayWithCollateralByPosition(address user, uint256 amount, uint256 shares);
+    event RepayByPosition(address user, uint256 amount, uint256 shares);
     event CreatePosition(address user, address positionAddress);
     event BorrowDebtCrosschain(
         address user, uint256 amount, uint256 shares, uint256 chainId, uint256 addExecutorLzReceiveOption
@@ -42,6 +46,9 @@ contract LendingPool is ReentrancyGuard {
     event InterestRateModelSet(address indexed oldModel, address indexed newModel);
 
     address public router;
+
+    // Track if we're in a withdrawal operation to avoid auto-wrapping
+    bool private _withdrawing;
 
     constructor(address _router) {
         router = _router;
@@ -69,7 +76,9 @@ contract LendingPool is ReentrancyGuard {
         uint256 shares = _supplyLiquidity(_amount, _user);
         _accrueInterest();
         if (_borrowToken() == address(1)) {
+            // Handle native KAIA by wrapping to WKAIA
             if (msg.value != _amount) revert InsufficientCollateral();
+            IWKAIA(_WKAIA()).deposit{value: msg.value}();
         } else {
             IERC20(_borrowToken()).safeTransferFrom(_user, address(this), _amount);
         }
@@ -87,9 +96,13 @@ contract LendingPool is ReentrancyGuard {
      */
     function withdrawLiquidity(uint256 _shares) public payable nonReentrant {
         uint256 amount = _withdrawLiquidity(_shares);
-        if (_borrowToken() == address(1)) {
+        bool unwrapToNative = (_borrowToken() == address(1));
+        if (unwrapToNative) {
+            _withdrawing = true;
+            IWKAIA(_WKAIA()).withdraw(amount);
             (bool sent,) = msg.sender.call{value: amount}("");
             if (!sent) revert TransferFailed();
+            _withdrawing = false;
         } else {
             IERC20(_borrowToken()).safeTransfer(msg.sender, amount);
         }
@@ -122,9 +135,11 @@ contract LendingPool is ReentrancyGuard {
         if (_amount == 0) revert ZeroAmount();
         _accrueInterest();
         if (_collateralToken() == address(1)) {
+            // Handle native KAIA by wrapping to WKAIA
             if (msg.value != _amount) revert InsufficientCollateral();
-            (bool sent,) = _addressPositions(_user).call{value: _amount}("");
-            if (!sent) revert TransferFailed();
+            IWKAIA(_WKAIA()).deposit{value: msg.value}();
+            IERC20(_WKAIA()).approve(_addressPositions(_user), _amount);
+            IERC20(_WKAIA()).safeTransfer(_addressPositions(_user), _amount);
         } else {
             IERC20(_collateralToken()).safeTransferFrom(_user, _addressPositions(_user), _amount);
         }
@@ -146,24 +161,23 @@ contract LendingPool is ReentrancyGuard {
         accessControl(msg.sender)
     {
         if (_amount == 0) revert ZeroAmount();
-        
+
         uint256 userCollateralBalance;
         if (_collateralToken() == address(1)) {
-            // For native tokens, check the balance of the position contract
-            userCollateralBalance = _addressPositions(msg.sender).balance;
+            userCollateralBalance = IERC20(_WKAIA()).balanceOf(_addressPositions(msg.sender));
         } else {
-            // For ERC20 tokens, check the token balance
             userCollateralBalance = IERC20(_collateralToken()).balanceOf(_addressPositions(msg.sender));
         }
-        
+
         if (_amount > userCollateralBalance) {
             revert InsufficientCollateral();
         }
+
         _accrueInterest();
         address isHealthy = IFactory(_factory()).isHealthy();
-        
-        // For both native tokens and ERC20 tokens, call the Position's withdrawCollateral function
-        IPosition(_addressPositions(msg.sender)).withdrawCollateral(_amount, msg.sender);
+
+        bool unwrapToNative = (_collateralToken() == address(1));
+        IPosition(_addressPositions(msg.sender)).withdrawCollateral(_amount, msg.sender, unwrapToNative);
 
         if (_userBorrowShares(msg.sender) > 0) {
             IIsHealthy(isHealthy)._isHealthy(
@@ -208,22 +222,31 @@ contract LendingPool is ReentrancyGuard {
                 composeMsg: "",
                 oftCmd: ""
             });
-            IERC20(_borrowToken()).safeTransfer(IFactory(_factory()).protocol(), protocolFee);
-            address oftAddress = IFactory(_factory()).oftAddress(_borrowToken());
-            OFTAdapter oft = OFTAdapter(oftAddress);
-            
-            // Approve the OFT adapter to spend tokens for cross-chain transfer
-            IERC20(_borrowToken()).approve(oftAddress, userAmount);
-            
-            MessagingFee memory fee = oft.quoteSend(sendParam, false);
-            oft.send{value: fee.nativeFee}(sendParam, fee, msg.sender);
+            if (_borrowToken() == address(1)) {
+                IERC20(_WKAIA()).safeTransfer(_protocol(), protocolFee);
+                address oftAddress = IFactory(_factory()).oftAddress(_borrowToken());
+                OFTKAIAAdapter oft = OFTKAIAAdapter(oftAddress);
+                IERC20(_WKAIA()).approve(oftAddress, userAmount);
+                MessagingFee memory fee = oft.quoteSend(sendParam, false);
+                oft.send{value: fee.nativeFee}(sendParam, fee, msg.sender);
+            } else {
+                IERC20(_borrowToken()).safeTransfer(_protocol(), protocolFee);
+                address oftAddress = IFactory(_factory()).oftAddress(_borrowToken());
+                OFTAdapter oft = OFTAdapter(oftAddress);
+                IERC20(_borrowToken()).approve(oftAddress, userAmount);
+                MessagingFee memory fee = oft.quoteSend(sendParam, false);
+                oft.send{value: fee.nativeFee}(sendParam, fee, msg.sender);
+            }
         } else {
             if (_borrowToken() == address(1)) {
-                (bool sentNative,) = (IFactory(_factory()).protocol()).call{value: protocolFee}("");
-                (bool sentToken,) = msg.sender.call{value: userAmount}("");
-                if (!sentToken || !sentNative) revert TransferFailed();
+                _withdrawing = true;
+                IWKAIA(_WKAIA()).withdraw(_amount);
+                (bool sent,) = _protocol().call{value: protocolFee}("");
+                (bool sent2,) = msg.sender.call{value: userAmount}("");
+                if (!sent && !sent2) revert TransferFailed();
+                _withdrawing = false;
             } else {
-                IERC20(_borrowToken()).safeTransfer(IFactory(_factory()).protocol(), protocolFee);
+                IERC20(_borrowToken()).safeTransfer(_protocol(), protocolFee);
                 IERC20(_borrowToken()).safeTransfer(msg.sender, userAmount);
             }
         }
@@ -238,10 +261,11 @@ contract LendingPool is ReentrancyGuard {
      * @param _fromPosition Whether to use tokens from the position contract (true) or from the user's wallet (false).
      * @custom:throws ZeroAmount if shares is 0.
      * @custom:throws amountSharesInvalid if shares exceed user's borrow shares.
-     * @custom:emits RepayWithCollateralByPosition when repayment is successful.
+     * @custom:emits RepayByPosition when repayment is successful.
      */
     function repayWithSelectedToken(uint256 shares, address _token, bool _fromPosition, address _user)
         public
+        payable
         positionRequired(_user)
         nonReentrant
         accessControl(_user)
@@ -253,9 +277,9 @@ contract LendingPool is ReentrancyGuard {
         (uint256 borrowAmount,,,) = _repayWithSelectedToken(shares, _user);
 
         if (_token == _borrowToken() && !_fromPosition) {
-            if (_borrowToken() == address(1)) {
-                (bool sent,) = address(this).call{value: borrowAmount}("");
-                if (!sent) revert TransferFailed();
+            if (_borrowToken() == address(1) && msg.value > 0) {
+                if (msg.value != borrowAmount) revert InsufficientCollateral();
+                IWKAIA(_WKAIA()).deposit{value: msg.value}();
             } else {
                 IERC20(_borrowToken()).safeTransferFrom(_user, address(this), borrowAmount);
             }
@@ -263,7 +287,7 @@ contract LendingPool is ReentrancyGuard {
             IPosition(_addressPositions(_user)).repayWithSelectedToken(borrowAmount, _token);
         }
 
-        emit RepayWithCollateralByPosition(_user, borrowAmount, shares);
+        emit RepayByPosition(_user, borrowAmount, shares);
     }
 
     function _accessControl(address _user) internal view {
@@ -341,5 +365,84 @@ contract LendingPool is ReentrancyGuard {
         return ILPRouter(router).factory();
     }
 
-    receive() external payable {}
+    function _protocol() internal view returns (address) {
+        return IFactory(_factory()).protocol();
+    }
+
+    function _WKAIA() internal view returns (address) {
+        return IFactory(_factory()).WKAIA();
+    }
+
+    function _liquidator() internal view returns (address) {
+        return IIsHealthy(_factory()).liquidator();
+    }
+    /**
+     * @notice Liquidates an unhealthy position using DEX swapping
+     * @param borrower The address of the borrower to liquidate
+     * @param liquidationIncentive The liquidation incentive in basis points (e.g., 500 = 5%)
+     * @return liquidatedAmount Amount of debt repaid through liquidation
+     * @dev Anyone can call this function to liquidate unhealthy positions
+     */
+    function liquidateByDEX(address borrower, uint256 liquidationIncentive) 
+        external 
+        nonReentrant 
+        returns (uint256 liquidatedAmount) 
+    {
+        address liquidator = _liquidator();
+        return ILiquidator(liquidator).liquidateByDEX(borrower, router, _factory(), liquidationIncentive);
+    }
+
+    /**
+     * @notice Liquidates an unhealthy position by allowing MEV/external liquidator to buy collateral
+     * @param borrower The address of the borrower to liquidate
+     * @param repayAmount Amount of debt the liquidator wants to repay
+     * @param liquidationIncentive The liquidation incentive in basis points
+     * @dev Liquidator pays debt and receives collateral with incentive
+     */
+    function liquidateByMEV(address borrower, uint256 repayAmount, uint256 liquidationIncentive) 
+        external 
+        payable 
+        nonReentrant 
+    {
+        address liquidator = _liquidator();
+        ILiquidator(liquidator).liquidateByMEV{value: msg.value}(borrower, router, _factory(), repayAmount, liquidationIncentive);
+    }
+
+    /**
+     * @notice Checks if a borrower's position is liquidatable
+     * @param borrower The address of the borrower to check
+     * @return isLiquidatable Whether the position can be liquidated
+     * @return borrowValue The current borrow value in USD
+     * @return collateralValue The current collateral value in USD
+     */
+    function checkLiquidation(address borrower) 
+        external 
+        view 
+        returns (bool isLiquidatable, uint256 borrowValue, uint256 collateralValue) 
+    {
+        address isHealthy = IFactory(_factory()).isHealthy();
+        return IIsHealthy(isHealthy).checkLiquidation(
+            _borrowToken(),
+            _factory(),
+            _addressPositions(borrower),
+            _ltv(),
+            _totalBorrowAssets(),
+            _totalBorrowShares(),
+            _userBorrowShares(borrower)
+        );
+    }
+
+    receive() external payable {
+        // Auto-wrap incoming native KAIA to WKAIA, but not during withdrawal operations
+        if (msg.value > 0 && !_withdrawing) {
+            IWKAIA(_WKAIA()).deposit{value: msg.value}();
+        }
+    }
+
+    fallback() external payable {
+        // Auto-wrap incoming native KAIA to WKAIA, but not during withdrawal operations
+        if (msg.value > 0 && !_withdrawing) {
+            IWKAIA(_WKAIA()).deposit{value: msg.value}();
+        }
+    }
 }

@@ -66,7 +66,7 @@ interface IPosition {
      * @notice This function allows users to withdraw their collateral
      * @custom:security Users can only withdraw their own collateral
      */
-    function withdrawCollateral(uint256 amount, address _user) external;
+    function withdrawCollateral(uint256 amount, address _user, bool unwrapToNative) external;
     
     /**
      * @dev Swaps tokens within a position
@@ -77,7 +77,7 @@ interface IPosition {
      * @notice This function allows users to swap tokens within their position
      * @custom:security Users must have sufficient balance of the input token
      */
-    function swapTokenByPosition(address _tokenIn, address _tokenOut, uint256 amountIn)
+    function swapTokenByPosition(address _tokenIn, address _tokenOut, uint256 amountIn, uint256 slippageTolerance)
         external
         returns (uint256 amountOut);
     

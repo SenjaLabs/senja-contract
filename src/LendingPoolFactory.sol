@@ -3,6 +3,11 @@ pragma solidity ^0.8.13;
 
 import {ILPDeployer} from "./interfaces/ILPDeployer.sol";
 import {LendingPoolRouter} from "./LendingPoolRouter.sol";
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import {ContextUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
 
 /*
 ██╗██████╗░██████╗░░█████╗░███╗░░██╗
@@ -21,7 +26,16 @@ import {LendingPoolRouter} from "./LendingPoolRouter.sol";
  * It maintains a registry of all created pools and manages token data streams
  * and cross-chain token senders.
  */
-contract LendingPoolFactory {
+contract LendingPoolFactory is
+    Initializable,
+    ContextUpgradeable,
+    PausableUpgradeable,
+    UUPSUpgradeable,
+    AccessControlUpgradeable
+{
+    bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
+    bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
+    bytes32 public constant OWNER_ROLE = keccak256("OWNER_ROLE");
     /**
      * @notice Emitted when a new lending pool is created
      * @param collateralToken The address of the collateral token
@@ -29,6 +43,7 @@ contract LendingPoolFactory {
      * @param lendingPool The address of the created lending pool
      * @param ltv The Loan-to-Value ratio for the pool
      */
+
     event LendingPoolCreated(
         address indexed collateralToken, address indexed borrowToken, address indexed lendingPool, uint256 ltv
     );
@@ -53,6 +68,13 @@ contract LendingPoolFactory {
      * @param dataStream The address of the data stream contract
      */
     event TokenDataStreamAdded(address indexed token, address indexed dataStream);
+    event LendingPoolDeployerSet(address indexed lendingPoolDeployer);
+
+    event ProtocolSet(address indexed protocol);
+
+    event IsHealthySet(address indexed isHealthy);
+
+    event PositionDeployerSet(address indexed positionDeployer);
 
     /**
      * @notice Structure representing a lending pool
@@ -67,9 +89,6 @@ contract LendingPoolFactory {
         address lendingPoolAddress;
     }
 
-    /// @notice The owner of the factory contract
-    address public owner;
-
     /// @notice The address of the IsHealthy contract for health checks
     address public isHealthy;
 
@@ -78,6 +97,10 @@ contract LendingPoolFactory {
 
     /// @notice The address of the protocol contract
     address public protocol;
+
+    address public positionDeployer;
+
+    address public constant WKAIA = 0x19Aac5f612f524B754CA7e7c41cbFa2E981A4432;
 
     /// @notice Mapping from token address to its data stream address
     mapping(address => address) public tokenDataStream;
@@ -92,28 +115,32 @@ contract LendingPoolFactory {
     /// @notice Total number of pools created
     uint256 public poolCount;
 
-    /**
-     * @notice Constructor for the LendingPoolFactory
-     * @param _isHealthy The address of the IsHealthy contract
-     * @param _lendingPoolDeployer The address of the lending pool deployer contract
-     */
-    constructor(address _isHealthy, address _lendingPoolDeployer, address _protocol) {
-        owner = msg.sender;
+    constructor() {
+        _disableInitializers();
+    }
+
+    function pause() public onlyRole(PAUSER_ROLE) {
+        _pause();
+    }
+
+    function unpause() public onlyRole(PAUSER_ROLE) {
+        _unpause();
+    }
+
+    function initialize(address _isHealthy, address _lendingPoolDeployer, address _protocol, address _positionDeployer) public initializer {
+        __Pausable_init();
+        __AccessControl_init();
+        __UUPSUpgradeable_init();
+
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(PAUSER_ROLE, msg.sender);
+        _grantRole(UPGRADER_ROLE, msg.sender);
+        _grantRole(OWNER_ROLE, msg.sender);
+
         isHealthy = _isHealthy;
         lendingPoolDeployer = _lendingPoolDeployer;
         protocol = _protocol;
-    }
-
-    /**
-     * @notice Modifier to restrict function access to the owner only
-     */
-    modifier onlyOwner() {
-        _onlyOwner();
-        _;
-    }
-
-    function _onlyOwner() internal view {
-        require(msg.sender == owner, "Only owner can call this function");
+        positionDeployer = _positionDeployer;
     }
 
     /**
@@ -129,16 +156,16 @@ contract LendingPoolFactory {
         LendingPoolRouter router = new LendingPoolRouter(address(0), address(this), collateralToken, borrowToken, ltv);
         // Deploy the LendingPool
         address lendingPool = ILPDeployer(lendingPoolDeployer).deployLendingPool(address(router));
-        
+
         // Configure the lending pool address in the router
         // This allows only the lending pool to update its own interest rate parameters
         router.setLendingPool(address(lendingPool));
-        
+
         pools.push(Pool(collateralToken, borrowToken, address(lendingPool)));
         poolCount++;
-        
+
         emit LendingPoolCreated(collateralToken, borrowToken, address(lendingPool), ltv);
-        
+
         return address(lendingPool);
     }
 
@@ -148,18 +175,45 @@ contract LendingPoolFactory {
      * @param _dataStream The address of the data stream contract
      * @dev Only callable by the owner
      */
-    function addTokenDataStream(address _token, address _dataStream) public onlyOwner {
+    function addTokenDataStream(address _token, address _dataStream) public onlyRole(OWNER_ROLE) {
         tokenDataStream[_token] = _dataStream;
         emit TokenDataStreamAdded(_token, _dataStream);
     }
 
-    function setOperator(address _operator, bool _status) public onlyOwner {
+    function setOperator(address _operator, bool _status) public onlyRole(OWNER_ROLE) {
         operator[_operator] = _status;
         emit OperatorSet(_operator, _status);
     }
 
-    function setOftAddress(address _token, address _oftAddress) public onlyOwner {
+    function setOftAddress(address _token, address _oftAddress) public onlyRole(OWNER_ROLE) {
         oftAddress[_token] = _oftAddress;
         emit OftAddressSet(_token, _oftAddress);
     }
+
+    function setLendingPoolDeployer(address _lendingPoolDeployer) public onlyRole(OWNER_ROLE) {
+        lendingPoolDeployer = _lendingPoolDeployer;
+        emit LendingPoolDeployerSet(_lendingPoolDeployer);
+    }
+
+    function setProtocol(address _protocol) public onlyRole(OWNER_ROLE) {
+        protocol = _protocol;
+        emit ProtocolSet(_protocol);
+    }
+
+    function setIsHealthy(address _isHealthy) public onlyRole(OWNER_ROLE) {
+        isHealthy = _isHealthy;
+        emit IsHealthySet(_isHealthy);
+    }
+
+    function setPositionDeployer(address _positionDeployer) public onlyRole(OWNER_ROLE) {
+        positionDeployer = _positionDeployer;
+        emit PositionDeployerSet(_positionDeployer);
+    }
+
+    /**
+     * @notice Authorizes contract upgrades
+     * @param newImplementation The address of the new implementation
+     * @dev Only callable by addresses with UPGRADER_ROLE
+     */
+    function _authorizeUpgrade(address newImplementation) internal override onlyRole(UPGRADER_ROLE) {}
 }

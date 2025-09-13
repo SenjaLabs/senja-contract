@@ -35,4 +35,9 @@ interface ILPRouter {
         external
         returns (uint256, uint256, uint256, uint256);
     function createPosition(address _user) external returns (address);
+    
+    // ** LIQUIDATION FUNCTIONS
+    function liquidatePosition(address _user, uint256 _repayAmount) external;
+    function emergencyResetPosition(address _user) external;
+    function reduceUserCollateral(address _user, uint256 _amount) external;
 }

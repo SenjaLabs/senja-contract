@@ -39,6 +39,19 @@ contract IsHealthy {
     error InsufficientCollateral();
 
     /**
+     * @notice Address of the Liquidator contract
+     */
+    address public liquidator;
+
+    /**
+     * @notice Constructor to set the liquidator contract address
+     * @param _liquidator Address of the Liquidator contract
+     */
+    constructor(address _liquidator) {
+        liquidator = _liquidator;
+    }
+
+    /**
      * @notice Validates if a user's lending position is healthy
      * @dev This function performs a comprehensive health check by:
      *      1. Fetching the current price of the borrowed token from Chainlink
@@ -73,7 +86,7 @@ contract IsHealthy {
         uint256 collateralValue = 0;
         for (uint256 i = 1; i <= _counter(addressPositions); i++) {
             address token = IPosition(addressPositions).tokenLists(i);
-            if (token != address(0)) {  // Include all tokens, including KAIA (address(1))
+            if (token != address(0)) {
                 collateralValue += _tokenValue(addressPositions, token);
             }
         }
@@ -85,9 +98,111 @@ contract IsHealthy {
         // Calculate maximum allowed borrow based on LTV ratio
         uint256 maxBorrow = (collateralValue * ltv) / 1e18;
 
-        // Validate position health
-        if (borrowValue > collateralValue) revert InsufficientCollateral();
-        if (borrowValue > maxBorrow) revert InsufficientCollateral();
+        // Check if position needs liquidation
+        bool isLiquidatable = (borrowValue > collateralValue) || (borrowValue > maxBorrow);
+        
+        if (isLiquidatable) {
+            // Position is unhealthy and should be liquidated
+            revert InsufficientCollateral();
+        }
+    }
+
+    /**
+     * @notice Checks if a position is liquidatable
+     * @param borrowToken The address of the token being borrowed
+     * @param factory The address of the lending pool factory contract
+     * @param addressPositions The address of the positions contract
+     * @param ltv The loan-to-value ratio
+     * @param totalBorrowAssets The total amount of assets borrowed across all users
+     * @param totalBorrowShares The total number of borrow shares across all users
+     * @param userBorrowShares The number of borrow shares owned by the user
+     * @return isLiquidatable Whether the position can be liquidated
+     * @return borrowValue The current borrow value in USD
+     * @return collateralValue The current collateral value in USD
+     */
+    function checkLiquidation(
+        address borrowToken,
+        address factory,
+        address addressPositions,
+        uint256 ltv,
+        uint256 totalBorrowAssets,
+        uint256 totalBorrowShares,
+        uint256 userBorrowShares
+    ) public view returns (bool isLiquidatable, uint256 borrowValue, uint256 collateralValue) {
+        (, uint256 borrowPrice,,,) = IOracle(_tokenDataStream(factory, borrowToken)).latestRoundData();
+        
+        collateralValue = 0;
+        for (uint256 i = 1; i <= _counter(addressPositions); i++) {
+            address token = IPosition(addressPositions).tokenLists(i);
+            if (token != address(0)) {
+                collateralValue += _tokenValue(addressPositions, token);
+            }
+        }
+
+        uint256 borrowed = (userBorrowShares * totalBorrowAssets) / totalBorrowShares;
+        uint256 borrowAdjustedPrice = uint256(borrowPrice) * 1e18 / 10 ** _oracleDecimal(factory, borrowToken);
+        borrowValue = (borrowed * borrowAdjustedPrice) / (10 ** _tokenDecimals(borrowToken));
+
+        uint256 maxBorrow = (collateralValue * ltv) / 1e18;
+        
+        isLiquidatable = (borrowValue > collateralValue) || (borrowValue > maxBorrow);
+    }
+
+    /**
+     * @notice Liquidates a position using DEX (delegates to Liquidator contract)
+     * @param borrower The address of the borrower to liquidate
+     * @param lendingPoolRouter The address of the lending pool router
+     * @param factory The address of the factory
+     * @param liquidationIncentive The liquidation incentive in basis points
+     * @return liquidatedAmount Amount of debt repaid
+     */
+    function liquidateByDEX(
+        address borrower,
+        address lendingPoolRouter,
+        address factory,
+        uint256 liquidationIncentive
+    ) external returns (uint256 liquidatedAmount) {
+        // Delegate call to liquidator contract
+        (bool success, bytes memory data) = liquidator.delegatecall(
+            abi.encodeWithSignature(
+                "liquidateByDEX(address,address,address,uint256)",
+                borrower,
+                lendingPoolRouter,
+                factory,
+                liquidationIncentive
+            )
+        );
+        require(success, "Liquidation failed");
+        liquidatedAmount = abi.decode(data, (uint256));
+    }
+
+    /**
+     * @notice Liquidates a position using MEV (delegates to Liquidator contract)
+     * @param borrower The address of the borrower to liquidate
+     * @param lendingPoolRouter The address of the lending pool router
+     * @param factory The address of the factory
+     * @param repayAmount Amount of debt the liquidator wants to repay
+     * @param liquidationIncentive The liquidation incentive in basis points
+     */
+    function liquidateByMEV(
+        address borrower,
+        address lendingPoolRouter,
+        address factory,
+        uint256 repayAmount,
+        uint256 liquidationIncentive
+    ) external payable {
+        // Delegate call to liquidator contract
+        (bool success,) = liquidator.delegatecall(
+            abi.encodeWithSignature(
+                "liquidateByMEV(address,address,address,uint256,uint256)",
+                borrower,
+                lendingPoolRouter,
+                factory,
+                repayAmount,
+                liquidationIncentive
+            )
+        );
+        require(success, "Liquidation failed");
     }
 
     function _tokenDecimals(address _token) internal view returns (uint8) {

@@ -10,6 +10,8 @@ import {IFactory} from "./interfaces/IFactory.sol";
 import {ILendingPool} from "./interfaces/ILendingPool.sol";
 import {ILPRouter} from "./interfaces/ILPRouter.sol";
 import {IDragonSwap} from "./interfaces/IDragonSwap.sol";
+import {IWKAIA} from "./interfaces/IWKAIA.sol";
+import {IIsHealthy} from "./interfaces/IIsHealthy.sol";
 
 /**
  * @title Position
@@ -50,9 +52,12 @@ contract Position is ReentrancyGuard {
     address public owner;
     address public lpAddress;
     uint256 public counter;
-    
+
     // DragonSwap router address on Kaia mainnet
     address public constant DRAGON_SWAP_ROUTER = 0xA324880f884036E3d21a09B90269E1aC57c7EC8a;
+
+    // Track if we're in a withdrawal operation to avoid auto-wrapping
+    bool private _withdrawing;
 
     /// @notice Mapping from token ID to token address
     mapping(uint256 => address) public tokenLists;
@@ -97,10 +102,22 @@ contract Position is ReentrancyGuard {
     }
 
     /**
-     * @notice Allows the contract to receive native tokens
+     * @notice Allows the contract to receive native tokens and automatically wraps them to WKAIA
      * @dev Required for native token collateral functionality
+     * @dev Avoids infinite loop when WKAIA contract sends native tokens during withdrawal
      */
-    receive() external payable {}
+    receive() external payable {
+        if (msg.value > 0 && !_withdrawing) {
+            IWKAIA(_WKAIA()).deposit{value: msg.value}();
+        }
+    }
+
+    fallback() external payable {
+        // Auto-wrap incoming native KAIA to WKAIA, but not during withdrawal operations
+        if (msg.value > 0 && !_withdrawing) {
+            IWKAIA(_WKAIA()).deposit{value: msg.value}();
+        }
+    }
 
     /**
      * @notice Modifier to check and register tokens in the position's token list
@@ -112,26 +129,31 @@ contract Position is ReentrancyGuard {
         _;
     }
 
-    function _checkTokenList(address _token) internal {
-        if (tokenListsId[_token] == 0) {
-            ++counter;
-            tokenLists[counter] = _token;
-            tokenListsId[_token] = counter;
-        }
-    }
-
     /**
      * @notice Withdraws collateral from the position
      * @param amount The amount of collateral to withdraw
      * @param _user The address of the user to receive the collateral
+     * @param unwrapToNative Whether to unwrap WKAIA to native KAIA for user
      * @dev Only the lending pool can call this function
      * @dev Transfers collateral tokens to the specified user
      */
-    function withdrawCollateral(uint256 amount, address _user) public {
-        if (msg.sender != lpAddress) revert NotForWithdraw();
+    function withdrawCollateral(uint256 amount, address _user, bool unwrapToNative) public {
+        // Allow withdrawals from lending pool, IsHealthy contract, or Liquidator contract
+        address factory = _factory();
+        address isHealthyContract = IFactory(factory).isHealthy();
+        address liquidatorContract = IIsHealthy(isHealthyContract).liquidator();
+        if (msg.sender != lpAddress && msg.sender != isHealthyContract && msg.sender != liquidatorContract) revert NotForWithdraw();
         if (_collateralToken() == address(1)) {
-            (bool sent,) = _user.call{value: amount}("");
-            if (!sent) revert TransferFailed();
+            if (unwrapToNative) {
+                _withdrawing = true;
+                IERC20(_WKAIA()).approve(_WKAIA(), amount);
+                IWKAIA(_WKAIA()).withdraw(amount);
+                (bool sent,) = _user.call{value: amount}("");
+                if (!sent) revert TransferFailed();
+                _withdrawing = false;
+            } else {
+                IERC20(_WKAIA()).safeTransfer(_user, amount);
+            }
         } else {
             IERC20(_collateralToken()).safeTransfer(_user, amount);
         }
@@ -161,89 +183,9 @@ contract Position is ReentrancyGuard {
         if (slippageTolerance > 10000) revert InvalidParameter(); // Max 100% slippage
 
         // Perform DragonSwap with slippage protection
-        amountOut = _performDragonSwap(_tokenIn, amountIn, slippageTolerance);
+        amountOut = _performDragonSwap(_tokenIn, _tokenOut, amountIn, slippageTolerance);
 
         emit SwapTokenByPosition(msg.sender, _tokenIn, _tokenOut, amountIn, amountOut);
-    }
-
-    /**
-     * @notice Internal function to perform token swap using DragonSwap
-     * @param _tokenIn The address of the input token
-     * @param amountIn The amount of input tokens to swap
-     * @param slippageTolerance The slippage tolerance in basis points
-     * @return amountOut The amount of output tokens received
-     * @dev Uses DragonSwap router for token swapping with slippage protection
-     */
-    function _performDragonSwap(address _tokenIn, uint256 amountIn, uint256 slippageTolerance) 
-        internal 
-        returns (uint256 amountOut) 
-    {
-        // Perform swap with DragonSwap
-        amountOut = _attemptDragonSwap(_tokenIn, amountIn, slippageTolerance);
-    }
-    
-    /**
-     * @notice Performs DragonSwap with slippage protection
-     * @param _tokenIn The address of the input token
-     * @param amountIn The amount of input tokens to swap
-     * @param slippageTolerance The slippage tolerance in basis points
-     * @return amountOut The amount of output tokens received
-     */
-    function _attemptDragonSwap(address _tokenIn, uint256 amountIn, uint256 slippageTolerance) 
-        internal 
-        returns (uint256 amountOut) 
-    {
-        // DragonSwap router address
-        address dragonSwapRouter = DRAGON_SWAP_ROUTER;
-        
-        // Calculate expected amount using price feeds
-        uint256 expectedAmount = _calculateExpectedAmount(_tokenIn, amountIn);
-        
-        // Calculate minimum amount out with slippage protection
-        uint256 amountOutMinimum = expectedAmount * (10000 - slippageTolerance) / 10000;
-        
-        // Approve DragonSwap router to spend tokens
-        IERC20(_tokenIn).approve(dragonSwapRouter, amountIn);
-        
-        // Prepare swap parameters
-        IDragonSwap.ExactInputSingleParams memory params = IDragonSwap.ExactInputSingleParams({
-            tokenIn: _tokenIn,
-            tokenOut: _borrowToken(),
-            fee: 1000, // 0.1% fee tier
-            recipient: address(this),
-            deadline: block.timestamp + 300, // 5 minutes deadline
-            amountIn: amountIn,
-            amountOutMinimum: amountOutMinimum, // Slippage protection
-            sqrtPriceLimitX96: 0 // No price limit
-        });
-        
-        // Perform the swap
-        amountOut = IDragonSwap(dragonSwapRouter).exactInputSingle(params);
-    }
-    
-    /**
-     * @notice Calculates expected amount out using price feeds
-     * @param _tokenIn The address of the input token
-     * @param amountIn The amount of input tokens
-     * @return expectedAmount The expected amount of output tokens
-     */
-    function _calculateExpectedAmount(address _tokenIn, uint256 amountIn) 
-        internal 
-        view 
-        returns (uint256 expectedAmount) 
-    {
-        // For now, use a simple calculation based on token decimals
-        // In production, this should use proper price feeds
-        if (_tokenIn == _collateralToken() && _borrowToken() == 0xd077A400968890Eacc75cdc901F0356c943e4fDb) {
-            // WKAIA to USDT: assume 1 WKAIA = 0.157 USDT (based on test data)
-            // WKAIA has 18 decimals, USDT has 6 decimals
-            // Convert: 1e18 WKAIA * 0.157 = 157000000000000000 (18 decimals)
-            // But USDT has 6 decimals, so divide by 1e12: 157000000000000000 / 1e12 = 157000 (6 decimals)
-            expectedAmount = (amountIn * 157) / (1000 * 1e12); // Convert to USDT decimals
-        } else {
-            // Fallback: 1:1 ratio
-            expectedAmount = amountIn;
-        }
     }
 
     /**
@@ -256,26 +198,17 @@ contract Position is ReentrancyGuard {
      */
     function repayWithSelectedToken(uint256 amount, address _token) public payable {
         if (msg.sender != lpAddress) revert NotForWithdraw();
+
+
         uint256 balance = IERC20(_token).balanceOf(address(this));
         if (_token != _borrowToken()) {
             uint256 amountOut = swapTokenByPosition(_token, _borrowToken(), balance, 500); // 5% slippage
             IERC20(_token).approve(lpAddress, amount);
-            if (_borrowToken() == address(1)) {
-                // transfer native token
-                (bool sent,) = lpAddress.call{value: amount}("");
-                if (!sent) revert TransferFailed();
-            } else {
-                IERC20(_borrowToken()).safeTransfer(lpAddress, amount);
-            }
+            IERC20(_borrowToken() == address(1) ? _WKAIA() : _borrowToken()).safeTransfer(lpAddress, amount);
             if (amountOut - amount != 0) swapTokenByPosition(_borrowToken(), _token, (amountOut - amount), 500); // 5% slippage
         } else {
-            if (_borrowToken() == address(1)) {
-                // transfer native token
-                (bool sent,) = lpAddress.call{value: amount}("");
-                if (!sent) revert TransferFailed();
-            } else {
-                IERC20(_borrowToken()).safeTransfer(lpAddress, amount);
-            }
+            IERC20(_token).approve(lpAddress, amount);
+            IERC20(_borrowToken() == address(1) ? _WKAIA() : _borrowToken()).safeTransfer(lpAddress, amount);
         }
     }
 
@@ -297,8 +230,8 @@ contract Position is ReentrancyGuard {
         address _tokenInPrice,
         address _tokenOutPrice
     ) public view returns (uint256) {
-        uint256 tokenInDecimal = _tokenIn == address(1) ? 18 : IERC20Metadata(_tokenIn).decimals();
-        uint256 tokenOutDecimal = _tokenOut == address(1) ? 18 : IERC20Metadata(_tokenOut).decimals();
+        uint256 tokenInDecimal = _tokenIn == _WKAIA() ? 18 : IERC20Metadata(_tokenIn).decimals();
+        uint256 tokenOutDecimal = _tokenOut == _WKAIA() ? 18 : IERC20Metadata(_tokenOut).decimals();
         (, uint256 quotePrice,,,) = IOracle(_tokenInPrice).latestRoundData();
         (, uint256 basePrice,,,) = IOracle(_tokenOutPrice).latestRoundData();
 
@@ -318,22 +251,30 @@ contract Position is ReentrancyGuard {
     function tokenValue(address token) public view returns (uint256) {
         uint256 tokenBalance;
         uint256 tokenDecimals;
-        
+
         if (token == address(1)) {
-            // Native token
-            tokenBalance = address(this).balance;
-            tokenDecimals = 18; // KAIA uses 18 decimals
+            // WKAIA token (wrapped KAIA)
+            tokenBalance = IERC20(_WKAIA()).balanceOf(address(this));
+            tokenDecimals = 18;
         } else {
             // ERC20 token
             tokenBalance = IERC20(token).balanceOf(address(this));
             tokenDecimals = IERC20Metadata(token).decimals();
         }
-        
+
         (, uint256 tokenPrice,,,) = IOracle(_tokenDataStream(token)).latestRoundData();
         uint256 tokenAdjustedPrice = uint256(tokenPrice) * 1e18 / (10 ** _oracleDecimal(token)); // token standarize to 18 decimal, and divide by price decimals
         uint256 value = (tokenBalance * tokenAdjustedPrice) / (10 ** tokenDecimals);
 
         return value;
+    }
+
+    function _checkTokenList(address _token) internal {
+        if (tokenListsId[_token] == 0) {
+            ++counter;
+            tokenLists[counter] = _token;
+            tokenListsId[_token] = counter;
+        }
     }
 
     function _router() internal view returns (address) {
@@ -360,4 +301,155 @@ contract Position is ReentrancyGuard {
         return IFactory(_factory()).tokenDataStream(_token);
     }
 
+    function _WKAIA() internal view returns (address) {
+        return IFactory(_factory()).WKAIA();
+    }
+
+    /**
+     * @notice Internal function to perform token swap using DragonSwap
+     * @param _tokenIn The address of the input token
+     * @param _tokenOut The address of the output token
+     * @param amountIn The amount of input tokens to swap
+     * @param slippageTolerance The slippage tolerance in basis points
+     * @return amountOut The amount of output tokens received
+     * @dev Uses DragonSwap router for token swapping with slippage protection
+     */
+    function _performDragonSwap(address _tokenIn, address _tokenOut, uint256 amountIn, uint256 slippageTolerance)
+        internal
+        returns (uint256 amountOut)
+    {
+        // Perform swap with DragonSwap
+        amountOut = _attemptDragonSwap(_tokenIn, _tokenOut, amountIn, slippageTolerance);
+    }
+
+    /**
+     * @notice Performs DragonSwap with slippage protection
+     * @param _tokenIn The address of the input token
+     * @param _tokenOut The address of the output token
+     * @param amountIn The amount of input tokens to swap
+     * @param slippageTolerance The slippage tolerance in basis points
+     * @return amountOut The amount of output tokens received
+     */
+    function _attemptDragonSwap(address _tokenIn, address _tokenOut, uint256 amountIn, uint256 slippageTolerance)
+        internal
+        returns (uint256 amountOut)
+    {
+        // DragonSwap router address
+        address dragonSwapRouter = DRAGON_SWAP_ROUTER;
+
+        // Calculate expected amount using price feeds
+        uint256 expectedAmount = _calculateExpectedAmount(_tokenIn, _tokenOut, amountIn);
+
+        // Calculate minimum amount out with slippage protection
+        uint256 amountOutMinimum = expectedAmount * (10000 - slippageTolerance) / 10000;
+
+        // Approve DragonSwap router to spend tokens
+        IERC20(_tokenIn).approve(dragonSwapRouter, amountIn);
+
+        // Prepare swap parameters
+        IDragonSwap.ExactInputSingleParams memory params = IDragonSwap.ExactInputSingleParams({
+            tokenIn: _tokenIn,
+            tokenOut: _tokenOut == address(1) ? _WKAIA() : _tokenOut,
+            fee: 1000, // 0.1% fee tier
+            recipient: address(this),
+            deadline: block.timestamp + 300, // 5 minutes deadline
+            amountIn: amountIn,
+            amountOutMinimum: amountOutMinimum, // Slippage protection
+            sqrtPriceLimitX96: 0 // No price limit
+        });
+
+        // Perform the swap
+        amountOut = IDragonSwap(dragonSwapRouter).exactInputSingle(params);
+    }
+
+    /**
+     * @notice Calculates expected amount out using dynamic price feeds
+     * @param _tokenIn The address of the input token
+     * @param _tokenOut The address of the output token
+     * @param amountIn The amount of input tokens
+     * @return expectedAmount The expected amount of output tokens
+     * @dev Uses the existing price oracle infrastructure to calculate dynamic exchange rates
+     * @dev Handles different token decimals automatically
+     * @dev Falls back to 1:1 ratio if price feeds are not available
+     */
+    function _calculateExpectedAmount(address _tokenIn, address _tokenOut, uint256 amountIn)
+        internal
+        view
+        returns (uint256 expectedAmount)
+    {
+        // Handle case where we're swapping to the same token
+        if (_tokenIn == _tokenOut) {
+            return amountIn;
+        }
+        
+        try this._calculateExpectedAmountWithPriceFeeds(_tokenIn, _tokenOut, amountIn) returns (uint256 amount) {
+            expectedAmount = amount;
+        } catch {
+            uint256 tokenInDecimals = _getTokenDecimals(_tokenIn);
+            uint256 tokenOutDecimals = _getTokenDecimals(_tokenOut);
+            
+            if (tokenInDecimals > tokenOutDecimals) {
+                expectedAmount = amountIn / (10 ** (tokenInDecimals - tokenOutDecimals));
+            } else if (tokenOutDecimals > tokenInDecimals) {
+                expectedAmount = amountIn * (10 ** (tokenOutDecimals - tokenInDecimals));
+            } else {
+                expectedAmount = amountIn;
+            }
+        }
+    }
+    
+    /**
+     * @notice Internal function to calculate expected amount using price feeds
+     * @param _tokenIn The address of the input token
+     * @param _tokenOut The address of the output token  
+     * @param amountIn The amount of input tokens
+     * @return expectedAmount The expected amount of output tokens
+     * @dev This function will revert if price feeds are not available
+     */
+    function _calculateExpectedAmountWithPriceFeeds(address _tokenIn, address _tokenOut, uint256 amountIn)
+        external
+        view
+        returns (uint256 expectedAmount)
+    {
+        // Only allow calls from this contract
+        require(msg.sender == address(this), "Unauthorized");
+        
+        // Get token decimals
+        uint256 tokenInDecimals = _getTokenDecimals(_tokenIn);
+        uint256 tokenOutDecimals = _getTokenDecimals(_tokenOut);
+        
+        // Get price feed addresses
+        address tokenInPriceFeed = _tokenDataStream(_tokenIn);
+        address tokenOutPriceFeed = _tokenDataStream(_tokenOut);
+        
+        // Get current prices from oracles
+        (, uint256 tokenInPrice,,,) = IOracle(tokenInPriceFeed).latestRoundData();
+        (, uint256 tokenOutPrice,,,) = IOracle(tokenOutPriceFeed).latestRoundData();
+        
+        // Get oracle decimals for price normalization
+        uint256 tokenInPriceDecimals = _oracleDecimal(_tokenIn);
+        uint256 tokenOutPriceDecimals = _oracleDecimal(_tokenOut);
+        
+        // Normalize prices to 18 decimals for calculation
+        uint256 normalizedTokenInPrice = tokenInPrice * 1e18 / (10 ** tokenInPriceDecimals);
+        uint256 normalizedTokenOutPrice = tokenOutPrice * 1e18 / (10 ** tokenOutPriceDecimals);
+        
+        // Calculate expected amount out
+        // Formula: (amountIn * tokenInPrice / tokenOutPrice) adjusted for decimals
+        expectedAmount = (amountIn * normalizedTokenInPrice * (10 ** tokenOutDecimals)) 
+                        / (normalizedTokenOutPrice * (10 ** tokenInDecimals));
+    }
+    
+    /**
+     * @notice Helper function to get token decimals
+     * @param _token The address of the token
+     * @return decimals The number of decimals for the token
+     */
+    function _getTokenDecimals(address _token) internal view returns (uint256 decimals) {
+        if (_token == address(1) || _token == _WKAIA()) {
+            decimals = 18;
+        } else {
+            decimals = IERC20Metadata(_token).decimals();
+        }
+    }
 }

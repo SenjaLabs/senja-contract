@@ -26,6 +26,8 @@ interface IFactory {
      */
     function tokenDataStream(address _token) external view returns (address);
     
+    function positionDeployer() external view returns (address);
+    
     /**
      * @dev Returns the owner address of the factory
      * @return Address of the factory owner
@@ -41,6 +43,8 @@ interface IFactory {
     function operator(address _operator) external view returns (bool);
 
     function oftAddress(address _token) external view returns (address);
+
+    function WKAIA() external view returns (address);
     
     /**
      * @dev Adds a token data stream to the factory
@@ -88,4 +92,8 @@ interface IFactory {
      * @return Address of the interest rate model contract
      */
     function getInterestRateModel(address lendingPool) external view returns (address);
+
+    function setOftAddress(address _token, address _oftAddress) external;
+
+    function setPositionDeployer(address _positionDeployer) external;
 }
