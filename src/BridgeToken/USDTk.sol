@@ -9,7 +9,7 @@ contract USDTk is ERC20, Ownable {
 
     error NotOperator();
 
-    constructor() ERC20("USDTk", "USDTk") Ownable(msg.sender) {}
+    constructor() ERC20("USD Tether representative", "USDTk") Ownable(msg.sender) {}
     
     modifier onlyOperator() {
         _onlyOperator();

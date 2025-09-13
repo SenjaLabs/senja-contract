@@ -8,7 +8,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {IOracle} from "./interfaces/IOracle.sol";
 import {ILPRouter} from "./interfaces/ILPRouter.sol";
-import {OFTAdapter} from "./layerzero/OFTAdapter.sol";
+import {OFTadapter} from "./layerzero/OFTadapter.sol";
 import {OptionsBuilder} from "@layerzerolabs/oapp-evm/contracts/oapp/libs/OptionsBuilder.sol";
 import {SendParam} from "@layerzerolabs/oft-evm/contracts/interfaces/IOFT.sol";
 import {MessagingFee} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
@@ -190,7 +190,7 @@ contract HelperUtils {
         view
         returns (uint256)
     {
-        OFTAdapter oft = OFTAdapter(_oftAddress);
+        OFTadapter oft = OFTadapter(_oftAddress);
         // Build send parameters
         bytes memory extraOptions = OptionsBuilder.newOptions().addExecutorLzReceiveOption(65000, 0);
         SendParam memory sendParam = SendParam({

@@ -39,13 +39,11 @@ contract SetReceiveConfig is Script, Helper {
     function _getUtils() internal {
         if (block.chainid == 8453) {
             endpoint = BASE_LZ_ENDPOINT;
-            oapp = BASE_OAPP;
             receiveLib = BASE_RECEIVE_LIB;
             dvn1 = BASE_DVN1;
             dvn2 = BASE_DVN2;
         } else if (block.chainid == 8217) {
             endpoint = KAIA_LZ_ENDPOINT;
-            oapp = KAIA_OAPP;
             receiveLib = KAIA_RECEIVE_LIB;
             dvn1 = KAIA_DVN1;
             dvn2 = KAIA_DVN2;
@@ -53,7 +51,7 @@ contract SetReceiveConfig is Script, Helper {
     }
 
     function run() external {
-        // deployBASE();
+        deployBASE();
         // deployKAIA();
         // optimism
         // hyperevm
@@ -78,30 +76,35 @@ contract SetReceiveConfig is Script, Helper {
         params[1] = SetConfigParam(eid1, RECEIVE_CONFIG_TYPE, encodedUln);
 
         vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
-        ILayerZeroEndpointV2(endpoint).setConfig(oapp, receiveLib, params); // Set config for messages received on B from A
+        ILayerZeroEndpointV2(endpoint).setConfig(BASE_OFT_USDTK_ADAPTER, receiveLib, params);
+        ILayerZeroEndpointV2(endpoint).setConfig(BASE_OFT_WKAIAK_ADAPTER, receiveLib, params);
+        ILayerZeroEndpointV2(endpoint).setConfig(BASE_OFT_WBTCK_ADAPTER, receiveLib, params);
+        ILayerZeroEndpointV2(endpoint).setConfig(BASE_OFT_WETHK_ADAPTER, receiveLib, params);
         vm.stopBroadcast();
     }
 
     function deployKAIA() public {
         vm.createSelectFork(vm.rpcUrl("kaia_mainnet"));
         _getUtils();
-        UlnConfig memory uln;
-        uln = UlnConfig({
-            confirmations: 15, // minimum block confirmations required on A before sending to B
-            requiredDVNCount: 2, // number of DVNs required
-            optionalDVNCount: type(uint8).max, // optional DVNs count, uint8
-            optionalDVNThreshold: 0, // optional DVN threshold
-            requiredDVNs: _toDynamicArray([dvn1, dvn2]), // sorted list of required DVN addresses
-            optionalDVNs: new address[](0) // sorted list of optional DVNs
+        UlnConfig memory uln = UlnConfig({
+            confirmations: 15,
+            requiredDVNCount: 2,
+            optionalDVNCount: type(uint8).max,
+            optionalDVNThreshold: 0,
+            requiredDVNs: _toDynamicArray([dvn1, dvn2]),
+            optionalDVNs: new address[](0)
         });
         bytes memory encodedUln = abi.encode(uln);
-        SetConfigParam[] memory params;
-        params = new SetConfigParam[](2);
+        SetConfigParam[] memory params = new SetConfigParam[](2);
         params[0] = SetConfigParam(eid0, RECEIVE_CONFIG_TYPE, encodedUln);
         params[1] = SetConfigParam(eid1, RECEIVE_CONFIG_TYPE, encodedUln);
 
         vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
-        ILayerZeroEndpointV2(endpoint).setConfig(oapp, receiveLib, params); // Set config for messages received on B from A
+        ILayerZeroEndpointV2(endpoint).setConfig(KAIA_OFT_USDT_ADAPTER, receiveLib, params);
+        ILayerZeroEndpointV2(endpoint).setConfig(KAIA_OFT_USDT_STARGATE_ADAPTER, receiveLib, params);
+        ILayerZeroEndpointV2(endpoint).setConfig(KAIA_OFT_WKAIA_ADAPTER, receiveLib, params);
+        ILayerZeroEndpointV2(endpoint).setConfig(KAIA_OFT_WBTC_ADAPTER, receiveLib, params);
+        ILayerZeroEndpointV2(endpoint).setConfig(KAIA_OFT_WETH_ADAPTER, receiveLib, params);
         vm.stopBroadcast();
     }
 }

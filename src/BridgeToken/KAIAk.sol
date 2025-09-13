@@ -9,7 +9,7 @@ contract KAIAk is ERC20, Ownable {
 
     error NotOperator();
 
-    constructor() ERC20("KAIAk", "KAIAk") Ownable(msg.sender) {}
+    constructor() ERC20("KAIA representative", "KAIAk") Ownable(msg.sender) {}
     
     modifier onlyOperator() {
         _onlyOperator();

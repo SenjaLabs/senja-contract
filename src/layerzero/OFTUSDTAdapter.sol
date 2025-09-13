@@ -9,7 +9,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /// @notice OFTAdapter uses a deployed ERC-20 token and SafeERC20 to interact with the OFTCore contract.
-contract OFTUSDTAdapter is OFTAdapter, ReentrancyGuard {
+contract OFTUSDTadapter is OFTAdapter, ReentrancyGuard {
     address tokenOFT;
     address elevatedMinterBurner;
 

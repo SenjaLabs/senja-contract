@@ -9,7 +9,7 @@ import {Helper} from "./Helper.sol";
 /// @notice Sets up peer connections between OApp deployments on different chains
 contract SetPeers is Script, Helper {
     function run() external {
-        // deployBASE();
+        deployBASE();
         // deployKAIA();
         // optimism
         // hyperevm
@@ -17,31 +17,51 @@ contract SetPeers is Script, Helper {
 
     function deployBASE() public {
         vm.createSelectFork(vm.rpcUrl("base_mainnet"));
-        // Load environment variables
-        address oapp = BASE_OAPP; // Your OApp contract address
-        // Example: Set peers for different chains
-        // Format: (chain EID, peer address in bytes32)
-        (uint32 eid1, bytes32 peer1) = (BASE_EID, bytes32(uint256(uint160(BASE_OAPP))));
-        (uint32 eid2, bytes32 peer2) = (KAIA_EID, bytes32(uint256(uint160(KAIA_OAPP))));
         vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
-        // Set peers for each chain
-        MyOApp(oapp).setPeer(eid1, peer1);
-        MyOApp(oapp).setPeer(eid2, peer2);
+        
+        // USDT Adapter peers
+        MyOApp(BASE_OFT_USDTK_ADAPTER).setPeer(BASE_EID, bytes32(uint256(uint160(BASE_OFT_USDTK_ADAPTER))));
+        MyOApp(BASE_OFT_USDTK_ADAPTER).setPeer(KAIA_EID, bytes32(uint256(uint160(KAIA_OFT_USDT_ADAPTER))));
+
+        // WKAIA Adapter peers
+        MyOApp(BASE_OFT_WKAIAK_ADAPTER).setPeer(BASE_EID, bytes32(uint256(uint160(BASE_OFT_WKAIAK_ADAPTER))));
+        MyOApp(BASE_OFT_WKAIAK_ADAPTER).setPeer(KAIA_EID, bytes32(uint256(uint160(KAIA_OFT_WKAIA_ADAPTER))));
+
+        // WBTC Adapter peers
+        MyOApp(BASE_OFT_WBTCK_ADAPTER).setPeer(BASE_EID, bytes32(uint256(uint160(BASE_OFT_WBTCK_ADAPTER))));
+        MyOApp(BASE_OFT_WBTCK_ADAPTER).setPeer(KAIA_EID, bytes32(uint256(uint160(KAIA_OFT_WBTC_ADAPTER))));
+
+        // WETH Adapter peers
+        MyOApp(BASE_OFT_WETHK_ADAPTER).setPeer(BASE_EID, bytes32(uint256(uint160(BASE_OFT_WETHK_ADAPTER))));
+        MyOApp(BASE_OFT_WETHK_ADAPTER).setPeer(KAIA_EID, bytes32(uint256(uint160(KAIA_OFT_WETH_ADAPTER))));
+        
         vm.stopBroadcast();
     }
 
     function deployKAIA() public {
         vm.createSelectFork(vm.rpcUrl("kaia_mainnet"));
-        // Load environment variables
-        address oapp = KAIA_OAPP; // Your OApp contract address
-        // Example: Set peers for different chains
-        // Format: (chain EID, peer address in bytes32)
-        (uint32 eid1, bytes32 peer1) = (BASE_EID, bytes32(uint256(uint160(BASE_OAPP))));
-        (uint32 eid2, bytes32 peer2) = (KAIA_EID, bytes32(uint256(uint160(KAIA_OAPP))));
         vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
-        // Set peers for each chain
-        MyOApp(oapp).setPeer(eid1, peer1);
-        MyOApp(oapp).setPeer(eid2, peer2);
+        
+        // USDT Adapter peers
+        MyOApp(KAIA_OFT_USDT_ADAPTER).setPeer(BASE_EID, bytes32(uint256(uint160(BASE_OFT_USDTK_ADAPTER))));
+        MyOApp(KAIA_OFT_USDT_ADAPTER).setPeer(KAIA_EID, bytes32(uint256(uint160(KAIA_OFT_USDT_ADAPTER))));
+
+        // USDT Stargate Adapter peers
+        MyOApp(KAIA_OFT_USDT_STARGATE_ADAPTER).setPeer(BASE_EID, bytes32(uint256(uint160(BASE_OFT_USDTK_ADAPTER))));
+        MyOApp(KAIA_OFT_USDT_STARGATE_ADAPTER).setPeer(KAIA_EID, bytes32(uint256(uint160(KAIA_OFT_USDT_STARGATE_ADAPTER))));
+
+        // WKAIA Adapter peers
+        MyOApp(KAIA_OFT_WKAIA_ADAPTER).setPeer(BASE_EID, bytes32(uint256(uint160(BASE_OFT_WKAIAK_ADAPTER))));
+        MyOApp(KAIA_OFT_WKAIA_ADAPTER).setPeer(KAIA_EID, bytes32(uint256(uint160(KAIA_OFT_WKAIA_ADAPTER))));
+
+        // WBTC Adapter peers
+        MyOApp(KAIA_OFT_WBTC_ADAPTER).setPeer(BASE_EID, bytes32(uint256(uint160(BASE_OFT_WBTCK_ADAPTER))));
+        MyOApp(KAIA_OFT_WBTC_ADAPTER).setPeer(KAIA_EID, bytes32(uint256(uint160(KAIA_OFT_WBTC_ADAPTER))));
+
+        // WETH Adapter peers
+        MyOApp(KAIA_OFT_WETH_ADAPTER).setPeer(BASE_EID, bytes32(uint256(uint160(BASE_OFT_WETHK_ADAPTER))));
+        MyOApp(KAIA_OFT_WETH_ADAPTER).setPeer(KAIA_EID, bytes32(uint256(uint160(KAIA_OFT_WETH_ADAPTER))));
+        
         vm.stopBroadcast();
     }
 }

@@ -19,7 +19,7 @@ contract SetLibraries is Script, Helper {
     uint32 gracePeriod;
 
     function run() external {
-        // deployBASE();
+        deployBASE();
         // deployKAIA();
         // optimism
         // hyperevm
@@ -28,14 +28,12 @@ contract SetLibraries is Script, Helper {
     function _getUtils() internal {
         if (block.chainid == 8453) {
             endpoint = BASE_LZ_ENDPOINT;
-            oapp = BASE_OAPP;
             sendLib = BASE_SEND_LIB;
             receiveLib = BASE_RECEIVE_LIB;
             srcEid = BASE_EID;
             gracePeriod = uint32(0);
         } else if (block.chainid == 8217) {
             endpoint = KAIA_LZ_ENDPOINT;
-            oapp = KAIA_OAPP;
             sendLib = KAIA_SEND_LIB;
             receiveLib = KAIA_RECEIVE_LIB;
             srcEid = KAIA_EID;
@@ -48,24 +46,16 @@ contract SetLibraries is Script, Helper {
         vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
         _getUtils();
 
-        ILayerZeroEndpointV2(endpoint).setSendLibrary(
-            oapp, // OApp address
-            dstEid0, // Destination chain EID
-            sendLib // SendUln302 address
-        );
-        ILayerZeroEndpointV2(endpoint).setSendLibrary(
-            oapp, // OApp address
-            dstEid1, // Destination chain EID
-            sendLib // SendUln302 address
-        );
+        ILayerZeroEndpointV2(endpoint).setSendLibrary(BASE_OFT_USDTK_ADAPTER, dstEid1, sendLib);
+        ILayerZeroEndpointV2(endpoint).setSendLibrary(BASE_OFT_WKAIAK_ADAPTER, dstEid1, sendLib);
+        ILayerZeroEndpointV2(endpoint).setSendLibrary(BASE_OFT_WBTCK_ADAPTER, dstEid1, sendLib);
+        ILayerZeroEndpointV2(endpoint).setSendLibrary(BASE_OFT_WETHK_ADAPTER, dstEid1, sendLib);
 
         // Set receive library for inbound messages
-        ILayerZeroEndpointV2(endpoint).setReceiveLibrary(
-            oapp, // OApp address
-            srcEid, // Source chain EID
-            receiveLib, // ReceiveUln302 address
-            gracePeriod // Grace period for library switch
-        );
+        ILayerZeroEndpointV2(endpoint).setReceiveLibrary(BASE_OFT_USDTK_ADAPTER, srcEid, receiveLib, gracePeriod);
+        ILayerZeroEndpointV2(endpoint).setReceiveLibrary(BASE_OFT_WKAIAK_ADAPTER, srcEid, receiveLib, gracePeriod);
+        ILayerZeroEndpointV2(endpoint).setReceiveLibrary(BASE_OFT_WBTCK_ADAPTER, srcEid, receiveLib, gracePeriod);
+        ILayerZeroEndpointV2(endpoint).setReceiveLibrary(BASE_OFT_WETHK_ADAPTER, srcEid, receiveLib, gracePeriod);
 
         vm.stopBroadcast();
     }
@@ -75,24 +65,18 @@ contract SetLibraries is Script, Helper {
         vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
         _getUtils();
 
-        ILayerZeroEndpointV2(endpoint).setSendLibrary(
-            oapp, // OApp address
-            dstEid0, // Destination chain EID
-            sendLib // SendUln302 address
-        );
-        ILayerZeroEndpointV2(endpoint).setSendLibrary(
-            oapp, // OApp address
-            dstEid1, // Destination chain EID
-            sendLib // SendUln302 address
-        );
+        ILayerZeroEndpointV2(endpoint).setSendLibrary(KAIA_OFT_USDT_ADAPTER, dstEid0, sendLib);
+        ILayerZeroEndpointV2(endpoint).setSendLibrary(KAIA_OFT_USDT_STARGATE_ADAPTER, dstEid0, sendLib);
+        ILayerZeroEndpointV2(endpoint).setSendLibrary(KAIA_OFT_WKAIA_ADAPTER, dstEid0, sendLib);
+        ILayerZeroEndpointV2(endpoint).setSendLibrary(KAIA_OFT_WBTC_ADAPTER, dstEid0, sendLib);
+        ILayerZeroEndpointV2(endpoint).setSendLibrary(KAIA_OFT_WETH_ADAPTER, dstEid0, sendLib);
 
         // Set receive library for inbound messages
-        ILayerZeroEndpointV2(endpoint).setReceiveLibrary(
-            oapp, // OApp address
-            srcEid, // Source chain EID
-            receiveLib, // ReceiveUln302 address
-            gracePeriod // Grace period for library switch
-        );
+        ILayerZeroEndpointV2(endpoint).setReceiveLibrary(KAIA_OFT_USDT_ADAPTER, srcEid, receiveLib, gracePeriod);
+        ILayerZeroEndpointV2(endpoint).setReceiveLibrary(KAIA_OFT_USDT_STARGATE_ADAPTER, srcEid, receiveLib, gracePeriod);
+        ILayerZeroEndpointV2(endpoint).setReceiveLibrary(KAIA_OFT_WKAIA_ADAPTER, srcEid, receiveLib, gracePeriod);
+        ILayerZeroEndpointV2(endpoint).setReceiveLibrary(KAIA_OFT_WBTC_ADAPTER, srcEid, receiveLib, gracePeriod);
+        ILayerZeroEndpointV2(endpoint).setReceiveLibrary(KAIA_OFT_WETH_ADAPTER, srcEid, receiveLib, gracePeriod);
 
         vm.stopBroadcast();
     }

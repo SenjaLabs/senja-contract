@@ -9,7 +9,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /// @notice OFTAdapter uses a deployed ERC-20 token and SafeERC20 to interact with the OFTCore contract.
-contract OFTKAIAAdapter is OFTAdapter, ReentrancyGuard {
+contract OFTKAIAadapter is OFTAdapter, ReentrancyGuard {
     address tokenOFT;
     address elevatedMinterBurner;
 
@@ -26,7 +26,7 @@ contract OFTKAIAAdapter is OFTAdapter, ReentrancyGuard {
     }
 
     function sharedDecimals() public pure override returns (uint8) {
-        return 6;
+        return 18;
     }
 
     function _credit(address _to, uint256 _amountLD, uint32)

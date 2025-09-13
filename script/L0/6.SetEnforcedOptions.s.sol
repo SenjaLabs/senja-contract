@@ -20,7 +20,7 @@ contract SetEnforcedOptions is Script, Helper {
     }
 
     function run() external {
-        // deployBASE();
+        deployBASE();
         // deployKAIA();
         // optimism
         // hyperevm
@@ -28,27 +28,21 @@ contract SetEnforcedOptions is Script, Helper {
 
     function deployBASE() public {
         vm.createSelectFork(vm.rpcUrl("base_mainnet"));
-        // Load environment variables
-        address oapp = BASE_OAPP; // Your OApp contract address
 
-        // Destination chain configurations
-        uint32 dstEid1 = BASE_EID; // First destination EID
-        uint32 dstEid2 = KAIA_EID; // Second destination EID
-
-        // Build options using OptionsBuilder
+        uint32 dstEid1 = BASE_EID;
+        uint32 dstEid2 = KAIA_EID;
         bytes memory options1 = OptionsBuilder.newOptions().addExecutorLzReceiveOption(80000, 0);
         bytes memory options2 = OptionsBuilder.newOptions().addExecutorLzReceiveOption(100000, 0);
 
-        // Create enforced options array
-        EnforcedOptionParam[] memory enforcedOptions;
-        enforcedOptions = new EnforcedOptionParam[](2);
-        // Set enforced options for first destination
+        EnforcedOptionParam[] memory enforcedOptions = new EnforcedOptionParam[](2);
         enforcedOptions[0] = EnforcedOptionParam({eid: dstEid1, msgType: SEND, options: options1});
-        // Set enforced options for second destination
         enforcedOptions[1] = EnforcedOptionParam({eid: dstEid2, msgType: SEND, options: options2});
 
         vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
-        MyOApp(oapp).setEnforcedOptions(enforcedOptions);
+        MyOApp(BASE_OFT_USDTK_ADAPTER).setEnforcedOptions(enforcedOptions);
+        MyOApp(BASE_OFT_WKAIAK_ADAPTER).setEnforcedOptions(enforcedOptions);
+        MyOApp(BASE_OFT_WBTCK_ADAPTER).setEnforcedOptions(enforcedOptions);
+        MyOApp(BASE_OFT_WETHK_ADAPTER).setEnforcedOptions(enforcedOptions);
         vm.stopBroadcast();
 
         console.log("deployed on ChainId: ", block.chainid);
@@ -57,26 +51,21 @@ contract SetEnforcedOptions is Script, Helper {
 
     function deployKAIA() public {
         vm.createSelectFork(vm.rpcUrl("kaia_mainnet"));
-        // Load environment variables
-        address oapp = KAIA_OAPP; // Your OApp contract address
-
-        // Destination chain configurations
-        uint32 dstEid1 = KAIA_EID; // first destination EID
-        uint32 dstEid2 = BASE_EID; // second destination EID
-        // Build options using OptionsBuilder
+        uint32 dstEid1 = KAIA_EID;
+        uint32 dstEid2 = BASE_EID;
         bytes memory options1 = OptionsBuilder.newOptions().addExecutorLzReceiveOption(80000, 0);
         bytes memory options2 = OptionsBuilder.newOptions().addExecutorLzReceiveOption(100000, 0);
 
-        // Create enforced options array
-        EnforcedOptionParam[] memory enforcedOptions;
-        enforcedOptions = new EnforcedOptionParam[](6);
-        // Set enforced options for first destination
+        EnforcedOptionParam[] memory enforcedOptions = new EnforcedOptionParam[](2);
         enforcedOptions[0] = EnforcedOptionParam({eid: dstEid1, msgType: SEND, options: options1});
-        // Set enforced options for second destination
         enforcedOptions[1] = EnforcedOptionParam({eid: dstEid2, msgType: SEND, options: options2});
 
         vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
-        MyOApp(oapp).setEnforcedOptions(enforcedOptions);
+        MyOApp(KAIA_OFT_USDT_ADAPTER).setEnforcedOptions(enforcedOptions);
+        MyOApp(KAIA_OFT_USDT_STARGATE_ADAPTER).setEnforcedOptions(enforcedOptions);
+        MyOApp(KAIA_OFT_WKAIA_ADAPTER).setEnforcedOptions(enforcedOptions);
+        MyOApp(KAIA_OFT_WBTC_ADAPTER).setEnforcedOptions(enforcedOptions);
+        MyOApp(KAIA_OFT_WETH_ADAPTER).setEnforcedOptions(enforcedOptions);
         vm.stopBroadcast();
 
         console.log("deployed on ChainId: ", block.chainid);

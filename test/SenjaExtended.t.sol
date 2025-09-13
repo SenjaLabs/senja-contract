@@ -11,8 +11,8 @@ import {Protocol} from "../src/Protocol.sol";
 import {Oracle} from "../src/Oracle.sol";
 import {Liquidator} from "../src/Liquidator.sol";
 import {IOracle} from "../src/interfaces/IOracle.sol";
-import {OFTKAIAAdapter} from "../src/layerzero/OFTKAIAAdapter.sol";
-import {OFTUSDTAdapter} from "../src/layerzero/OFTUSDTAdapter.sol";
+import {OFTKAIAadapter} from "../src/layerzero/OFTKAIAadapter.sol";
+import {OFTUSDTadapter} from "../src/layerzero/OFTUSDTadapter.sol";
 import {ElevatedMinterBurner} from "../src/layerzero/ElevatedMinterBurner.sol";
 import {Helper} from "../script/L0/Helper.sol";
 import {ILayerZeroEndpointV2} from "@layerzerolabs/lz-evm-protocol-v2/contracts/interfaces/ILayerZeroEndpointV2.sol";
@@ -46,8 +46,8 @@ contract SenjaExtendedTest is Test, Helper {
     PositionDeployer public positionDeployer;
     LendingPoolFactory public lendingPoolFactory;
     Oracle public oracle;
-    OFTUSDTAdapter public oftusdtadapter;
-    OFTKAIAAdapter public oftkaiaadapter;
+    OFTUSDTadapter public oftusdtadapter;
+    OFTKAIAadapter public oftkaiaadapter;
     ElevatedMinterBurner public elevatedminterburner;
     HelperUtils public helperUtils;
     ERC1967Proxy public proxy;
@@ -60,7 +60,7 @@ contract SenjaExtendedTest is Test, Helper {
     address public alice = makeAddr("alice");
 
     address public USDT = 0xd077A400968890Eacc75cdc901F0356c943e4fDb;
-    // address public USDT = 0x8619bA1B324e099CB2227060c4BC5bDEe14456c6; // stargate
+    // address public USDT = 0x9025095263d1e548dc890a7589a4c78038ac40ab; // stargate
     address public WKAIA = 0x19Aac5f612f524B754CA7e7c41cbFa2E981A4432;
     address public KAIA = address(1);
     // Using WKAIA instead of native token address(1) for better DeFi composability
@@ -158,17 +158,17 @@ contract SenjaExtendedTest is Test, Helper {
 
     function _deployOFT() internal {
         elevatedminterburner = new ElevatedMinterBurner(USDT, owner);
-        oftusdtadapter = new OFTUSDTAdapter(USDT, address(elevatedminterburner), KAIA_LZ_ENDPOINT, owner);
+        oftusdtadapter = new OFTUSDTadapter(USDT, address(elevatedminterburner), KAIA_LZ_ENDPOINT, owner);
         kaia_oftusdt_adapter = address(oftusdtadapter);
         oapp = address(oftusdtadapter);
 
         elevatedminterburner = new ElevatedMinterBurner(WKAIA, owner);
-        oftkaiaadapter = new OFTKAIAAdapter(WKAIA, address(elevatedminterburner), KAIA_LZ_ENDPOINT, owner);
+        oftkaiaadapter = new OFTKAIAadapter(WKAIA, address(elevatedminterburner), KAIA_LZ_ENDPOINT, owner);
         kaia_oftkaia_adapter = address(oftkaiaadapter);
         oapp2 = address(oftkaiaadapter);
 
         elevatedminterburner = new ElevatedMinterBurner(WKAIA, owner);
-        oftkaiaadapter = new OFTKAIAAdapter(WKAIA, address(elevatedminterburner), KAIA_LZ_ENDPOINT, owner);
+        oftkaiaadapter = new OFTKAIAadapter(WKAIA, address(elevatedminterburner), KAIA_LZ_ENDPOINT, owner);
         kaia_oftkaia_ori_adapter = address(oftkaiaadapter);
         oapp3 = address(oftkaiaadapter);
     }
@@ -235,16 +235,16 @@ contract SenjaExtendedTest is Test, Helper {
 
     function _setPeers() internal {
         bytes32 oftPeer = bytes32(uint256(uint160(address(oapp)))); // oapp
-        OFTUSDTAdapter(oapp).setPeer(BASE_EID, oftPeer);
-        OFTUSDTAdapter(oapp).setPeer(KAIA_EID, oftPeer);
+        OFTUSDTadapter(oapp).setPeer(BASE_EID, oftPeer);
+        OFTUSDTadapter(oapp).setPeer(KAIA_EID, oftPeer);
 
         bytes32 oftPeer2 = bytes32(uint256(uint160(address(oapp2)))); // oapp2
-        OFTKAIAAdapter(oapp2).setPeer(BASE_EID, oftPeer2);
-        OFTKAIAAdapter(oapp2).setPeer(KAIA_EID, oftPeer2);
+        OFTKAIAadapter(oapp2).setPeer(BASE_EID, oftPeer2);
+        OFTKAIAadapter(oapp2).setPeer(KAIA_EID, oftPeer2);
 
         bytes32 oftPeer3 = bytes32(uint256(uint160(address(oapp3))));
-        OFTKAIAAdapter(oapp3).setPeer(BASE_EID, oftPeer3);
-        OFTKAIAAdapter(oapp3).setPeer(KAIA_EID, oftPeer3);
+        OFTKAIAadapter(oapp3).setPeer(BASE_EID, oftPeer3);
+        OFTKAIAadapter(oapp3).setPeer(KAIA_EID, oftPeer3);
     }
 
     function _setEnforcedOptions() internal {

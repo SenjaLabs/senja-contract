@@ -2,7 +2,7 @@
 pragma solidity ^0.8.22;
 
 import {Script, console} from "forge-std/Script.sol";
-import {OFTAdapter} from "../../src/layerzero/OFTAdapter.sol";
+import {OFTadapter} from "../../src/layerzero/OFTadapter.sol";
 import {SendParam} from "@layerzerolabs/oft-evm/contracts/interfaces/IOFT.sol";
 import {OptionsBuilder} from "@layerzerolabs/oapp-evm/contracts/oapp/libs/OptionsBuilder.sol";
 import {MessagingFee} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
@@ -29,10 +29,11 @@ contract SendOFT is Script, Helper {
         address toAddress = vm.envAddress("PUBLIC_KEY");
 
         // *********FILL THIS*********
-        address oftAddress = KAIA_OAPP; // src
-        address TOKEN = KAIA_USDT;
+        address oftAddress = KAIA_OFT_WKAIA_ADAPTER; // src
+        address TOKEN = KAIA_WKAIA;
         uint256 amount = 1_000; // amount to send
-        uint256 tokensToSend = amount * 10 ** IERC20Metadata(TOKEN).decimals(); // src
+        // uint256 tokensToSend = amount * 10 ** IERC20Metadata(TOKEN).decimals(); // src
+        uint256 tokensToSend = amount; // src
         uint256 privateKey = vm.envUint("PRIVATE_KEY");
         //*******
         //** DESTINATION
@@ -42,7 +43,7 @@ contract SendOFT is Script, Helper {
 
 
         vm.startBroadcast(privateKey);
-        OFTAdapter oft = OFTAdapter(oftAddress);
+        OFTadapter oft = OFTadapter(oftAddress);
         // Build send parameters
         bytes memory extraOptions = OptionsBuilder.newOptions().addExecutorLzReceiveOption(65000, 0);
         SendParam memory sendParam = SendParam({
@@ -63,8 +64,8 @@ contract SendOFT is Script, Helper {
         console.log("eth before", address(toAddress).balance);
         console.log("TOKEN Balance before", IERC20(TOKEN).balanceOf(toAddress));
         // Send tokens
-        // IERC20(TOKEN).approve(oftAddress, tokensToSend);
-        IERC20(TOKEN).approve(KAIA_MINTER_BURNER, tokensToSend);
+        IERC20(TOKEN).approve(oftAddress, tokensToSend);
+        // IERC20(TOKEN).approve(KAIA_MINTER_BURNER, tokensToSend);
         oft.send{value: fee.nativeFee}(sendParam, fee, msg.sender);
         console.log("eth after", address(toAddress).balance);
         console.log("TOKEN Balance after", IERC20(TOKEN).balanceOf(toAddress));

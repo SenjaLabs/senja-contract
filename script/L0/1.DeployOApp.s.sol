@@ -3,7 +3,7 @@ pragma solidity ^0.8.22;
 
 import {Script, console} from "forge-std/Script.sol";
 import {ElevatedMinterBurner} from "../../src/layerzero/ElevatedMinterBurner.sol";
-import {OFTAdapter} from "../../src/layerzero/OFTAdapter.sol";
+import {OFTadapter} from "../../src/layerzero/OFTadapter.sol";
 import {IMintableBurnable} from "@layerzerolabs/oft-evm/contracts/interfaces/IMintableBurnable.sol";
 import {Helper} from "./Helper.sol";
 import {SrcEidLib} from "../../src/layerzero/SrcEidLib.sol";
@@ -12,7 +12,7 @@ import {ISrcEidLib} from "../../src/interfaces/ISrcEidLib.sol";
 contract DeployOApp is Script, Helper {
     ElevatedMinterBurner public minterBurner;
     SrcEidLib public srcEidLib;
-    OFTAdapter public oapp;
+    OFTadapter public oapp;
 
     address owner = vm.envAddress("PUBLIC_KEY");
     address token;
@@ -50,7 +50,7 @@ contract DeployOApp is Script, Helper {
         ISrcEidLib.SrcEidInfo[] memory srcEidInfos = srcEidInfo();
         srcEidLib = new SrcEidLib(srcEidInfos, owner);
         minterBurner = new ElevatedMinterBurner(token, owner);
-        oapp = new OFTAdapter(
+        oapp = new OFTadapter(
             token, address(minterBurner), IMintableBurnable(token), endpoint, owner, address(srcEidLib)
         );
         minterBurner.setOperator(address(oapp), true);
@@ -70,7 +70,7 @@ contract DeployOApp is Script, Helper {
         ISrcEidLib.SrcEidInfo[] memory srcEidInfos = srcEidInfo();
         srcEidLib = new SrcEidLib(srcEidInfos, owner);
         minterBurner = new ElevatedMinterBurner(token, owner);
-        oapp = new OFTAdapter(
+        oapp = new OFTadapter(
             token, address(minterBurner), IMintableBurnable(token), endpoint, owner, address(srcEidLib)
         );
         minterBurner.setOperator(address(oapp), true);

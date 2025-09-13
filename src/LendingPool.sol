@@ -7,8 +7,8 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 import {OptionsBuilder} from "@layerzerolabs/oapp-evm/contracts/oapp/libs/OptionsBuilder.sol";
 import {SendParam} from "@layerzerolabs/oft-evm/contracts/interfaces/IOFT.sol";
 import {MessagingFee} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
-import {OFTAdapter} from "./layerzero/OFTAdapter.sol";
-import {OFTKAIAAdapter} from "./layerzero/OFTKAIAAdapter.sol";
+import {OFTadapter} from "./layerzero/OFTadapter.sol";
+import {OFTKAIAadapter} from "./layerzero/OFTKAIAadapter.sol";
 import {IFactory} from "./interfaces/IFactory.sol";
 import {IPosition} from "./interfaces/IPosition.sol";
 import {IIsHealthy} from "./interfaces/IIsHealthy.sol";
@@ -225,14 +225,14 @@ contract LendingPool is ReentrancyGuard {
             if (_borrowToken() == address(1)) {
                 IERC20(_WKAIA()).safeTransfer(_protocol(), protocolFee);
                 address oftAddress = IFactory(_factory()).oftAddress(_borrowToken());
-                OFTKAIAAdapter oft = OFTKAIAAdapter(oftAddress);
+                OFTKAIAadapter oft = OFTKAIAadapter(oftAddress);
                 IERC20(_WKAIA()).approve(oftAddress, userAmount);
                 MessagingFee memory fee = oft.quoteSend(sendParam, false);
                 oft.send{value: fee.nativeFee}(sendParam, fee, msg.sender);
             } else {
                 IERC20(_borrowToken()).safeTransfer(_protocol(), protocolFee);
                 address oftAddress = IFactory(_factory()).oftAddress(_borrowToken());
-                OFTAdapter oft = OFTAdapter(oftAddress);
+                OFTadapter oft = OFTadapter(oftAddress);
                 IERC20(_borrowToken()).approve(oftAddress, userAmount);
                 MessagingFee memory fee = oft.quoteSend(sendParam, false);
                 oft.send{value: fee.nativeFee}(sendParam, fee, msg.sender);
