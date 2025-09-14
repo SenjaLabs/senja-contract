@@ -66,11 +66,11 @@ contract SenjaTest is Test, Helper {
     // Using WKAIA instead of native token address(1) for better DeFi composability
 
     // ORAKL
-    address public usdt_usd = 0xa7C4c292Ed720b1318F415B106a443Dc1f052994;
-    address public kaia_usdt = 0x9254CD72f207cc231A2307Eac5e4BFa316eb0c2e;
+    // address public usdt_usd = 0xa7C4c292Ed720b1318F415B106a443Dc1f052994;
+    // address public kaia_usdt = 0x9254CD72f207cc231A2307Eac5e4BFa316eb0c2e;
     address public hype_usdt = 0x79e87F197FdAd9d26B5DbadB5789E8f353C421B3;
-    address public eth_usdt = 0xbF61f1F8D45EcB33006a335E7c76f306689dcAab;
-    address public btc_usdt = 0x624c060ea3fe93321e40530F3f7E587545D594aA;
+    // address public eth_usdt = 0xbF61f1F8D45EcB33006a335E7c76f306689dcAab;
+    // address public btc_usdt = 0x624c060ea3fe93321e40530F3f7E587545D594aA;
 
     address public usdt_usd_adapter;
     address public kaia_usdt_adapter;

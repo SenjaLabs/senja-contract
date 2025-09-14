@@ -27,7 +27,6 @@ contract SendOFT is Script, Helper {
     function run() external {
         // Load environment variables
         address toAddress = vm.envAddress("PUBLIC_KEY");
-
         // *********FILL THIS*********
         address oftAddress = KAIA_OFT_WKAIA_ADAPTER; // src
         address TOKEN = KAIA_WKAIA;

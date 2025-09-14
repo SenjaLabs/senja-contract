@@ -26,8 +26,6 @@ contract Helper {
     address public BASE_EXECUTOR = 0x2CCA08ae69E0C44b18a57Ab2A87644234dAebaE4;
     address public KAIA_EXECUTOR = 0xe149187a987F129FD3d397ED04a60b0b89D1669f;
 
-    // ** SELF DEPLOYED Mainnet **
-
     address public KAIA_USDT = 0xd077A400968890Eacc75cdc901F0356c943e4fDb;
     address public KAIA_USDT_STARGATE = 0x9025095263d1E548dc890A7589A4C78038aC40ab; // stargate
     address public KAIA_KAIA = address(1);
@@ -36,33 +34,24 @@ contract Helper {
     address public KAIA_WBTC = 0x981846bE8d2d697f4dfeF6689a161A25FfbAb8F9;
 
     address public BASE_USDT = 0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2;
-    address public BASE_USDTk;
-    address public KAIA_USDTk;
+    address public BASE_KAIA;
+    address public BASE_WETH = 0x4200000000000000000000000000000000000006;
+    address public BASE_WBTC = 0x0555E30da8f98308EdB960aa94C0Db47230d2B9c;
 
-    address public BASE_SRC_EID_LIB;
-    address public BASE_OAPP;
-    address public BASE_MINTER_BURNER;
-    address public ARB_SRC_EID_LIB;
-    address public ARB_OAPP;
-    address public ARB_MINTER_BURNER;
-    address public POL_SRC_EID_LIB;
-    address public POL_OAPP;
-    address public POL_MINTER_BURNER;
-    address public BSC_SRC_EID_LIB;
-    address public BSC_OAPP;
-    address public BSC_MINTER_BURNER;
-    address public KAIA_SRC_EID_LIB;
-    address public KAIA_OAPP;
-    address public KAIA_MINTER_BURNER;
-    address public GNOSIS_SRC_EID_LIB;
-    address public GNOSIS_OAPP;
-    address public GNOSIS_MINTER_BURNER;
-
+    // ** SELF DEPLOYED Mainnet **
     address public KAIA_OFT_USDT_ADAPTER = 0xdF05e9AbF64dA281B3cBd8aC3581022eC4841FB2;
     address public KAIA_OFT_USDT_STARGATE_ADAPTER = 0x04C37dc1b538E00b31e6bc883E16d97cD7937a10;
     address public KAIA_OFT_WKAIA_ADAPTER = 0x15858A57854BBf0DF60A737811d50e1Ee785f9bc;
     address public KAIA_OFT_WBTC_ADAPTER = 0x4Ba8D8083e7F3652CCB084C32652e68566E9Ef23;
     address public KAIA_OFT_WETH_ADAPTER = 0x007F735Fd070DeD4B0B58D430c392Ff0190eC20F;
+
+    address public KAIA_MOCK_USDT = 0xCEb5c8903060197e46Ab5ea5087b9F99CBc8da49;
+    address public KAIA_MOCK_USDT_ELEVATED_MINTER_BURNER = 0x7c9cF703903680ae5EB6ec2Bb2BEbb1ec751918A;
+    address public KAIA_OFT_MOCK_USDT_ADAPTER = 0x5e6671ef689B2B2D4391a766B0486E5054136546;
+
+    address public KAIA_MOCK_WKAIA = 0x684a2aAF3d98bC8eD2c07988E8da9023026aD511;
+    address public KAIA_MOCK_WKAIA_ELEVATED_MINTER_BURNER = 0xc160A1bcF0c79A6fC5b0f015bfaAA9A6CDa35687;
+    address public KAIA_OFT_MOCK_WKAIA_ADAPTER = 0xcdEc0D768e43090a9eeC47d87d8165E9FA78B204;
 
     address public BASE_USDTK = 0xc3be8ab4CA0cefE3119A765b324bBDF54a16A65b;
     address public BASE_USDTK_ELEVATED_MINTER_BURNER = 0xE2e025Ff8a8adB2561e3C631B5a03842b9A1Ae88;
@@ -84,13 +73,25 @@ contract Helper {
     address public BASE_WETHK_ELEVATED_MINTER_BURNER = 0xfBC915dc39654b52B2E9284FB966C79A1071eA3A;
     address public BASE_OFT_WETHK_ADAPTER = 0x6A58615739b0FC710E6A380E893E672968E30B5F;
     // *******************
-
-    // forge verify-contract --verifier-url https://mainnet-api.kaiascan.io/forge-verify-flatten \
-    // --chain-id 8217 \
-    // 0x583C963CB88FD42409021039B692646617F77b63 src/MyMintBurnOFTAdapterDecimal2.sol:MyMintBurnOFTAdapterDecimal2 --retries 1
-
-    // forge verify-contract --verifier-url https://mainnet-api.kaiascan.io/forge-verify-flatten \
-    // --chain-id 8217 --compiler-version 0.8.28 \
-    // 0x583C963CB88FD42409021039B692646617F77b63 MyMintBurnOFTAdapterDecimal2Flattened.sol:MyMintBurnOFTAdapterDecimal2 --retries 1
     // *******************
+
+    // ORAKL
+    address public usdt_usd = 0xa7C4c292Ed720b1318F415B106a443Dc1f052994;
+    address public kaia_usdt = 0x9254CD72f207cc231A2307Eac5e4BFa316eb0c2e;
+    address public eth_usdt = 0xbF61f1F8D45EcB33006a335E7c76f306689dcAab;
+    address public btc_usdt = 0x624c060ea3fe93321e40530F3f7E587545D594aA;
+
+    address public KAIA_usdt_usd_adapter = 0xC72f2eb4A97F19ecD0C10b5201676a10B6D8bB67;
+    address public KAIA_kaia_usdt_adapter = 0x46638aD472507482B7D5ba45124E93D16bc97eCE;
+    address public KAIA_eth_usdt_adapter = 0xdbbb07E1AE9D0F23Ac6dA9BDDA3Dff96fcA73650;
+    address public KAIA_btc_usdt_adapter = 0x3703a1DA99a2BDf2d8ce57802aaCb20fb546Ff12;
+
+    address public KAIA_liquidator = 0x4900409aabeCd5DE4ab22D61cdEc4b7478783806;
+    address public KAIA_isHealthy = 0xB9B3A1baA8CF4C5Cd6b4d132eD7B0cBe05646f6f;
+    address public KAIA_lendingPoolDeployer = 0xbd3B8bbE94a301B96c5207F8bE17Ed1cd3236550;
+    address public KAIA_protocol = 0x394239573079a46e438ea6D118Fd96d37A61f270;
+    address public KAIA_positionDeployer = 0x54f6Ff27093FC45c5A39083C3Ef0260D25012Be3;
+    address public KAIA_lendingPoolFactoryImplementation = 0xb0FCA55167f94D0f515877C411E0deb904321761;
+    address public KAIA_lendingPoolFactoryProxy = 0xa971CD2714fbCc9A942b09BC391a724Df9338206;
+    address public KAIA_HELPER_UTILS = 0x07BC7BCB0C54f8811491dB5d09C29490B51bc2C8;
 }
