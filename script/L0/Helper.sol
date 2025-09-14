@@ -93,5 +93,5 @@ contract Helper {
     address public KAIA_positionDeployer = 0x54f6Ff27093FC45c5A39083C3Ef0260D25012Be3;
     address public KAIA_lendingPoolFactoryImplementation = 0xb0FCA55167f94D0f515877C411E0deb904321761;
     address public KAIA_lendingPoolFactoryProxy = 0xa971CD2714fbCc9A942b09BC391a724Df9338206;
-    address public KAIA_HELPER_UTILS = 0x07BC7BCB0C54f8811491dB5d09C29490B51bc2C8;
+    address public KAIA_HELPER_UTILS = 0x3De8C22F6b84C575429c1B9cbf5bdDd49cf129fC;
 }

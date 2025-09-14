@@ -112,6 +112,169 @@ contract HelperUtils {
         return healthFactor; // >1e8 is healthy, <1e8 is unhealthy
     }
 
+    function getFee(address _oftAddress, uint32 _dstEid, address _toAddress, uint256 _tokensToSend)
+        public
+        view
+        returns (uint256)
+    {
+        OFTadapter oft = OFTadapter(_oftAddress);
+        // Build send parameters
+        bytes memory extraOptions = OptionsBuilder.newOptions().addExecutorLzReceiveOption(65000, 0);
+        SendParam memory sendParam = SendParam({
+            dstEid: _dstEid,
+            to: _addressToBytes32(_toAddress),
+            amountLD: _tokensToSend,
+            minAmountLD: _tokensToSend, // 0% slippage tolerance
+            extraOptions: extraOptions,
+            composeMsg: "",
+            oftCmd: ""
+        });
+
+        // Get fee quote
+        MessagingFee memory fee = oft.quoteSend(sendParam, false);
+
+        return fee.nativeFee;
+    }
+
+    /**
+     * @notice Get the supply APY (Annual Percentage Yield) for a lending pool
+     * @param _lendingPool The address of the lending pool
+     * @return supplyAPY The supply APY scaled by 1e18 (e.g., 5% = 5e16)
+     * @dev APY accounts for daily compounding: APY = (1 + rate/365)^365 - 1
+     */
+    function getSupplyAPY(address _lendingPool) public view returns (uint256 supplyAPY) {
+        ILPRouter router = _router(_lendingPool);
+        uint256 supplyRate = router.calculateSupplyRate(); // Rate scaled by 100 (e.g., 500 = 5%)
+
+        if (supplyRate == 0) {
+            return 0;
+        }
+
+        // Convert rate from percentage to decimal: supplyRate / 10000
+        // Then calculate daily rate: rate / 365
+        // APY = (1 + dailyRate)^365 - 1
+        // Using approximation for gas efficiency: APY ≈ rate + (rate^2 / 2) for small rates
+
+        uint256 rateDecimal = (supplyRate * 1e18) / 10000; // Convert to 1e18 scale
+        uint256 compoundEffect = (rateDecimal * rateDecimal) / (2 * 1e18); // rate^2 / 2
+        supplyAPY = rateDecimal + compoundEffect;
+
+        return supplyAPY;
+    }
+
+    /**
+     * @notice Get the borrow APY (Annual Percentage Yield) for a lending pool
+     * @param _lendingPool The address of the lending pool
+     * @return borrowAPY The borrow APY scaled by 1e18 (e.g., 10% = 1e17)
+     * @dev APY accounts for daily compounding: APY = (1 + rate/365)^365 - 1
+     */
+    function getBorrowAPY(address _lendingPool) public view returns (uint256 borrowAPY) {
+        ILPRouter router = _router(_lendingPool);
+        uint256 borrowRate = router.calculateBorrowRate(); // Rate scaled by 100 (e.g., 1000 = 10%)
+
+        if (borrowRate == 0) {
+            return 0;
+        }
+
+        // Convert rate from percentage to decimal: borrowRate / 10000
+        // Then calculate APY with compounding effect
+        uint256 rateDecimal = (borrowRate * 1e18) / 10000; // Convert to 1e18 scale
+        uint256 compoundEffect = (rateDecimal * rateDecimal) / (2 * 1e18); // rate^2 / 2
+        borrowAPY = rateDecimal + compoundEffect;
+
+        return borrowAPY;
+    }
+
+    /**
+     * @notice Get both supply and borrow APY for a lending pool
+     * @param _lendingPool The address of the lending pool
+     * @return supplyAPY The supply APY scaled by 1e18
+     * @return borrowAPY The borrow APY scaled by 1e18
+     * @return utilizationRate The utilization rate scaled by 1e18
+     */
+    function getAPY(address _lendingPool)
+        public
+        view
+        returns (uint256 supplyAPY, uint256 borrowAPY, uint256 utilizationRate)
+    {
+        supplyAPY = getSupplyAPY(_lendingPool);
+        borrowAPY = getBorrowAPY(_lendingPool);
+        utilizationRate = getUtilizationRate(_lendingPool);
+
+        return (supplyAPY, borrowAPY, utilizationRate);
+    }
+
+    /**
+     * @notice Get the utilization rate for a lending pool
+     * @param _lendingPool The address of the lending pool
+     * @return utilizationRate The utilization rate scaled by 1e18 (e.g., 80% = 8e17)
+     */
+    function getUtilizationRate(address _lendingPool) public view returns (uint256 utilizationRate) {
+        ILPRouter router = _router(_lendingPool);
+        uint256 utilization = router.getUtilizationRate(); // Rate scaled by 10000 (e.g., 8000 = 80%)
+
+        // Convert from 10000 scale to 1e18 scale
+        utilizationRate = (utilization * 1e18) / 10000;
+
+        return utilizationRate;
+    }
+
+    /**
+     * @notice Get detailed lending pool metrics
+     * @param _lendingPool The address of the lending pool
+     * @return supplyAPY The supply APY scaled by 1e18
+     * @return borrowAPY The borrow APY scaled by 1e18
+     * @return utilizationRate The utilization rate scaled by 1e18
+     * @return totalSupplyAssets Total supply assets in the pool
+     * @return totalBorrowAssets Total borrow assets in the pool
+     */
+    function getLendingPoolMetrics(address _lendingPool)
+        public
+        view
+        returns (
+            uint256 supplyAPY,
+            uint256 borrowAPY,
+            uint256 utilizationRate,
+            uint256 totalSupplyAssets,
+            uint256 totalBorrowAssets
+        )
+    {
+        ILPRouter router = _router(_lendingPool);
+
+        supplyAPY = getSupplyAPY(_lendingPool);
+        borrowAPY = getBorrowAPY(_lendingPool);
+        utilizationRate = getUtilizationRate(_lendingPool);
+        totalSupplyAssets = router.totalSupplyAssets();
+        totalBorrowAssets = router.totalBorrowAssets();
+
+        return (supplyAPY, borrowAPY, utilizationRate, totalSupplyAssets, totalBorrowAssets);
+    }
+
+    function getTotalLiquidity(address _lendingPool) public view returns (uint256 totalLiquidity) {
+        address borrowToken = ILPRouter(_router(_lendingPool)).borrowToken();
+        if (borrowToken == address(1)) {
+            totalLiquidity = IERC20(_WKAIA()).balanceOf(_lendingPool);
+        } else {
+            totalLiquidity = IERC20(borrowToken).balanceOf(_lendingPool);
+        }
+        return totalLiquidity;
+    }
+
+    function getCollateralBalance(address _lendingPool, address _user)
+        public
+        view
+        returns (uint256 collateralBalance)
+    {
+        address collateralToken = ILPRouter(_router(_lendingPool)).collateralToken();
+        address addressPosition = ILPRouter(_router(_lendingPool)).addressPositions(_user);
+        if (collateralToken == address(1)) {
+            collateralBalance = IERC20(_WKAIA()).balanceOf(addressPosition);
+        } else {
+            collateralBalance = IERC20(collateralToken).balanceOf(addressPosition);
+        }
+        return collateralBalance;
+    }
+
     function _calculateCollateralValue(address _lendingPool, address _user) internal view returns (uint256) {
         address collateralToken = _collateralToken(_lendingPool);
         address borrowToken = _borrowToken(_lendingPool);
@@ -183,143 +346,5 @@ contract HelperUtils {
 
     function _WKAIA() internal view returns (address) {
         return IFactory(factory).WKAIA();
-    }
-
-    function getFee(address _oftAddress, uint32 _dstEid, address _toAddress, uint256 _tokensToSend)
-        public
-        view
-        returns (uint256)
-    {
-        OFTadapter oft = OFTadapter(_oftAddress);
-        // Build send parameters
-        bytes memory extraOptions = OptionsBuilder.newOptions().addExecutorLzReceiveOption(65000, 0);
-        SendParam memory sendParam = SendParam({
-            dstEid: _dstEid,
-            to: _addressToBytes32(_toAddress),
-            amountLD: _tokensToSend,
-            minAmountLD: _tokensToSend, // 0% slippage tolerance
-            extraOptions: extraOptions,
-            composeMsg: "",
-            oftCmd: ""
-        });
-
-        // Get fee quote
-        MessagingFee memory fee = oft.quoteSend(sendParam, false);
-
-        return fee.nativeFee;
-    }
-
-    /**
-     * @notice Get the supply APY (Annual Percentage Yield) for a lending pool
-     * @param _lendingPool The address of the lending pool
-     * @return supplyAPY The supply APY scaled by 1e18 (e.g., 5% = 5e16)
-     * @dev APY accounts for daily compounding: APY = (1 + rate/365)^365 - 1
-     */
-    function getSupplyAPY(address _lendingPool) public view returns (uint256 supplyAPY) {
-        ILPRouter router = _router(_lendingPool);
-        uint256 supplyRate = router.calculateSupplyRate(); // Rate scaled by 100 (e.g., 500 = 5%)
-        
-        if (supplyRate == 0) {
-            return 0;
-        }
-        
-        // Convert rate from percentage to decimal: supplyRate / 10000
-        // Then calculate daily rate: rate / 365
-        // APY = (1 + dailyRate)^365 - 1
-        // Using approximation for gas efficiency: APY ≈ rate + (rate^2 / 2) for small rates
-        
-        uint256 rateDecimal = (supplyRate * 1e18) / 10000; // Convert to 1e18 scale
-        uint256 compoundEffect = (rateDecimal * rateDecimal) / (2 * 1e18); // rate^2 / 2
-        supplyAPY = rateDecimal + compoundEffect;
-        
-        return supplyAPY;
-    }
-
-    /**
-     * @notice Get the borrow APY (Annual Percentage Yield) for a lending pool
-     * @param _lendingPool The address of the lending pool
-     * @return borrowAPY The borrow APY scaled by 1e18 (e.g., 10% = 1e17)
-     * @dev APY accounts for daily compounding: APY = (1 + rate/365)^365 - 1
-     */
-    function getBorrowAPY(address _lendingPool) public view returns (uint256 borrowAPY) {
-        ILPRouter router = _router(_lendingPool);
-        uint256 borrowRate = router.calculateBorrowRate(); // Rate scaled by 100 (e.g., 1000 = 10%)
-        
-        if (borrowRate == 0) {
-            return 0;
-        }
-        
-        // Convert rate from percentage to decimal: borrowRate / 10000
-        // Then calculate APY with compounding effect
-        uint256 rateDecimal = (borrowRate * 1e18) / 10000; // Convert to 1e18 scale
-        uint256 compoundEffect = (rateDecimal * rateDecimal) / (2 * 1e18); // rate^2 / 2
-        borrowAPY = rateDecimal + compoundEffect;
-        
-        return borrowAPY;
-    }
-
-    /**
-     * @notice Get both supply and borrow APY for a lending pool
-     * @param _lendingPool The address of the lending pool
-     * @return supplyAPY The supply APY scaled by 1e18
-     * @return borrowAPY The borrow APY scaled by 1e18
-     * @return utilizationRate The utilization rate scaled by 1e18
-     */
-    function getAPY(address _lendingPool) 
-        public 
-        view 
-        returns (uint256 supplyAPY, uint256 borrowAPY, uint256 utilizationRate) 
-    {
-        supplyAPY = getSupplyAPY(_lendingPool);
-        borrowAPY = getBorrowAPY(_lendingPool);
-        utilizationRate = getUtilizationRate(_lendingPool);
-        
-        return (supplyAPY, borrowAPY, utilizationRate);
-    }
-
-    /**
-     * @notice Get the utilization rate for a lending pool
-     * @param _lendingPool The address of the lending pool
-     * @return utilizationRate The utilization rate scaled by 1e18 (e.g., 80% = 8e17)
-     */
-    function getUtilizationRate(address _lendingPool) public view returns (uint256 utilizationRate) {
-        ILPRouter router = _router(_lendingPool);
-        uint256 utilization = router.getUtilizationRate(); // Rate scaled by 10000 (e.g., 8000 = 80%)
-        
-        // Convert from 10000 scale to 1e18 scale
-        utilizationRate = (utilization * 1e18) / 10000;
-        
-        return utilizationRate;
-    }
-
-    /**
-     * @notice Get detailed lending pool metrics
-     * @param _lendingPool The address of the lending pool
-     * @return supplyAPY The supply APY scaled by 1e18
-     * @return borrowAPY The borrow APY scaled by 1e18
-     * @return utilizationRate The utilization rate scaled by 1e18
-     * @return totalSupplyAssets Total supply assets in the pool
-     * @return totalBorrowAssets Total borrow assets in the pool
-     */
-    function getLendingPoolMetrics(address _lendingPool) 
-        public 
-        view 
-        returns (
-            uint256 supplyAPY,
-            uint256 borrowAPY, 
-            uint256 utilizationRate,
-            uint256 totalSupplyAssets,
-            uint256 totalBorrowAssets
-        ) 
-    {
-        ILPRouter router = _router(_lendingPool);
-        
-        supplyAPY = getSupplyAPY(_lendingPool);
-        borrowAPY = getBorrowAPY(_lendingPool);
-        utilizationRate = getUtilizationRate(_lendingPool);
-        totalSupplyAssets = router.totalSupplyAssets();
-        totalBorrowAssets = router.totalBorrowAssets();
-        
-        return (supplyAPY, borrowAPY, utilizationRate, totalSupplyAssets, totalBorrowAssets);
     }
 }
