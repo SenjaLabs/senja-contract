@@ -275,6 +275,10 @@ contract HelperUtils {
         return collateralBalance;
     }
 
+    function getRouter(address _lendingPool) public view returns (address) {
+        return ILendingPool(_lendingPool).router();
+    }
+
     function _calculateCollateralValue(address _lendingPool, address _user) internal view returns (uint256) {
         address collateralToken = _collateralToken(_lendingPool);
         address borrowToken = _borrowToken(_lendingPool);

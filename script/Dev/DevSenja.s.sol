@@ -22,6 +22,7 @@ contract DevSenja is Script, Helper {
 
     MOCKUSDT public mockUSDT;
     MOCKWKAIA public mockWKAIA;
+
     ElevatedMinterBurner public elevatedminterburner;
     OFTUSDTadapter public oftusdtadapter;
     OFTKAIAadapter public oftkaiaadapter;
@@ -56,27 +57,33 @@ contract DevSenja is Script, Helper {
     uint16 SEND = 1; // Message type for sendString function
 
     function run() public {
-        vm.createSelectFork(vm.rpcUrl("kaia_mainnet"));
+        // vm.createSelectFork(vm.rpcUrl("kaia_mainnet"));
+        vm.createSelectFork(vm.rpcUrl("base_mainnet"));
         vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
         // _deployTokens();
-        _getUtils();
-        _deployOFT();
-        _setLibraries();
-        _setSendConfig();
-        _setReceiveConfig();
+        // _getUtils();
+        // _deployOFT();
+        // _setLibraries();
+        // _setSendConfig();
+        // _setReceiveConfig();
         _setPeers();
-        _setEnforcedOFT();
-        _setOFTAddress();
+        // _setEnforcedOFT();
+        // _setOFTAddress();
         vm.stopBroadcast();
     }
 
     function _deployTokens() internal {
+        // mockUSDT = new MOCKUSDT();
+        // mockWKAIA = new MOCKWKAIA();
+        // IFactory(KAIA_lendingPoolFactoryProxy).addTokenDataStream(address(mockWKAIA), KAIA_kaia_usdt_adapter);
+        // IFactory(KAIA_lendingPoolFactoryProxy).addTokenDataStream(address(mockUSDT), KAIA_usdt_usd_adapter);
+        // console.log("address public KAIA_mockUSDT =", address(mockUSDT), ";");
+        // console.log("mockWKAIA deployed to =", address(mockWKAIA), ";");
+
         mockUSDT = new MOCKUSDT();
         mockWKAIA = new MOCKWKAIA();
-        IFactory(KAIA_lendingPoolFactoryProxy).addTokenDataStream(address(mockWKAIA), KAIA_kaia_usdt_adapter);
-        IFactory(KAIA_lendingPoolFactoryProxy).addTokenDataStream(address(mockUSDT), KAIA_usdt_usd_adapter);
-        console.log("address public KAIA_mockUSDT =", address(mockUSDT), ";");
-        console.log("mockWKAIA deployed to =", address(mockWKAIA), ";");
+        console.log("address public BASE_mockUSDT =", address(mockUSDT), ";");
+        console.log("address public BASE_mockWKAIA =", address(mockWKAIA), ";");
     }
 
     function _getUtils() internal {
@@ -108,18 +115,19 @@ contract DevSenja is Script, Helper {
     }
 
     function _deployOFT() internal {
-        elevatedminterburner = new ElevatedMinterBurner(address(KAIA_MOCK_USDT), owner);
-        console.log("address public KAIA_MOCK_USDT_ELEVATED_MINTER_BURNER =", address(elevatedminterburner), ";");
-        oftusdtadapter = new OFTUSDTadapter(address(KAIA_MOCK_USDT), address(elevatedminterburner), BASE_LZ_ENDPOINT, owner);
-        console.log("address public KAIA_OFT_MOCK_USDT_ADAPTER =", address(oftusdtadapter), ";");
+        elevatedminterburner = new ElevatedMinterBurner(address(BASE_MOCK_USDT), owner);
+        console.log("address public BASE_MOCK_USDT_ELEVATED_MINTER_BURNER =", address(elevatedminterburner), ";");
+        oftusdtadapter =
+            new OFTUSDTadapter(address(BASE_MOCK_USDT), address(elevatedminterburner), BASE_LZ_ENDPOINT, owner);
+        console.log("address public BASE_OFT_MOCK_USDT_ADAPTER =", address(oftusdtadapter), ";");
         elevatedminterburner.setOperator(address(oftusdtadapter), true);
         oftusdt = address(oftusdtadapter);
 
-        elevatedminterburner = new ElevatedMinterBurner(address(KAIA_MOCK_WKAIA), owner);
-        console.log("address public KAIA_MOCK_WKAIA_ELEVATED_MINTER_BURNER =", address(elevatedminterburner), ";");
+        elevatedminterburner = new ElevatedMinterBurner(BASE_M0CK_WKAIA, owner);
+        console.log("address public BASE_MOCK_WKAIA_ELEVATED_MINTER_BURNER =", address(elevatedminterburner), ";");
         oftkaiaadapter =
-            new OFTKAIAadapter(address(KAIA_MOCK_WKAIA), address(elevatedminterburner), BASE_LZ_ENDPOINT, owner);
-        console.log("address public KAIA_OFT_MOCK_WKAIA_ADAPTER =", address(oftkaiaadapter), ";");
+            new OFTKAIAadapter(BASE_M0CK_WKAIA, address(elevatedminterburner), BASE_LZ_ENDPOINT, owner);
+        console.log("address public BASE_OFT_MOCK_WKAIA_ADAPTER =", address(oftkaiaadapter), ";");
         elevatedminterburner.setOperator(address(oftkaiaadapter), true);
         oftwkaia = address(oftkaiaadapter);
     }
@@ -174,8 +182,11 @@ contract DevSenja is Script, Helper {
     }
 
     function _setPeers() internal {
-        MyOApp(oftusdt).setPeer(BASE_EID, bytes32(uint256(uint160(BASE_OFT_USDTK_ADAPTER))));
-        MyOApp(oftwkaia).setPeer(BASE_EID, bytes32(uint256(uint160(BASE_OFT_WKAIAK_ADAPTER))));
+        // MyOApp(KAIA_OFT_MOCK_USDT_ADAPTER).setPeer(BASE_EID, bytes32(uint256(uint160(BASE_OFT_MOCK_USDT_ADAPTER))));
+        // MyOApp(KAIA_OFT_MOCK_WKAIA_ADAPTER).setPeer(BASE_EID, bytes32(uint256(uint160(BASE_OFT_MOCK_WKAIA_ADAPTER))));
+
+        MyOApp(BASE_OFT_MOCK_USDT_ADAPTER).setPeer(KAIA_EID, bytes32(uint256(uint160(BASE_OFT_MOCK_USDT_ADAPTER))));
+        MyOApp(BASE_OFT_MOCK_WKAIA_ADAPTER).setPeer(KAIA_EID, bytes32(uint256(uint160(BASE_OFT_MOCK_WKAIA_ADAPTER))));
     }
 
     function _setEnforcedOFT() internal {
