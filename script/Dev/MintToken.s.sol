@@ -10,9 +10,9 @@ interface IToken {
 }
 
 contract MintToken is Script, Helper {
-    address public minter = vm.envAddress("PUBLIC_KEY");
-    address public token = KAIA_MOCK_WKAIA;
-    uint256 public amount = 100_000e18;
+    address public minter = KAIA_OFT_MOCK_USDT_ADAPTER;
+    address public token = KAIA_MOCK_USDT;
+    uint256 public amount = 100_000;
 
     function run() public {
         vm.createSelectFork(vm.rpcUrl("kaia_mainnet"));
