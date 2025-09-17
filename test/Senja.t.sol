@@ -47,6 +47,7 @@ contract SenjaTest is Test, Helper {
     Protocol public protocol;
     PositionDeployer public positionDeployer;
     LendingPoolFactory public lendingPoolFactory;
+    LendingPoolFactory public newImplementation;
     Oracle public oracle;
     OFTUSDTadapter public oftusdtadapter;
     OFTKAIAadapter public oftkaiaadapter;
@@ -556,4 +557,5 @@ contract SenjaTest is Test, Helper {
         dynamicArray[1] = fixedArray[1];
         return dynamicArray;
     }
+
 }

@@ -94,12 +94,20 @@ contract Helper {
     address public KAIA_eth_usdt_adapter = 0xdbbb07E1AE9D0F23Ac6dA9BDDA3Dff96fcA73650;
     address public KAIA_btc_usdt_adapter = 0x3703a1DA99a2BDf2d8ce57802aaCb20fb546Ff12;
 
-    address public KAIA_liquidator = 0x4900409aabeCd5DE4ab22D61cdEc4b7478783806;
-    address public KAIA_isHealthy = 0xB9B3A1baA8CF4C5Cd6b4d132eD7B0cBe05646f6f;
-    address public KAIA_lendingPoolDeployer = 0xbd3B8bbE94a301B96c5207F8bE17Ed1cd3236550;
-    address public KAIA_protocol = 0x394239573079a46e438ea6D118Fd96d37A61f270;
-    address public KAIA_positionDeployer = 0x54f6Ff27093FC45c5A39083C3Ef0260D25012Be3;
-    address public KAIA_lendingPoolFactoryImplementation = 0xb0FCA55167f94D0f515877C411E0deb904321761;
+    // address public KAIA_liquidator = 0x4900409aabeCd5DE4ab22D61cdEc4b7478783806;
+    // address public KAIA_isHealthy = 0xB9B3A1baA8CF4C5Cd6b4d132eD7B0cBe05646f6f;
+    // address public KAIA_lendingPoolDeployer = 0xbd3B8bbE94a301B96c5207F8bE17Ed1cd3236550;
+    // address public KAIA_positionDeployer = 0x54f6Ff27093FC45c5A39083C3Ef0260D25012Be3;
+    // address public KAIA_protocol = 0x394239573079a46e438ea6D118Fd96d37A61f270;
+
+    address public KAIA_liquidator = 0x530F48Df8e4D60BBF9BbcFE8cF584344514af193;
+    address public KAIA_isHealthy = 0x057852e8211698a22953e0343Aae24E446ECF105;
+    address public KAIA_positionDeployer = 0x1385Df17F009F88e6cA1380798BF20B0669C8ee0;
+    address public KAIA_protocol = 0xd8d5edCE9F0e3544D2A712818232fdA7502BA1A6;
+    address public KAIA_lendingPoolDeployer = 0x677f0172ff3E8EEf477Ce811Ed57A85B8d8a3bDa;
+    address public KAIA_lendingPoolRouterDeployer = 0x60377628d1733fe0FB64D8B84466b461974DA60A;
+    // address public KAIA_lendingPoolFactoryImplementation = 0xb0FCA55167f94D0f515877C411E0deb904321761; // V1
+    address public KAIA_lendingPoolImplementation = 0xc28446267B3c9a733D6C7419535B883908e55813;
     address public KAIA_lendingPoolFactoryProxy = 0xa971CD2714fbCc9A942b09BC391a724Df9338206;
     address public KAIA_HELPER_UTILS = 0x3De8C22F6b84C575429c1B9cbf5bdDd49cf129fC;
 }

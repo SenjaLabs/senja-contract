@@ -77,6 +77,8 @@ contract LendingPoolFactory is
 
     event PositionDeployerSet(address indexed positionDeployer);
 
+    event LendingPoolRouterDeployerSet(address indexed lendingPoolRouterDeployer);
+
     /**
      * @notice Structure representing a lending pool
      * @param collateralToken The address of the collateral token
@@ -92,9 +94,6 @@ contract LendingPoolFactory is
 
     /// @notice The address of the IsHealthy contract for health checks
     address public isHealthy;
-
-    /// @notice The address of the lending pool deployer contract
-    address public lendingPoolRouterDeployer;
 
     /// @notice The address of the lending pool deployer contract
     address public lendingPoolDeployer;
@@ -119,7 +118,11 @@ contract LendingPoolFactory is
     /// @notice Total number of pools created
     uint256 public poolCount;
 
+    /// @notice VERSION Upgraded
     uint8 public constant VERSION = 2;
+
+    /// @notice The address of the lending pool deployer contract
+    address public lendingPoolRouterDeployer;
 
     constructor() {
         _disableInitializers();
@@ -224,6 +227,11 @@ contract LendingPoolFactory is
     function setPositionDeployer(address _positionDeployer) public onlyRole(OWNER_ROLE) {
         positionDeployer = _positionDeployer;
         emit PositionDeployerSet(_positionDeployer);
+    }
+
+    function setLendingPoolRouterDeployer(address _lendingPoolRouterDeployer) public onlyRole(OWNER_ROLE) {
+        lendingPoolRouterDeployer = _lendingPoolRouterDeployer;
+        emit LendingPoolRouterDeployerSet(_lendingPoolRouterDeployer);
     }
 
     /**
