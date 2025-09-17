@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
 import {OApp, Origin, MessagingFee} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
@@ -59,13 +59,12 @@ contract OAppSupplyLiquidityUSDT is OApp, OAppOptionsType3 {
         uint256 oftNativeFee = _quoteOftNativeFee(_dstEid, _oappaddressdst, _amount, _slippageTolerance);
         uint256 lzNativeFee = _quoteLzNativeFee(_dstEid, _lendingPool, _user, _tokendst, _amount, _options);
 
-        if(msg.value < oftNativeFee + lzNativeFee) revert InsufficientNativeFee();
+        if (msg.value < oftNativeFee + lzNativeFee) revert InsufficientNativeFee();
 
         _performOftSend(_dstEid, _oappaddressdst, _user, _amount, _slippageTolerance, oftNativeFee);
         _performLzSend(_dstEid, _lendingPool, _user, _tokendst, _amount, _options, lzNativeFee);
         emit SendLiquidityFromSrc(_lendingPool, _user, _tokendst, _amount);
     }
-
 
     function _lzReceive(Origin calldata, bytes32, bytes calldata _message, address, bytes calldata) internal override {
         (address _lendingPool, address _user, address _token, uint256 _amount) =
@@ -77,8 +76,7 @@ contract OAppSupplyLiquidityUSDT is OApp, OAppOptionsType3 {
     }
 
     function execute(address _lendingPool, address _user, uint256 _amount) public {
-        // TODO: passing byte code
-        if (_amount > userAmount[_user]) revert InsufficientBalance();
+        if (_amount > userAmount[_user]) revert InsufficientBalance(); // TODO: passing byte code
         userAmount[_user] -= _amount;
         address borrowToken = _borrowToken(_lendingPool);
         IERC20(borrowToken).approve(_lendingPool, _amount);
@@ -86,30 +84,11 @@ contract OAppSupplyLiquidityUSDT is OApp, OAppOptionsType3 {
         emit ExecuteLiquidity(_lendingPool, borrowToken, _user, _amount);
     }
 
-    // SRC
-    function setFactory(address _factory) public onlyOwner {
-        factory = _factory;
-    }
-
-    // SRC - DST
-    function setOFTaddress(address _oftaddress) public onlyOwner {
-        oftaddress = _oftaddress;
-    }
-
-    function _borrowToken(address _lendingPool) internal view returns (address) {
-        return ILPRouter(ILendingPool(_lendingPool).router()).borrowToken();
-    }
-
-    function addressToBytes32(address _address) internal pure returns (bytes32) {
-        return bytes32(uint256(uint160(_address)));
-    }
-
-    function _quoteOftNativeFee(
-        uint32 _dstEid,
-        address _oappaddressdst,
-        uint256 _amount,
-        uint256 _slippageTolerance
-    ) internal view returns (uint256) {
+    function _quoteOftNativeFee(uint32 _dstEid, address _oappaddressdst, uint256 _amount, uint256 _slippageTolerance)
+        internal
+        view
+        returns (uint256)
+    {
         OFTadapter oft = OFTadapter(oftaddress);
         bytes memory extraOptions = OptionsBuilder.newOptions().addExecutorLzReceiveOption(65000, 0);
         SendParam memory sendParam = SendParam({
@@ -173,5 +152,23 @@ contract OAppSupplyLiquidityUSDT is OApp, OAppOptionsType3 {
         bytes memory lzOptions = combineOptions(_dstEid, SEND, _options);
         bytes memory payload = abi.encode(_lendingPool, _user, _tokendst, _amount);
         _lzSend(_dstEid, payload, lzOptions, MessagingFee(_lzNativeFee, 0), payable(_user));
+    }
+
+    // SRC
+    function setFactory(address _factory) public onlyOwner {
+        factory = _factory;
+    }
+
+    // SRC - DST
+    function setOFTaddress(address _oftaddress) public onlyOwner {
+        oftaddress = _oftaddress;
+    }
+
+    function _borrowToken(address _lendingPool) internal view returns (address) {
+        return ILPRouter(ILendingPool(_lendingPool).router()).borrowToken();
+    }
+
+    function addressToBytes32(address _address) internal pure returns (bytes32) {
+        return bytes32(uint256(uint160(_address)));
     }
 }

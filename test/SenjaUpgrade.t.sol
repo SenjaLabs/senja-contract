@@ -29,8 +29,8 @@ contract SenjaUpgradeTest is Test, Helper {
         console.log("lendingPoolDeployer", LendingPoolFactory(KAIA_lendingPoolFactoryProxy).lendingPoolDeployer());
         console.log("protocol", LendingPoolFactory(KAIA_lendingPoolFactoryProxy).protocol());
         console.log("positionDeployer", LendingPoolFactory(KAIA_lendingPoolFactoryProxy).positionDeployer());
-        // console.log("VERSION", LendingPoolFactory(KAIA_lendingPoolFactoryProxy).VERSION());
-        // console.log("lendingPoolRouterDeployer", LendingPoolFactory(KAIA_lendingPoolFactoryProxy).lendingPoolRouterDeployer());
+        console.log("VERSION", LendingPoolFactory(KAIA_lendingPoolFactoryProxy).VERSION());
+        console.log("lendingPoolRouterDeployer", LendingPoolFactory(KAIA_lendingPoolFactoryProxy).lendingPoolRouterDeployer());
         console.log("USDT", LendingPoolFactory(KAIA_lendingPoolFactoryProxy).tokenDataStream(KAIA_USDT));
         console.log("WKAIA", LendingPoolFactory(KAIA_lendingPoolFactoryProxy).tokenDataStream(KAIA_WKAIA));
         console.log("KAIA", LendingPoolFactory(KAIA_lendingPoolFactoryProxy).tokenDataStream(KAIA_KAIA));

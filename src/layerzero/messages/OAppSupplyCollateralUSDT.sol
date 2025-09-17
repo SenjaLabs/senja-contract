@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
 import {OApp, Origin, MessagingFee} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
@@ -17,6 +17,7 @@ contract OAppSupplyCollateralUSDT is OApp, OAppOptionsType3 {
     using SafeERC20 for IERC20;
 
     error InsufficientBalance();
+    error InsufficientNativeFee();
 
     bytes public lastMessage;
     address public factory;
@@ -58,40 +59,11 @@ contract OAppSupplyCollateralUSDT is OApp, OAppOptionsType3 {
         uint256 oftNativeFee = _quoteOftNativeFee(_dstEid, _oappaddressdst, _amount, _slippageTolerance);
         uint256 lzNativeFee = _quoteLzNativeFee(_dstEid, _lendingPool, _user, _tokendst, _amount, _options);
 
-        require(msg.value >= oftNativeFee + lzNativeFee, "Insufficient native fee");
+        if (msg.value < oftNativeFee + lzNativeFee) revert InsufficientNativeFee();
 
         _performOftSend(_dstEid, _oappaddressdst, _user, _amount, _slippageTolerance, oftNativeFee);
         _performLzSend(_dstEid, _lendingPool, _user, _tokendst, _amount, _options, lzNativeFee);
         emit SendCollateralFromSrc(_lendingPool, _user, _tokendst, _amount);
-    }
-
-    function _sendBridge(
-        uint32 _dstEid,
-        address _user,
-        address _oappaddressdst,
-        uint256 _amount,
-        uint256 _slippageTolerance
-    ) internal {
-        OFTadapter oft = OFTadapter(oftaddress);
-        bytes memory extraOptions = OptionsBuilder.newOptions().addExecutorLzReceiveOption(65000, 0);
-        SendParam memory sendParam = SendParam({
-            dstEid: _dstEid,
-            to: addressToBytes32(_oappaddressdst),
-            amountLD: _amount,
-            minAmountLD: _amount * (100 - _slippageTolerance) / 100,
-            extraOptions: extraOptions,
-            composeMsg: "",
-            oftCmd: ""
-        });
-        MessagingFee memory fee = oft.quoteSend(sendParam, false);
-        IERC20(oft.tokenOFT()).safeTransferFrom(_user, address(this), _amount);
-        IERC20(oft.tokenOFT()).approve(oftaddress, _amount);
-        oft.send{value: fee.nativeFee}(sendParam, fee, _user);
-    }
-
-    function _sendMessage(address _lendingPool, address _user, address _token, uint256 _amount, uint32 _dstEid, bytes calldata _options) internal {
-        bytes memory _message = abi.encode(_lendingPool, _user, _token, _amount);
-        _lzSend(_dstEid, _message, combineOptions(_dstEid, SEND, _options), MessagingFee(msg.value, 0), payable(_user));
     }
 
     function _lzReceive(Origin calldata, bytes32, bytes calldata _message, address, bytes calldata) internal override {
@@ -112,12 +84,11 @@ contract OAppSupplyCollateralUSDT is OApp, OAppOptionsType3 {
         emit ExecuteCollateral(_lendingPool, collateralToken, _user, _amount);
     }
 
-    function _quoteOftNativeFee(
-        uint32 _dstEid,
-        address _oappaddressdst,
-        uint256 _amount,
-        uint256 _slippageTolerance
-    ) internal view returns (uint256) {
+    function _quoteOftNativeFee(uint32 _dstEid, address _oappaddressdst, uint256 _amount, uint256 _slippageTolerance)
+        internal
+        view
+        returns (uint256)
+    {
         OFTadapter oft = OFTadapter(oftaddress);
         bytes memory extraOptions = OptionsBuilder.newOptions().addExecutorLzReceiveOption(65000, 0);
         SendParam memory sendParam = SendParam({
