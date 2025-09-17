@@ -12,17 +12,18 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 contract OFTUSDTadapter is OFTAdapter, ReentrancyGuard {
     error InsufficientBalance();
 
-    address tokenOFT;
-    address elevatedMinterBurner;
+    event Credit(address to, uint256 amount);
+    event Debit(address from, uint256 amount);
+
+    address public tokenOFT;
+    address public elevatedMinterBurner;
 
     using SafeERC20 for IERC20;
 
-    constructor(
-        address _token, // Your existing ERC20 token with mint/burn exposed
-        address _elevatedMinterBurner,
-        address _lzEndpoint, // Local LayerZero endpoint
-        address _owner // Contract owner
-    ) OFTAdapter(_token, _lzEndpoint, _owner) Ownable(_owner) {
+    constructor(address _token, address _elevatedMinterBurner, address _lzEndpoint, address _owner)
+        OFTAdapter(_token, _lzEndpoint, _owner)
+        Ownable(_owner)
+    {
         tokenOFT = _token;
         elevatedMinterBurner = _elevatedMinterBurner;
     }
@@ -39,11 +40,12 @@ contract OFTUSDTadapter is OFTAdapter, ReentrancyGuard {
     {
         if (_to == address(0x0)) _to = address(0xdead); // _mint(...) does not support address(0x0)
         if (block.chainid == 8217) {
-            if (IERC20(address(this)).balanceOf(address(this)) < _amountLD) revert InsufficientBalance();
+            if (IERC20(tokenOFT).balanceOf(address(this)) < _amountLD) revert InsufficientBalance();
             IERC20(tokenOFT).safeTransfer(_to, _amountLD);
         } else {
             IElevatedMintableBurnable(elevatedMinterBurner).mint(_to, _amountLD); // dst kaia release pay borrow, dst other chain mint representative
         }
+        emit Credit(_to, _amountLD);
         return _amountLD;
     }
 
@@ -57,7 +59,10 @@ contract OFTUSDTadapter is OFTAdapter, ReentrancyGuard {
         if (block.chainid == 8217) {
             IERC20(tokenOFT).safeTransferFrom(_from, address(this), amountSentLD);
         } else {
+            IERC20(tokenOFT).safeTransferFrom(_from, address(this), amountSentLD);
+            IERC20(tokenOFT).approve(elevatedMinterBurner, amountSentLD);
             IElevatedMintableBurnable(elevatedMinterBurner).burn(_from, amountSentLD);
         }
+        emit Debit(_from, _amountLD);
     }
 }

@@ -51,8 +51,16 @@ contract Protocol is ReentrancyGuard, Ownable {
      */
     receive() external payable {
         if (msg.value > 0) {
+            // Always wrap native tokens to WKAIA for consistent handling
             IWKAIA(WKAIA).deposit{value: msg.value}();
         }
+    }
+
+    /**
+     * @dev Fallback function - rejects calls with data to prevent accidental interactions
+     */
+    fallback() external {
+        revert("Fallback not allowed");
     }
 
     /**

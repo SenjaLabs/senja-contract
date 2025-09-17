@@ -28,6 +28,7 @@ import {IFactory} from "../src/interfaces/IFactory.sol";
 import {IPosition} from "../src/interfaces/IPosition.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {PositionDeployer} from "../src/PositionDeployer.sol";
+import {LendingPoolRouterDeployer} from "../src/LendingPoolRouterDeployer.sol";
 
 interface IOrakl {
     function latestRoundData() external view returns (uint80, int256, uint256);
@@ -41,6 +42,7 @@ contract SenjaExtendedTest is Test, Helper {
 
     IsHealthy public isHealthy;
     Liquidator public liquidator;
+    LendingPoolRouterDeployer public lendingPoolRouterDeployer;
     LendingPoolDeployer public lendingPoolDeployer;
     Protocol public protocol;
     PositionDeployer public positionDeployer;
@@ -117,11 +119,11 @@ contract SenjaExtendedTest is Test, Helper {
 
         _deployOracleAdapter();
         _deployFactory();
+        _setOFTAddress();
         helperUtils = new HelperUtils(address(proxy));
         lendingPool = IFactory(address(proxy)).createLendingPool(WKAIA, USDT, 8e17);
         lendingPool2 = IFactory(address(proxy)).createLendingPool(USDT, WKAIA, 8e17);
         lendingPool3 = IFactory(address(proxy)).createLendingPool(KAIA, USDT, 8e17);
-        _setOFTAddress();
         deal(USDT, alice, 100_000e6);
         deal(WKAIA, alice, 100_000 ether);
         vm.deal(alice, 100_000 ether);
@@ -278,6 +280,7 @@ contract SenjaExtendedTest is Test, Helper {
         liquidator = new Liquidator();
         isHealthy = new IsHealthy(address(liquidator));
         lendingPoolDeployer = new LendingPoolDeployer();
+        lendingPoolRouterDeployer = new LendingPoolRouterDeployer();
         protocol = new Protocol();
         positionDeployer = new PositionDeployer();
 
@@ -285,6 +288,7 @@ contract SenjaExtendedTest is Test, Helper {
         bytes memory data = abi.encodeWithSelector(
             lendingPoolFactory.initialize.selector,
             address(isHealthy),
+            address(lendingPoolRouterDeployer),
             address(lendingPoolDeployer),
             address(protocol),
             address(positionDeployer)
@@ -292,6 +296,7 @@ contract SenjaExtendedTest is Test, Helper {
         proxy = new ERC1967Proxy(address(lendingPoolFactory), data);
 
         lendingPoolDeployer.setFactory(address(proxy));
+        lendingPoolRouterDeployer.setFactory(address(proxy));
 
         IFactory(address(proxy)).addTokenDataStream(USDT, usdt_usd_adapter);
         IFactory(address(proxy)).addTokenDataStream(WKAIA, kaia_usdt_adapter);
@@ -432,19 +437,19 @@ contract SenjaExtendedTest is Test, Helper {
 
         vm.startPrank(alice);
         ILendingPool(lendingPool).borrowDebt(10e6, block.chainid, KAIA_EID, 65000);
-        ILendingPool(lendingPool2).borrowDebt(50 ether, block.chainid, KAIA_EID, 65000);
+        ILendingPool(lendingPool2).borrowDebt(5 ether, block.chainid, KAIA_EID, 65000);
         ILendingPool(lendingPool3).borrowDebt(10e6, block.chainid, KAIA_EID, 65000);
         ILendingPool(lendingPool).borrowDebt(10e6, block.chainid, KAIA_EID, 65000);
-        ILendingPool(lendingPool2).borrowDebt(50 ether, block.chainid, KAIA_EID, 65000);
+        ILendingPool(lendingPool2).borrowDebt(5 ether, block.chainid, KAIA_EID, 65000);
         ILendingPool(lendingPool3).borrowDebt(10e6, block.chainid, KAIA_EID, 65000);
         vm.stopPrank();
 
         assertEq(ILPRouter(_router(lendingPool)).userBorrowShares(alice), 2 * 10e6);
         assertEq(ILPRouter(_router(lendingPool)).totalBorrowAssets(), 2 * 10e6);
         assertEq(ILPRouter(_router(lendingPool)).totalBorrowShares(), 2 * 10e6);
-        assertEq(ILPRouter(_router(lendingPool2)).userBorrowShares(alice), 2 * 50 ether);
-        assertEq(ILPRouter(_router(lendingPool2)).totalBorrowAssets(), 2 * 50 ether);
-        assertEq(ILPRouter(_router(lendingPool2)).totalBorrowShares(), 2 * 50 ether);
+        assertEq(ILPRouter(_router(lendingPool2)).userBorrowShares(alice), 2 * 5 ether);
+        assertEq(ILPRouter(_router(lendingPool2)).totalBorrowAssets(), 2 * 5 ether);
+        assertEq(ILPRouter(_router(lendingPool2)).totalBorrowShares(), 2 * 5 ether);
         assertEq(ILPRouter(_router(lendingPool3)).userBorrowShares(alice), 2 * 10e6);
         assertEq(ILPRouter(_router(lendingPool3)).totalBorrowAssets(), 2 * 10e6);
         assertEq(ILPRouter(_router(lendingPool3)).totalBorrowShares(), 2 * 10e6);
@@ -461,10 +466,10 @@ contract SenjaExtendedTest is Test, Helper {
         IERC20(USDT).approve(lendingPool, 10e6);
         ILendingPool(lendingPool).repayWithSelectedToken(10e6, USDT, false, alice);
         // For WKAIA repayment, send native KAIA which gets auto-wrapped
-        IERC20(WKAIA).approve(lendingPool2, 50 ether);
-        ILendingPool(lendingPool2).repayWithSelectedToken(50 ether, WKAIA, false, alice);
-        IERC20(WKAIA).approve(lendingPool2, 50 ether);
-        ILendingPool(lendingPool2).repayWithSelectedToken(50 ether, WKAIA, false, alice);
+        IERC20(WKAIA).approve(lendingPool2, 5 ether);
+        ILendingPool(lendingPool2).repayWithSelectedToken(5 ether, WKAIA, false, alice);
+        IERC20(WKAIA).approve(lendingPool2, 5 ether);
+        ILendingPool(lendingPool2).repayWithSelectedToken(5 ether, WKAIA, false, alice);
 
         IERC20(USDT).approve(lendingPool3, 10e6);
         ILendingPool(lendingPool3).repayWithSelectedToken(10e6, USDT, false, alice);
@@ -499,10 +504,10 @@ contract SenjaExtendedTest is Test, Helper {
         fee = helperUtils.getFee(kaia_oftusdt_adapter, BASE_EID, alice, 10e6);
         ILendingPool(lendingPool).borrowDebt{value: fee}(10e6, 8453, BASE_EID, 65000);
 
-        fee = helperUtils.getFee(kaia_oftkaia_adapter, BASE_EID, alice, 50 ether);
-        ILendingPool(lendingPool2).borrowDebt{value: fee}(50 ether, 8453, BASE_EID, 65000);
-        fee = helperUtils.getFee(kaia_oftkaia_adapter, BASE_EID, alice, 50 ether);
-        ILendingPool(lendingPool2).borrowDebt{value: fee}(50 ether, 8453, BASE_EID, 65000);
+        fee = helperUtils.getFee(kaia_oftkaia_adapter, BASE_EID, alice, 5 ether);
+        ILendingPool(lendingPool2).borrowDebt{value: fee}(5 ether, 8453, BASE_EID, 65000);
+        fee = helperUtils.getFee(kaia_oftkaia_adapter, BASE_EID, alice, 5 ether);
+        ILendingPool(lendingPool2).borrowDebt{value: fee}(5 ether, 8453, BASE_EID, 65000);
 
         fee = helperUtils.getFee(kaia_oftusdt_adapter, BASE_EID, alice, 10e6);
         ILendingPool(lendingPool3).borrowDebt{value: fee}(10e6, 8453, BASE_EID, 65000);
@@ -514,9 +519,9 @@ contract SenjaExtendedTest is Test, Helper {
         assertEq(ILPRouter(_router(lendingPool)).userBorrowShares(alice), 2 * 10e6);
         assertEq(ILPRouter(_router(lendingPool)).totalBorrowAssets(), 2 * 10e6);
         assertEq(ILPRouter(_router(lendingPool)).totalBorrowShares(), 2 * 10e6);
-        assertEq(ILPRouter(_router(lendingPool2)).userBorrowShares(alice), 2 * 50 ether);
-        assertEq(ILPRouter(_router(lendingPool2)).totalBorrowAssets(), 2 * 50 ether);
-        assertEq(ILPRouter(_router(lendingPool2)).totalBorrowShares(), 2 * 50 ether);
+        assertEq(ILPRouter(_router(lendingPool2)).userBorrowShares(alice), 2 * 5 ether);
+        assertEq(ILPRouter(_router(lendingPool2)).totalBorrowAssets(), 2 * 5 ether);
+        assertEq(ILPRouter(_router(lendingPool2)).totalBorrowShares(), 2 * 5 ether);
         assertEq(ILPRouter(_router(lendingPool3)).userBorrowShares(alice), 2 * 10e6);
         assertEq(ILPRouter(_router(lendingPool3)).totalBorrowAssets(), 2 * 10e6);
         assertEq(ILPRouter(_router(lendingPool3)).totalBorrowShares(), 2 * 10e6);
@@ -559,12 +564,13 @@ contract SenjaExtendedTest is Test, Helper {
         _setupPositionWithDebt();
 
         // Check if position is liquidatable (should be healthy)
-        (bool isLiquidatable, uint256 borrowValue, uint256 collateralValue) = ILendingPool(lendingPool).checkLiquidation(alice);
-        
+        (bool isLiquidatable, uint256 borrowValue, uint256 collateralValue) =
+            ILendingPool(lendingPool).checkLiquidation(alice);
+
         console.log("Is liquidatable:", isLiquidatable);
         console.log("Borrow value:", borrowValue);
         console.log("Collateral value:", collateralValue);
-        
+
         // Position should be healthy initially
         assertEq(isLiquidatable, false);
         assertTrue(collateralValue > borrowValue);
@@ -573,22 +579,22 @@ contract SenjaExtendedTest is Test, Helper {
     function _setupPositionWithDebt() internal {
         test_supply_liquidity();
         test_supply_collateral();
-        
+
         vm.startPrank(alice);
         ILendingPool(lendingPool).borrowDebt(10e6, block.chainid, KAIA_EID, 65000);
-        ILendingPool(lendingPool2).borrowDebt(50 ether, block.chainid, KAIA_EID, 65000);
+        ILendingPool(lendingPool2).borrowDebt(5 ether, block.chainid, KAIA_EID, 65000);
         ILendingPool(lendingPool3).borrowDebt(10e6, block.chainid, KAIA_EID, 65000);
         ILendingPool(lendingPool).borrowDebt(10e6, block.chainid, KAIA_EID, 65000);
-        ILendingPool(lendingPool2).borrowDebt(50 ether, block.chainid, KAIA_EID, 65000);
+        ILendingPool(lendingPool2).borrowDebt(5 ether, block.chainid, KAIA_EID, 65000);
         ILendingPool(lendingPool3).borrowDebt(10e6, block.chainid, KAIA_EID, 65000);
         vm.stopPrank();
 
         assertEq(ILPRouter(_router(lendingPool)).userBorrowShares(alice), 2 * 10e6);
         assertEq(ILPRouter(_router(lendingPool)).totalBorrowAssets(), 2 * 10e6);
         assertEq(ILPRouter(_router(lendingPool)).totalBorrowShares(), 2 * 10e6);
-        assertEq(ILPRouter(_router(lendingPool2)).userBorrowShares(alice), 2 * 50 ether);
-        assertEq(ILPRouter(_router(lendingPool2)).totalBorrowAssets(), 2 * 50 ether);
-        assertEq(ILPRouter(_router(lendingPool2)).totalBorrowShares(), 2 * 50 ether);
+        assertEq(ILPRouter(_router(lendingPool2)).userBorrowShares(alice), 2 * 5 ether);
+        assertEq(ILPRouter(_router(lendingPool2)).totalBorrowAssets(), 2 * 5 ether);
+        assertEq(ILPRouter(_router(lendingPool2)).totalBorrowShares(), 2 * 5 ether);
         assertEq(ILPRouter(_router(lendingPool3)).userBorrowShares(alice), 2 * 10e6);
         assertEq(ILPRouter(_router(lendingPool3)).totalBorrowAssets(), 2 * 10e6);
         assertEq(ILPRouter(_router(lendingPool3)).totalBorrowShares(), 2 * 10e6);
@@ -600,29 +606,30 @@ contract SenjaExtendedTest is Test, Helper {
         // Setup an unhealthy position by manipulating oracle prices or borrowing too much
         test_supply_liquidity();
         test_supply_collateral();
-        
+
         vm.startPrank(alice);
         // Borrow maximum allowed amount (this should make position close to liquidation threshold)
         ILendingPool(lendingPool).borrowDebt(80e6, block.chainid, KAIA_EID, 65000); // Much higher amount
-        vm.stopPrank();    // Check liquidation status
-        (bool isLiquidatable, uint256 borrowValue, uint256 collateralValue) = ILendingPool(lendingPool).checkLiquidation(alice);
-        
+        vm.stopPrank(); // Check liquidation status
+        (bool isLiquidatable, uint256 borrowValue, uint256 collateralValue) =
+            ILendingPool(lendingPool).checkLiquidation(alice);
+
         if (isLiquidatable) {
             console.log("Position is liquidatable");
             console.log("Borrow value:", borrowValue);
             console.log("Collateral value:", collateralValue);
-            
+
             // Attempt DEX liquidation
             address liquidatorUser = makeAddr("liquidatorUser");
             vm.startPrank(liquidatorUser);
-            
+
             uint256 liquidatedAmount = ILendingPool(lendingPool).liquidateByDEX(alice, 500); // 5% incentive
-            
+
             console.log("Liquidated amount:", liquidatedAmount);
             assertTrue(liquidatedAmount > 0);
-            
+
             vm.stopPrank();
-            
+
             // Check that user's borrow shares have been reduced
             uint256 remainingShares = ILPRouter(_router(lendingPool)).userBorrowShares(alice);
             console.log("Remaining borrow shares:", remainingShares);
@@ -637,7 +644,7 @@ contract SenjaExtendedTest is Test, Helper {
         // Setup an unhealthy position
         test_supply_liquidity();
         test_supply_collateral();
-        
+
         vm.startPrank(alice);
         // Borrow close to maximum
         ILendingPool(lendingPool).borrowDebt(50e6, block.chainid, KAIA_EID, 65000);
@@ -645,31 +652,31 @@ contract SenjaExtendedTest is Test, Helper {
 
         // Check liquidation status
         (bool isLiquidatable,,) = ILendingPool(lendingPool).checkLiquidation(alice);
-        
+
         if (isLiquidatable) {
             console.log("Position is liquidatable for MEV");
-            
+
             // Setup MEV liquidator
             address mevBot = makeAddr("mevBot");
             deal(USDT, mevBot, 1000e6); // Give MEV bot some USDT
-            
+
             vm.startPrank(mevBot);
-            
+
             // MEV bot approves and liquidates
             uint256 repayAmount = 100e6; // Partial liquidation
             IERC20(USDT).approve(address(proxy), repayAmount);
-            
+
             uint256 collateralBefore = IERC20(WKAIA).balanceOf(mevBot);
             console.log("MEV bot WKAIA before:", collateralBefore);
-            
+
             ILendingPool(lendingPool).liquidateByMEV(alice, repayAmount, 500); // 5% incentive
-            
+
             uint256 collateralAfter = IERC20(WKAIA).balanceOf(mevBot);
             console.log("MEV bot WKAIA after:", collateralAfter);
-            
+
             // MEV bot should have received collateral
             assertTrue(collateralAfter > collateralBefore);
-            
+
             vm.stopPrank();
         } else {
             console.log("Position is not liquidatable - may need to adjust test parameters");
@@ -682,7 +689,7 @@ contract SenjaExtendedTest is Test, Helper {
         // Setup position and make it liquidatable
         test_supply_liquidity();
         test_supply_collateral();
-        
+
         vm.startPrank(alice);
         ILendingPool(lendingPool).borrowDebt(100e6, block.chainid, KAIA_EID, 65000);
         vm.stopPrank();
@@ -690,13 +697,13 @@ contract SenjaExtendedTest is Test, Helper {
         // Record initial state
         uint256 initialBorrowShares = ILPRouter(_router(lendingPool)).userBorrowShares(alice);
         uint256 initialSupplyShares = ILPRouter(_router(lendingPool)).userSupplyShares(alice);
-        
+
         console.log("Initial borrow shares:", initialBorrowShares);
         console.log("Initial supply shares:", initialSupplyShares);
-        
+
         // Force liquidation by manipulating the position to be unhealthy
         // This is a simplified test - in practice, price movements would trigger liquidation
-        
+
         // Check that supply shares remain untouched (key requirement)
         uint256 finalSupplyShares = ILPRouter(_router(lendingPool)).userSupplyShares(alice);
         assertEq(finalSupplyShares, initialSupplyShares, "Supply shares should remain unchanged");
@@ -707,7 +714,7 @@ contract SenjaExtendedTest is Test, Helper {
     function test_liquidation_incentive_calculation() public {
         test_supply_liquidity();
         test_supply_collateral();
-        
+
         vm.startPrank(alice);
         ILendingPool(lendingPool).borrowDebt(50e6, block.chainid, KAIA_EID, 65000);
         vm.stopPrank();
@@ -720,10 +727,10 @@ contract SenjaExtendedTest is Test, Helper {
 
         for (uint256 i = 0; i < incentives.length; i++) {
             console.log("Testing incentive:", incentives[i], "basis points");
-            
+
             // Check liquidation status
             (bool isLiquidatable,,) = ILendingPool(lendingPool).checkLiquidation(alice);
-            
+
             if (isLiquidatable) {
                 console.log("Position can be liquidated with", incentives[i], "bp incentive");
                 // More detailed testing could be done here
@@ -738,7 +745,7 @@ contract SenjaExtendedTest is Test, Helper {
         // 2. Having user borrow maximum amount
         // 3. Simulating collateral value drop
         // For now, we'll try borrowing a large amount
-        
+
         vm.startPrank(user);
         try ILendingPool(pool).borrowDebt(900e6, block.chainid, KAIA_EID, 65000) {
             console.log("Successfully made position liquidatable");
@@ -753,21 +760,21 @@ contract SenjaExtendedTest is Test, Helper {
     function test_emergency_liquidation_scenarios() public {
         test_supply_liquidity();
         test_supply_collateral();
-        
+
         // Test emergency reset functionality
         vm.startPrank(owner);
-        
+
         // Use emergency reset (should only be available to factory)
         address routerAddr = _router(lendingPool);
-        
+
         // Record state before emergency reset
         uint256 beforeBorrowShares = ILPRouter(routerAddr).userBorrowShares(alice);
-        
+
         console.log("Before emergency reset - borrow shares:", beforeBorrowShares);
-        
+
         // Emergency reset should clear all user positions except liquidity
         // Note: This function should be used very carefully in production
-        
+
         vm.stopPrank();
     }
 }

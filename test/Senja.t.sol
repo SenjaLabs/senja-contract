@@ -28,6 +28,7 @@ import {IFactory} from "../src/interfaces/IFactory.sol";
 import {IPosition} from "../src/interfaces/IPosition.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {PositionDeployer} from "../src/PositionDeployer.sol";
+import {LendingPoolRouterDeployer} from "../src/LendingPoolRouterDeployer.sol";
 
 interface IOrakl {
     function latestRoundData() external view returns (uint80, int256, uint256);
@@ -41,6 +42,7 @@ contract SenjaTest is Test, Helper {
 
     IsHealthy public isHealthy;
     Liquidator public liquidator;
+    LendingPoolRouterDeployer public lendingPoolRouterDeployer;
     LendingPoolDeployer public lendingPoolDeployer;
     Protocol public protocol;
     PositionDeployer public positionDeployer;
@@ -278,6 +280,7 @@ contract SenjaTest is Test, Helper {
         liquidator = new Liquidator();
         isHealthy = new IsHealthy(address(liquidator));
         lendingPoolDeployer = new LendingPoolDeployer();
+        lendingPoolRouterDeployer = new LendingPoolRouterDeployer();
         protocol = new Protocol();
         positionDeployer = new PositionDeployer();
 
@@ -285,6 +288,7 @@ contract SenjaTest is Test, Helper {
         bytes memory data = abi.encodeWithSelector(
             lendingPoolFactory.initialize.selector,
             address(isHealthy),
+            address(lendingPoolRouterDeployer),
             address(lendingPoolDeployer),
             address(protocol),
             address(positionDeployer)
@@ -292,6 +296,7 @@ contract SenjaTest is Test, Helper {
         proxy = new ERC1967Proxy(address(lendingPoolFactory), data);
 
         lendingPoolDeployer.setFactory(address(proxy));
+        lendingPoolRouterDeployer.setFactory(address(proxy));
 
         IFactory(address(proxy)).addTokenDataStream(USDT, usdt_usd_adapter);
         IFactory(address(proxy)).addTokenDataStream(WKAIA, kaia_usdt_adapter);
@@ -304,6 +309,8 @@ contract SenjaTest is Test, Helper {
         IFactory(address(proxy)).setOftAddress(KAIA, kaia_oftkaia_adapter);
     }
 
+    // RUN
+    // forge test --match-test test_factory -vvv
     function test_factory() public view {
         address router = ILendingPool(lendingPool).router();
         assertEq(ILPRouter(router).lendingPool(), address(lendingPool));
@@ -394,10 +401,10 @@ contract SenjaTest is Test, Helper {
     // forge test --match-test test_supply_collateral -vvv
     function test_supply_collateral() public {
         vm.startPrank(alice);
-        // Supply 1000 KAIA as collateral (KAIA uses 18 decimals)
+
         IERC20(WKAIA).approve(lendingPool, 1000 ether);
         ILendingPool(lendingPool).supplyCollateral(1000 ether, alice);
-        // Supply 1000 USDT as collateral (USDT uses 6 decimals)
+
         IERC20(USDT).approve(lendingPool2, 1_000e6);
         ILendingPool(lendingPool2).supplyCollateral(1_000e6, alice);
 
@@ -432,19 +439,19 @@ contract SenjaTest is Test, Helper {
 
         vm.startPrank(alice);
         ILendingPool(lendingPool).borrowDebt(10e6, block.chainid, KAIA_EID, 65000);
-        ILendingPool(lendingPool2).borrowDebt(50 ether, block.chainid, KAIA_EID, 65000);
+        ILendingPool(lendingPool2).borrowDebt(5 ether, block.chainid, KAIA_EID, 65000);
         ILendingPool(lendingPool3).borrowDebt(10e6, block.chainid, KAIA_EID, 65000);
         ILendingPool(lendingPool).borrowDebt(10e6, block.chainid, KAIA_EID, 65000);
-        ILendingPool(lendingPool2).borrowDebt(50 ether, block.chainid, KAIA_EID, 65000);
+        ILendingPool(lendingPool2).borrowDebt(5 ether, block.chainid, KAIA_EID, 65000);
         ILendingPool(lendingPool3).borrowDebt(10e6, block.chainid, KAIA_EID, 65000);
         vm.stopPrank();
 
         assertEq(ILPRouter(_router(lendingPool)).userBorrowShares(alice), 2 * 10e6);
         assertEq(ILPRouter(_router(lendingPool)).totalBorrowAssets(), 2 * 10e6);
         assertEq(ILPRouter(_router(lendingPool)).totalBorrowShares(), 2 * 10e6);
-        assertEq(ILPRouter(_router(lendingPool2)).userBorrowShares(alice), 2 * 50 ether);
-        assertEq(ILPRouter(_router(lendingPool2)).totalBorrowAssets(), 2 * 50 ether);
-        assertEq(ILPRouter(_router(lendingPool2)).totalBorrowShares(), 2 * 50 ether);
+        assertEq(ILPRouter(_router(lendingPool2)).userBorrowShares(alice), 2 * 5 ether);
+        assertEq(ILPRouter(_router(lendingPool2)).totalBorrowAssets(), 2 * 5 ether);
+        assertEq(ILPRouter(_router(lendingPool2)).totalBorrowShares(), 2 * 5 ether);
         assertEq(ILPRouter(_router(lendingPool3)).userBorrowShares(alice), 2 * 10e6);
         assertEq(ILPRouter(_router(lendingPool3)).totalBorrowAssets(), 2 * 10e6);
         assertEq(ILPRouter(_router(lendingPool3)).totalBorrowShares(), 2 * 10e6);
@@ -461,10 +468,10 @@ contract SenjaTest is Test, Helper {
         IERC20(USDT).approve(lendingPool, 10e6);
         ILendingPool(lendingPool).repayWithSelectedToken(10e6, USDT, false, alice);
         // For WKAIA repayment, send native KAIA which gets auto-wrapped
-        IERC20(WKAIA).approve(lendingPool2, 50 ether);
-        ILendingPool(lendingPool2).repayWithSelectedToken(50 ether, WKAIA, false, alice);
-        IERC20(WKAIA).approve(lendingPool2, 50 ether);
-        ILendingPool(lendingPool2).repayWithSelectedToken(50 ether, WKAIA, false, alice);
+        IERC20(WKAIA).approve(lendingPool2, 5 ether);
+        ILendingPool(lendingPool2).repayWithSelectedToken(5 ether, WKAIA, false, alice);
+        IERC20(WKAIA).approve(lendingPool2, 5 ether);
+        ILendingPool(lendingPool2).repayWithSelectedToken(5 ether, WKAIA, false, alice);
 
         IERC20(USDT).approve(lendingPool3, 10e6);
         ILendingPool(lendingPool3).repayWithSelectedToken(10e6, USDT, false, alice);
@@ -499,10 +506,10 @@ contract SenjaTest is Test, Helper {
         fee = helperUtils.getFee(kaia_oftusdt_adapter, BASE_EID, alice, 10e6);
         ILendingPool(lendingPool).borrowDebt{value: fee}(10e6, 8453, BASE_EID, 65000);
 
-        fee = helperUtils.getFee(kaia_oftkaia_adapter, BASE_EID, alice, 50 ether);
-        ILendingPool(lendingPool2).borrowDebt{value: fee}(50 ether, 8453, BASE_EID, 65000);
-        fee = helperUtils.getFee(kaia_oftkaia_adapter, BASE_EID, alice, 50 ether);
-        ILendingPool(lendingPool2).borrowDebt{value: fee}(50 ether, 8453, BASE_EID, 65000);
+        fee = helperUtils.getFee(kaia_oftkaia_adapter, BASE_EID, alice, 15 ether);
+        ILendingPool(lendingPool2).borrowDebt{value: fee}(15 ether, 8453, BASE_EID, 65000);
+        fee = helperUtils.getFee(kaia_oftkaia_adapter, BASE_EID, alice, 15 ether);
+        ILendingPool(lendingPool2).borrowDebt{value: fee}(15 ether, 8453, BASE_EID, 65000);
 
         fee = helperUtils.getFee(kaia_oftusdt_adapter, BASE_EID, alice, 10e6);
         ILendingPool(lendingPool3).borrowDebt{value: fee}(10e6, 8453, BASE_EID, 65000);
@@ -514,9 +521,9 @@ contract SenjaTest is Test, Helper {
         assertEq(ILPRouter(_router(lendingPool)).userBorrowShares(alice), 2 * 10e6);
         assertEq(ILPRouter(_router(lendingPool)).totalBorrowAssets(), 2 * 10e6);
         assertEq(ILPRouter(_router(lendingPool)).totalBorrowShares(), 2 * 10e6);
-        assertEq(ILPRouter(_router(lendingPool2)).userBorrowShares(alice), 2 * 50 ether);
-        assertEq(ILPRouter(_router(lendingPool2)).totalBorrowAssets(), 2 * 50 ether);
-        assertEq(ILPRouter(_router(lendingPool2)).totalBorrowShares(), 2 * 50 ether);
+        assertEq(ILPRouter(_router(lendingPool2)).userBorrowShares(alice), 2 * 15 ether);
+        assertEq(ILPRouter(_router(lendingPool2)).totalBorrowAssets(), 2 * 15 ether);
+        assertEq(ILPRouter(_router(lendingPool2)).totalBorrowShares(), 2 * 15 ether);
         assertEq(ILPRouter(_router(lendingPool3)).userBorrowShares(alice), 2 * 10e6);
         assertEq(ILPRouter(_router(lendingPool3)).totalBorrowAssets(), 2 * 10e6);
         assertEq(ILPRouter(_router(lendingPool3)).totalBorrowShares(), 2 * 10e6);

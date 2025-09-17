@@ -57,8 +57,8 @@ contract DevSenja is Script, Helper {
     uint16 SEND = 1; // Message type for sendString function
 
     function run() public {
-        // vm.createSelectFork(vm.rpcUrl("kaia_mainnet"));
-        vm.createSelectFork(vm.rpcUrl("base_mainnet"));
+        vm.createSelectFork(vm.rpcUrl("kaia_mainnet"));
+        // vm.createSelectFork(vm.rpcUrl("base_mainnet"));
         vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
         // _deployTokens();
         // _getUtils();
@@ -185,8 +185,8 @@ contract DevSenja is Script, Helper {
         // MyOApp(KAIA_OFT_MOCK_USDT_ADAPTER).setPeer(BASE_EID, bytes32(uint256(uint160(BASE_OFT_MOCK_USDT_ADAPTER))));
         // MyOApp(KAIA_OFT_MOCK_WKAIA_ADAPTER).setPeer(BASE_EID, bytes32(uint256(uint160(BASE_OFT_MOCK_WKAIA_ADAPTER))));
 
-        MyOApp(BASE_OFT_MOCK_USDT_ADAPTER).setPeer(KAIA_EID, bytes32(uint256(uint160(BASE_OFT_MOCK_USDT_ADAPTER))));
-        MyOApp(BASE_OFT_MOCK_WKAIA_ADAPTER).setPeer(KAIA_EID, bytes32(uint256(uint160(BASE_OFT_MOCK_WKAIA_ADAPTER))));
+        MyOApp(BASE_OFT_MOCK_USDT_ADAPTER).setPeer(KAIA_EID, bytes32(uint256(uint160(KAIA_OFT_MOCK_USDT_ADAPTER))));
+        MyOApp(BASE_OFT_MOCK_WKAIA_ADAPTER).setPeer(KAIA_EID, bytes32(uint256(uint160(KAIA_OFT_MOCK_WKAIA_ADAPTER))));
     }
 
     function _setEnforcedOFT() internal {
@@ -197,8 +197,11 @@ contract DevSenja is Script, Helper {
         enforcedOptions[0] = EnforcedOptionParam({eid: eid0, msgType: SEND, options: options1});
         enforcedOptions[1] = EnforcedOptionParam({eid: eid1, msgType: SEND, options: options2});
 
-        MyOApp(oftusdt).setEnforcedOptions(enforcedOptions);
-        MyOApp(oftwkaia).setEnforcedOptions(enforcedOptions);
+        MyOApp(KAIA_OFT_MOCK_USDT_ADAPTER).setEnforcedOptions(enforcedOptions);
+        MyOApp(KAIA_OFT_MOCK_WKAIA_ADAPTER).setEnforcedOptions(enforcedOptions);
+        
+        // MyOApp(BASE_OFT_MOCK_USDT_ADAPTER).setEnforcedOptions(enforcedOptions);
+        // MyOApp(BASE_OFT_MOCK_WKAIA_ADAPTER).setEnforcedOptions(enforcedOptions);
     }
 
     function _setOFTAddress() internal {

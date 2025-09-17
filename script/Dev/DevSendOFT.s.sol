@@ -8,10 +8,10 @@ import {OptionsBuilder} from "@layerzerolabs/oapp-evm/contracts/oapp/libs/Option
 import {MessagingFee} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
 import {Helper} from "../L0/Helper.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 contract DevSendOFT is Script, Helper {
     using OptionsBuilder for bytes;
+    address toAddress = vm.envAddress("PUBLIC_KEY");
 
     function setUp() public {
         // base
@@ -25,8 +25,6 @@ contract DevSendOFT is Script, Helper {
     }
 
     function run() external {
-        // Load environment variables
-        address toAddress = vm.envAddress("PUBLIC_KEY");
         // *********FILL THIS*********
         address oftAddress = KAIA_OFT_MOCK_USDT_ADAPTER; // src
         address minterBurner = KAIA_MOCK_USDT_ELEVATED_MINTER_BURNER;
@@ -66,7 +64,7 @@ contract DevSendOFT is Script, Helper {
         // Send tokens
         IERC20(TOKEN).approve(oftAddress, tokensToSend);
         IERC20(TOKEN).approve(minterBurner, tokensToSend);
-        oft.send{value: fee.nativeFee}(sendParam, fee, msg.sender);
+        oft.send{value: fee.nativeFee}(sendParam, fee, toAddress);
         console.log("eth after", address(toAddress).balance);
         console.log("TOKEN Balance after", IERC20(TOKEN).balanceOf(toAddress));
 

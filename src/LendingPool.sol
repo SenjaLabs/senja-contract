@@ -20,6 +20,9 @@ contract LendingPool is ReentrancyGuard {
     using SafeERC20 for IERC20;
     using OptionsBuilder for bytes;
 
+    /// @notice Contract version for tracking upgrades
+    uint8 public constant VERSION = 1;
+
     error InsufficientCollateral();
     error InsufficientLiquidity();
     error InsufficientShares();
@@ -433,16 +436,20 @@ contract LendingPool is ReentrancyGuard {
     }
 
     receive() external payable {
-        // Auto-wrap incoming native KAIA to WKAIA, but not during withdrawal operations
-        if (msg.value > 0 && !_withdrawing) {
+        // Only auto-wrap if this is the native token lending pool and not during withdrawal
+        if (msg.value > 0 && !_withdrawing && (_borrowToken() == address(1) || _collateralToken() == address(1))) {
             IWKAIA(_WKAIA()).deposit{value: msg.value}();
+        } else if (msg.value > 0 && _withdrawing) {
+            // During withdrawal, don't wrap - just pass through
+            return;
+        } else if (msg.value > 0) {
+            // Unexpected native token - revert to prevent loss
+            revert("Unexpected native token");
         }
     }
 
     fallback() external payable {
-        // Auto-wrap incoming native KAIA to WKAIA, but not during withdrawal operations
-        if (msg.value > 0 && !_withdrawing) {
-            IWKAIA(_WKAIA()).deposit{value: msg.value}();
-        }
+        // Fallback should not accept native tokens to prevent accidental loss
+        revert("Fallback not allowed");
     }
 }

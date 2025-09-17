@@ -75,6 +75,8 @@ contract Liquidator is ReentrancyGuard, Ownable {
         address lendingPoolRouter,
         uint256 liquidationIncentive
     ) external nonReentrant returns (uint256 liquidatedAmount) {
+        // Validate liquidation incentive (max 50%)
+        require(liquidationIncentive <= 5000, "Liquidation incentive too high");
         // Validate liquidation eligibility
         address borrowerPosition = ILPRouter(lendingPoolRouter).addressPositions(borrower);
         require(borrowerPosition != address(0), "No position found");
@@ -115,6 +117,10 @@ contract Liquidator is ReentrancyGuard, Ownable {
         uint256 repayAmount,
         uint256 liquidationIncentive
     ) external payable nonReentrant {
+        // Validate liquidation incentive (max 50%)
+        require(liquidationIncentive <= 5000, "Liquidation incentive too high");
+        // Validate repay amount
+        require(repayAmount > 0, "Invalid repay amount");
         // Validate liquidation eligibility
         address borrowerPosition = ILPRouter(lendingPoolRouter).addressPositions(borrower);
         require(borrowerPosition != address(0), "No position found");
@@ -127,6 +133,14 @@ contract Liquidator is ReentrancyGuard, Ownable {
         );
 
         if (!isLiquidatable) revert NotLiquidatable();
+
+        // Validate collateral availability before liquidation        
+        uint256 maxRepayAmount = _calculateMaxRepayAmount(
+            borrower,
+            lendingPoolRouter,
+            borrowerPosition
+        );
+        require(repayAmount <= maxRepayAmount, "Repay amount exceeds maximum allowed");
 
         // Execute MEV liquidation
         uint256 collateralValue = _executeMEVLiquidation(
@@ -401,24 +415,54 @@ contract Liquidator is ReentrancyGuard, Ownable {
     }
 
     /**
-     * @notice Calculates expected amount for token swap
+     * @notice Calculates expected amount for token swap using price feeds
      */
     function _calculateExpectedAmount(
         address _tokenIn,
         address _tokenOut,
         uint256 amountIn
-    ) internal pure returns (uint256 expectedAmount) {
-        // Simple calculation - in production should use proper price feeds
-        if (_tokenIn != _tokenOut) {
-            // For WKAIA to USDT conversion (example)
-            if (_tokenOut == 0xd077A400968890Eacc75cdc901F0356c943e4fDb) {
-                expectedAmount = (amountIn * 157) / (1000 * 1e12);
+    ) internal view returns (uint256 expectedAmount) {
+        if (_tokenIn == _tokenOut) {
+            return amountIn;
+        }
+
+        try this._calculateExpectedAmountWithOracle(_tokenIn, _tokenOut, amountIn) returns (uint256 amount) {
+            expectedAmount = amount;
+        } catch {
+            // Fallback to 1:1 ratio with decimal adjustment
+            uint8 tokenInDecimals = _tokenDecimals(_tokenIn);
+            uint8 tokenOutDecimals = _tokenDecimals(_tokenOut);
+            
+            if (tokenInDecimals > tokenOutDecimals) {
+                expectedAmount = amountIn / (10 ** (tokenInDecimals - tokenOutDecimals));
+            } else if (tokenOutDecimals > tokenInDecimals) {
+                expectedAmount = amountIn * (10 ** (tokenOutDecimals - tokenInDecimals));
             } else {
                 expectedAmount = amountIn;
             }
-        } else {
-            expectedAmount = amountIn;
         }
+    }
+
+    /**
+     * @notice Internal function to calculate expected amount using oracle prices
+     */
+    function _calculateExpectedAmountWithOracle(
+        address _tokenIn,
+        address _tokenOut,
+        uint256 amountIn
+    ) external view returns (uint256 expectedAmount) {
+        require(msg.sender == address(this), "Unauthorized");
+        
+        // Get oracle prices
+        (, uint256 tokenInPrice,,,) = IOracle(_tokenDataStream(_tokenIn)).latestRoundData();
+        (, uint256 tokenOutPrice,,,) = IOracle(_tokenDataStream(_tokenOut)).latestRoundData();
+        
+        uint8 tokenInDecimals = _tokenDecimals(_tokenIn);
+        uint8 tokenOutDecimals = _tokenDecimals(_tokenOut);
+        
+        // Calculate expected amount with price normalization
+        expectedAmount = (amountIn * tokenInPrice * (10 ** tokenOutDecimals)) / 
+                        (tokenOutPrice * (10 ** tokenInDecimals));
     }
 
     /**
@@ -468,6 +512,27 @@ contract Liquidator is ReentrancyGuard, Ownable {
 
     function _WKAIA() internal view returns (address) {
         return IFactory(factory).WKAIA();
+    }
+
+    /**
+     * @notice Calculates the maximum amount that can be repaid in liquidation
+     */
+    function _calculateMaxRepayAmount(
+        address borrower,
+        address lendingPoolRouter,
+        address /* borrowerPosition */
+    ) internal view returns (uint256 maxRepayAmount) {
+        uint256 totalBorrowAssets = ILPRouter(lendingPoolRouter).totalBorrowAssets();
+        uint256 totalBorrowShares = ILPRouter(lendingPoolRouter).totalBorrowShares();
+        uint256 userBorrowShares = ILPRouter(lendingPoolRouter).userBorrowShares(borrower);
+        
+        if (totalBorrowShares == 0) return 0;
+        
+        // Calculate user's total debt
+        uint256 userDebt = (userBorrowShares * totalBorrowAssets) / totalBorrowShares;
+        
+        // Maximum liquidation is 50% of user's debt
+        maxRepayAmount = userDebt / 2;
     }
 
     // Allow contract to receive native tokens

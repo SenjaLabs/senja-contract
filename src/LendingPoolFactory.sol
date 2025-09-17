@@ -2,7 +2,8 @@
 pragma solidity ^0.8.13;
 
 import {ILPDeployer} from "./interfaces/ILPDeployer.sol";
-import {LendingPoolRouter} from "./LendingPoolRouter.sol";
+import {ILPRouterDeployer} from "./interfaces/ILPRouterDeployer.sol";
+import {ILPRouter} from "./interfaces/ILPRouter.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
@@ -93,6 +94,9 @@ contract LendingPoolFactory is
     address public isHealthy;
 
     /// @notice The address of the lending pool deployer contract
+    address public lendingPoolRouterDeployer;
+
+    /// @notice The address of the lending pool deployer contract
     address public lendingPoolDeployer;
 
     /// @notice The address of the protocol contract
@@ -115,6 +119,8 @@ contract LendingPoolFactory is
     /// @notice Total number of pools created
     uint256 public poolCount;
 
+    uint8 public constant VERSION = 2;
+
     constructor() {
         _disableInitializers();
     }
@@ -127,7 +133,13 @@ contract LendingPoolFactory is
         _unpause();
     }
 
-    function initialize(address _isHealthy, address _lendingPoolDeployer, address _protocol, address _positionDeployer) public initializer {
+    function initialize(
+        address _isHealthy,
+        address _lendingPoolRouterDeployer,
+        address _lendingPoolDeployer,
+        address _protocol,
+        address _positionDeployer
+    ) public initializer {
         __Pausable_init();
         __AccessControl_init();
         __UUPSUpgradeable_init();
@@ -138,6 +150,7 @@ contract LendingPoolFactory is
         _grantRole(OWNER_ROLE, msg.sender);
 
         isHealthy = _isHealthy;
+        lendingPoolRouterDeployer = _lendingPoolRouterDeployer;
         lendingPoolDeployer = _lendingPoolDeployer;
         protocol = _protocol;
         positionDeployer = _positionDeployer;
@@ -148,18 +161,21 @@ contract LendingPoolFactory is
      * @param collateralToken The address of the collateral token
      * @param borrowToken The address of the borrow token
      * @param ltv The Loan-to-Value ratio for the pool (in basis points)
+     * @dev This function deploys a new lending pool using the lending pool deployer
      * @return The address of the newly created lending pool
      * @dev This function deploys a new lending pool using the lending pool deployer
      */
     function createLendingPool(address collateralToken, address borrowToken, uint256 ltv) public returns (address) {
         // Deploy a new router for this pool
-        LendingPoolRouter router = new LendingPoolRouter(address(0), address(this), collateralToken, borrowToken, ltv);
+        address router = ILPRouterDeployer(lendingPoolRouterDeployer).deployLendingPoolRouter(
+            address(this), collateralToken, borrowToken, ltv
+        );
         // Deploy the LendingPool
         address lendingPool = ILPDeployer(lendingPoolDeployer).deployLendingPool(address(router));
 
         // Configure the lending pool address in the router
         // This allows only the lending pool to update its own interest rate parameters
-        router.setLendingPool(address(lendingPool));
+        ILPRouter(router).setLendingPool(address(lendingPool));
 
         pools.push(Pool(collateralToken, borrowToken, address(lendingPool)));
         poolCount++;

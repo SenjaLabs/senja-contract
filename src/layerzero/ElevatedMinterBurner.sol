@@ -4,10 +4,13 @@ pragma solidity ^0.8.22;
 import {IMintableBurnable} from "../interfaces/IMintableBurnable.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 contract ElevatedMinterBurner is Ownable {
     address public immutable TOKEN;
     mapping(address => bool) public operators;
+
+    using SafeERC20 for IERC20;
 
     modifier onlyOperators() {
         _onlyOperators();
@@ -27,7 +30,7 @@ contract ElevatedMinterBurner is Ownable {
     }
 
     function burn(address _from, uint256 _amount) external onlyOperators returns (bool) {
-        IERC20(TOKEN).approve(address(this), _amount);
+        IERC20(TOKEN).safeTransferFrom(_from, address(this), _amount);
         IMintableBurnable(TOKEN).burn(_from, _amount);
         return true;
     }

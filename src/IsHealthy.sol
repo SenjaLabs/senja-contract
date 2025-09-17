@@ -100,7 +100,7 @@ contract IsHealthy {
 
         // Check if position needs liquidation
         bool isLiquidatable = (borrowValue > collateralValue) || (borrowValue > maxBorrow);
-        
+
         if (isLiquidatable) {
             // Position is unhealthy and should be liquidated
             revert InsufficientCollateral();
@@ -130,7 +130,7 @@ contract IsHealthy {
         uint256 userBorrowShares
     ) public view returns (bool isLiquidatable, uint256 borrowValue, uint256 collateralValue) {
         (, uint256 borrowPrice,,,) = IOracle(_tokenDataStream(factory, borrowToken)).latestRoundData();
-        
+
         collateralValue = 0;
         for (uint256 i = 1; i <= _counter(addressPositions); i++) {
             address token = IPosition(addressPositions).tokenLists(i);
@@ -144,32 +144,28 @@ contract IsHealthy {
         borrowValue = (borrowed * borrowAdjustedPrice) / (10 ** _tokenDecimals(borrowToken));
 
         uint256 maxBorrow = (collateralValue * ltv) / 1e18;
-        
+
         isLiquidatable = (borrowValue > collateralValue) || (borrowValue > maxBorrow);
     }
 
     /**
-     * @notice Liquidates a position using DEX (delegates to Liquidator contract)
+     * @notice Liquidates a position using DEX (calls Liquidator contract)
      * @param borrower The address of the borrower to liquidate
      * @param lendingPoolRouter The address of the lending pool router
-     * @param factory The address of the factory
+     * @param // factory The address of the factory
      * @param liquidationIncentive The liquidation incentive in basis points
      * @return liquidatedAmount Amount of debt repaid
      */
     function liquidateByDEX(
         address borrower,
         address lendingPoolRouter,
-        address factory,
+        address, /* factory */
         uint256 liquidationIncentive
     ) external returns (uint256 liquidatedAmount) {
-        // Delegate call to liquidator contract
-        (bool success, bytes memory data) = liquidator.delegatecall(
+        // Use regular call instead of delegatecall for security
+        (bool success, bytes memory data) = liquidator.call(
             abi.encodeWithSignature(
-                "liquidateByDEX(address,address,address,uint256)",
-                borrower,
-                lendingPoolRouter,
-                factory,
-                liquidationIncentive
+                "liquidateByDEX(address,address,uint256)", borrower, lendingPoolRouter, liquidationIncentive
             )
         );
         require(success, "Liquidation failed");
@@ -177,27 +173,26 @@ contract IsHealthy {
     }
 
     /**
-     * @notice Liquidates a position using MEV (delegates to Liquidator contract)
+     * @notice Liquidates a position using MEV (calls Liquidator contract)
      * @param borrower The address of the borrower to liquidate
      * @param lendingPoolRouter The address of the lending pool router
-     * @param factory The address of the factory
+     * @param // factory The address of the factory
      * @param repayAmount Amount of debt the liquidator wants to repay
      * @param liquidationIncentive The liquidation incentive in basis points
      */
     function liquidateByMEV(
         address borrower,
         address lendingPoolRouter,
-        address factory,
+        address, /* factory */
         uint256 repayAmount,
         uint256 liquidationIncentive
     ) external payable {
-        // Delegate call to liquidator contract
-        (bool success,) = liquidator.delegatecall(
+        // Use regular call instead of delegatecall for security
+        (bool success,) = liquidator.call{value: msg.value}(
             abi.encodeWithSignature(
-                "liquidateByMEV(address,address,address,uint256,uint256)",
+                "liquidateByMEV(address,address,uint256,uint256)",
                 borrower,
                 lendingPoolRouter,
-                factory,
                 repayAmount,
                 liquidationIncentive
             )

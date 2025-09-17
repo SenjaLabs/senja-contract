@@ -11,11 +11,13 @@ import {PositionDeployer} from "../../src/PositionDeployer.sol";
 import {LendingPoolFactory} from "../../src/LendingPoolFactory.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {IFactory} from "../../src/interfaces/IFactory.sol";
+import {LendingPoolRouterDeployer} from "../../src/LendingPoolRouterDeployer.sol";
 
 contract SenjaCoreContracts is Script, Helper {
     Liquidator public liquidator;
     IsHealthy public isHealthy;
     LendingPoolDeployer public lendingPoolDeployer;
+    LendingPoolRouterDeployer public lendingPoolRouterDeployer;
     Protocol public protocol;
     PositionDeployer public positionDeployer;
     LendingPoolFactory public lendingPoolFactory;
@@ -27,6 +29,7 @@ contract SenjaCoreContracts is Script, Helper {
         liquidator = new Liquidator();
         isHealthy = new IsHealthy(address(liquidator));
         lendingPoolDeployer = new LendingPoolDeployer();
+        lendingPoolRouterDeployer = new LendingPoolRouterDeployer();
         protocol = new Protocol();
         positionDeployer = new PositionDeployer();
 
@@ -34,6 +37,7 @@ contract SenjaCoreContracts is Script, Helper {
         bytes memory data = abi.encodeWithSelector(
             lendingPoolFactory.initialize.selector,
             address(isHealthy),
+            address(lendingPoolRouterDeployer),
             address(lendingPoolDeployer),
             address(protocol),
             address(positionDeployer)
@@ -41,6 +45,7 @@ contract SenjaCoreContracts is Script, Helper {
         proxy = new ERC1967Proxy(address(lendingPoolFactory), data);
 
         lendingPoolDeployer.setFactory(address(proxy));
+        lendingPoolRouterDeployer.setFactory(address(proxy));
 
         IFactory(address(proxy)).addTokenDataStream(KAIA_USDT, KAIA_usdt_usd_adapter);
         IFactory(address(proxy)).addTokenDataStream(KAIA_USDT_STARGATE, KAIA_usdt_usd_adapter);

@@ -5,32 +5,59 @@ import {IFactory} from "./Interfaces/IFactory.sol";
 import {IIsHealthy} from "./Interfaces/IIsHealthy.sol";
 import {IPositionDeployer} from "./interfaces/IPositionDeployer.sol";
 
+/**
+ * @title LendingPoolRouter
+ * @author Ibran Protocol
+ * @notice Router contract that manages lending pool operations and state
+ * @dev This contract handles the core logic for supply, borrow, and interest calculations
+ */
 contract LendingPoolRouter {
+    /// @notice Error thrown when amount is zero
     error ZeroAmount();
+    /// @notice Error thrown when user has insufficient shares
     error InsufficientShares();
+    /// @notice Error thrown when protocol has insufficient liquidity
     error InsufficientLiquidity();
+    /// @notice Error thrown when caller is not the lending pool
     error NotLendingPool();
+    /// @notice Error thrown when caller is not the factory
     error NotFactory();
+    /// @notice Error thrown when position already exists
     error PositionAlreadyCreated();
+    /// @notice Error thrown when user has insufficient collateral
     error InsufficientCollateral();
 
+    /// @notice Total supply assets in the pool
     uint256 public totalSupplyAssets;
+    /// @notice Total supply shares issued
     uint256 public totalSupplyShares;
+    /// @notice Total borrowed assets from the pool
     uint256 public totalBorrowAssets;
+    /// @notice Total borrow shares issued
     uint256 public totalBorrowShares;
 
+    /// @notice Mapping of user to their supply shares
     mapping(address => uint256) public userSupplyShares;
+    /// @notice Mapping of user to their borrow shares
     mapping(address => uint256) public userBorrowShares;
+    /// @notice Mapping of user to their collateral amount
     mapping(address => uint256) public userCollateral;
+    /// @notice Mapping of user to their position contract address
     mapping(address => address) public addressPositions;
 
+    /// @notice Timestamp of last interest accrual
     uint256 public lastAccrued;
 
+    /// @notice Address of the lending pool contract
     address public lendingPool;
+    /// @notice Address of the factory contract
     address public factory;
 
+    /// @notice Address of the collateral token
     address public collateralToken;
+    /// @notice Address of the borrow token
     address public borrowToken;
+    /// @notice Loan-to-value ratio in basis points
     uint256 public ltv;
 
     constructor(address _lendingPool, address _factory, address _collateralToken, address _borrowToken, uint256 _ltv) {
@@ -273,6 +300,10 @@ contract LendingPoolRouter {
         return position;
     }
 
+    /**
+     * @notice Gets the position deployer address from factory
+     * @return The address of the position deployer contract
+     */
     function _positionDeployer() internal view returns (address) {
         return IFactory(factory).positionDeployer();
     }
@@ -351,6 +382,13 @@ contract LendingPoolRouter {
     }
 
     // Events for liquidation tracking
+    /// @notice Emitted when a position is liquidated
+    /// @param user The address of the user being liquidated
+    /// @param sharesRemoved The amount of borrow shares removed
+    /// @param debtRepaid The amount of debt repaid
     event PositionLiquidated(address indexed user, uint256 sharesRemoved, uint256 debtRepaid);
+    
+    /// @notice Emitted when a position is reset in emergency
+    /// @param user The address of the user whose position was reset
     event EmergencyPositionReset(address indexed user);
 }

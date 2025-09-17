@@ -9,146 +9,91 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {OFTadapter} from "../OFTAdapter.sol";
 import {SendParam} from "@layerzerolabs/oft-evm/contracts/interfaces/IOFT.sol";
 import {OptionsBuilder} from "@layerzerolabs/oapp-evm/contracts/oapp/libs/OptionsBuilder.sol";
-import {MessagingFee} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
 import {ILPRouter} from "../../interfaces/ILPRouter.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-contract OAppUSDT is OApp, OAppOptionsType3 {
+contract OAppSupplyLiquidityUSDT is OApp, OAppOptionsType3 {
     using OptionsBuilder for bytes;
+    using SafeERC20 for IERC20;
 
     error InsufficientBalance();
-    /// @notice Last string received from any remote chain
+    error InsufficientNativeFee();
 
     bytes public lastMessage;
     address public factory;
     address public oftaddress;
 
-    /// @notice Msg type for sending a string, for use in OAppOptionsType3 as an enforced option
     uint16 public constant SEND = 1;
 
-    event LzSendLiquidity(address lendingPool, address user, address token, uint256 amount);
+    event SendLiquidityFromDst(address lendingPool, address user, address token, uint256 amount);
+    event SendLiquidityFromSrc(address lendingPool, address user, address token, uint256 amount);
+    event ExecuteLiquidity(address lendingPool, address token, address user, uint256 amount);
 
     mapping(address => uint256) public userAmount;
 
-    /// @notice Initialize with Endpoint V2 and owner address
-    /// @param _endpoint The local chain's LayerZero Endpoint V2 address
-    /// @param _owner    The address permitted to configure this OApp
     constructor(address _endpoint, address _owner) OApp(_endpoint, _owner) Ownable(_owner) {}
 
-    // ──────────────────────────────────────────────────────────────────────────────
-    // 0. (Optional) Quote business logic
-    //
-    // Example: Get a quote from the Endpoint for a cost estimate of sending a message.
-    // Replace this to mirror your own send business logic.
-    // ──────────────────────────────────────────────────────────────────────────────
-
-    /**
-     * @notice Quotes the gas needed to pay for the full omnichain transaction in native gas or ZRO token.
-     * @param _dstEid Destination chain's endpoint ID.
-     * @param _string The string to send.
-     * @param _options Message execution options (e.g., for sending gas to destination).
-     * @param _payInLzToken Whether to return fee in ZRO token.
-     * @return fee A `MessagingFee` struct containing the calculated gas fee in either the native token or ZRO token.
-     */
-    function quoteSendString(uint32 _dstEid, string calldata _string, bytes calldata _options, bool _payInLzToken)
-        public
-        view
-        returns (MessagingFee memory fee)
-    {
-        bytes memory _message = abi.encode(_string);
-        // combineOptions (from OAppOptionsType3) merges enforced options set by the contract owner
-        // with any additional execution options provided by the caller
-        fee = _quote(_dstEid, _message, combineOptions(_dstEid, SEND, _options), _payInLzToken);
-    }
-
-    // ──────────────────────────────────────────────────────────────────────────────
-    // 1. Send business logic
-    //
-    // Example: send a simple string to a remote chain. Replace this with your
-    // own state-update logic, then encode whatever data your application needs.
-    // ──────────────────────────────────────────────────────────────────────────────
-
-    /// @notice Send a string to a remote OApp on another chain
-    /// @param _dstEid   Destination Endpoint ID (uint32)
-    /// @param _lendingPool  The lending pool address
-    /// @param _user  The user address
-    /// @param _amount  The amount to send
-    /// @param _options  Execution options for gas on the destination (bytes)
-    function sendString(
+    function quoteSendString(
         uint32 _dstEid,
         address _lendingPool,
         address _user,
         address _token,
         uint256 _amount,
+        bytes calldata _options,
+        bool _payInLzToken
+    ) public view returns (MessagingFee memory fee) {
+        bytes memory _message = abi.encode(_lendingPool, _user, _token, _amount);
+        fee = _quote(_dstEid, _message, combineOptions(_dstEid, SEND, _options), _payInLzToken);
+    }
+
+    function sendString(
+        uint32 _dstEid,
+        address _lendingPool,
+        address _user,
+        address _tokendst,
+        address _oappaddressdst,
+        uint256 _amount,
         uint256 _slippageTolerance,
         bytes calldata _options
     ) external payable {
-        bytes memory _message = abi.encode(_lendingPool, _user, _token, _amount);
+        uint256 oftNativeFee = _quoteOftNativeFee(_dstEid, _oappaddressdst, _amount, _slippageTolerance);
+        uint256 lzNativeFee = _quoteLzNativeFee(_dstEid, _lendingPool, _user, _tokendst, _amount, _options);
 
-        _lzSend(
-            _dstEid, _message, combineOptions(_dstEid, SEND, _options), MessagingFee(msg.value, 0), payable(msg.sender)
-        );
+        if(msg.value < oftNativeFee + lzNativeFee) revert InsufficientNativeFee();
 
-        OFTadapter oft = OFTadapter(oftaddress);
-        bytes memory extraOptions = OptionsBuilder.newOptions().addExecutorLzReceiveOption(65000, 0);
-        SendParam memory sendParam = SendParam({
-            dstEid: _dstEid,
-            to: addressToBytes32(_user),
-            amountLD: _amount,
-            minAmountLD: _amount * (100 - _slippageTolerance) / 100, // 0% slippage tolerance
-            extraOptions: extraOptions,
-            composeMsg: "",
-            oftCmd: ""
-        });
-        MessagingFee memory fee = oft.quoteSend(sendParam, false);
-        oft.send{value: fee.nativeFee}(sendParam, fee, msg.sender);
+        _performOftSend(_dstEid, _oappaddressdst, _user, _amount, _slippageTolerance, oftNativeFee);
+        _performLzSend(_dstEid, _lendingPool, _user, _tokendst, _amount, _options, lzNativeFee);
+        emit SendLiquidityFromSrc(_lendingPool, _user, _tokendst, _amount);
     }
 
-    // ──────────────────────────────────────────────────────────────────────────────
-    // 2. Receive business logic
-    //
-    // Override _lzReceive to decode the incoming bytes and apply your logic.
-    // The base OAppReceiver.lzReceive ensures:
-    //   • Only the LayerZero Endpoint can call this method
-    //   • The sender is a registered peer (peers[srcEid] == origin.sender)
-    // ──────────────────────────────────────────────────────────────────────────────
 
-    /// @notice Invoked by OAppReceiver when EndpointV2.lzReceive is called
-    /// @dev   _origin    Metadata (source chain, sender address, nonce)
-    /// @dev   _guid      Global unique ID for tracking this message
-    /// @param _message   ABI-encoded bytes (the string we sent earlier)
-    /// @dev   _executor  Executor address that delivered the message
-    /// @dev   _extraData Additional data from the Executor (unused here)
-    function _lzReceive(
-        Origin calldata, /*_origin*/
-        bytes32, /*_guid*/
-        bytes calldata _message,
-        address, /*_executor*/
-        bytes calldata /*_extraData*/
-    ) internal override {
-        // 1. Decode the incoming bytes into a string
-        //    You can use abi.decode, abi.decodePacked, or directly splice bytes
-        //    if you know the format of your data structures
+    function _lzReceive(Origin calldata, bytes32, bytes calldata _message, address, bytes calldata) internal override {
         (address _lendingPool, address _user, address _token, uint256 _amount) =
             abi.decode(_message, (address, address, address, uint256));
 
-        // 2. Apply your custom logic. In this example, store it in `lastMessage`.
-        address borrowToken = _borrowToken(_lendingPool);
         userAmount[_user] += _amount;
         lastMessage = _message;
-        emit LzSendLiquidity(_lendingPool, _user, _token, _amount);
+        emit SendLiquidityFromDst(_lendingPool, _user, _token, _amount);
     }
 
-    // check if balance increase, do execute
     function execute(address _lendingPool, address _user, uint256 _amount) public {
+        // TODO: passing byte code
         if (_amount > userAmount[_user]) revert InsufficientBalance();
+        userAmount[_user] -= _amount;
         address borrowToken = _borrowToken(_lendingPool);
         IERC20(borrowToken).approve(_lendingPool, _amount);
         ILendingPool(_lendingPool).supplyLiquidity(_user, _amount);
-        userAmount[_user] -= _amount;
+        emit ExecuteLiquidity(_lendingPool, borrowToken, _user, _amount);
     }
 
-    function setFactory(address _factory) public {
+    // SRC
+    function setFactory(address _factory) public onlyOwner {
         factory = _factory;
+    }
+
+    // SRC - DST
+    function setOFTaddress(address _oftaddress) public onlyOwner {
+        oftaddress = _oftaddress;
     }
 
     function _borrowToken(address _lendingPool) internal view returns (address) {
@@ -157,5 +102,76 @@ contract OAppUSDT is OApp, OAppOptionsType3 {
 
     function addressToBytes32(address _address) internal pure returns (bytes32) {
         return bytes32(uint256(uint160(_address)));
+    }
+
+    function _quoteOftNativeFee(
+        uint32 _dstEid,
+        address _oappaddressdst,
+        uint256 _amount,
+        uint256 _slippageTolerance
+    ) internal view returns (uint256) {
+        OFTadapter oft = OFTadapter(oftaddress);
+        bytes memory extraOptions = OptionsBuilder.newOptions().addExecutorLzReceiveOption(65000, 0);
+        SendParam memory sendParam = SendParam({
+            dstEid: _dstEid,
+            to: addressToBytes32(_oappaddressdst),
+            amountLD: _amount,
+            minAmountLD: _amount * (100 - _slippageTolerance) / 100,
+            extraOptions: extraOptions,
+            composeMsg: "",
+            oftCmd: ""
+        });
+        return oft.quoteSend(sendParam, false).nativeFee;
+    }
+
+    function _quoteLzNativeFee(
+        uint32 _dstEid,
+        address _lendingPool,
+        address _user,
+        address _tokendst,
+        uint256 _amount,
+        bytes calldata _options
+    ) internal view returns (uint256) {
+        bytes memory lzOptions = combineOptions(_dstEid, SEND, _options);
+        bytes memory payload = abi.encode(_lendingPool, _user, _tokendst, _amount);
+        return _quote(_dstEid, payload, lzOptions, false).nativeFee;
+    }
+
+    function _performOftSend(
+        uint32 _dstEid,
+        address _oappaddressdst,
+        address _user,
+        uint256 _amount,
+        uint256 _slippageTolerance,
+        uint256 _oftNativeFee
+    ) internal {
+        OFTadapter oft = OFTadapter(oftaddress);
+        bytes memory extraOptions = OptionsBuilder.newOptions().addExecutorLzReceiveOption(65000, 0);
+        SendParam memory sendParam = SendParam({
+            dstEid: _dstEid,
+            to: addressToBytes32(_oappaddressdst),
+            amountLD: _amount,
+            minAmountLD: _amount * (100 - _slippageTolerance) / 100,
+            extraOptions: extraOptions,
+            composeMsg: "",
+            oftCmd: ""
+        });
+        IERC20(oft.tokenOFT()).safeTransferFrom(_user, address(this), _amount);
+        IERC20(oft.tokenOFT()).approve(oftaddress, _amount);
+        oft.send{value: _oftNativeFee}(sendParam, MessagingFee(_oftNativeFee, 0), _user);
+    }
+
+    function _performLzSend(
+        uint32 _dstEid,
+        address _lendingPool,
+        address _user,
+        address _tokendst,
+        uint256 _amount,
+        bytes calldata _options,
+        uint256 _lzNativeFee
+    ) internal {
+        bytes memory lzOptions = combineOptions(_dstEid, SEND, _options);
+        bytes memory payload = abi.encode(_lendingPool, _user, _tokendst, _amount);
+        _lzSend(_dstEid, payload, lzOptions, MessagingFee(_lzNativeFee, 0), payable(_user));
     }
 }
