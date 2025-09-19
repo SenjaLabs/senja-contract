@@ -20,12 +20,10 @@ contract OFTKAIAadapter is OFTAdapter, ReentrancyGuard {
 
     using SafeERC20 for IERC20;
 
-    constructor(
-        address _token, // Your existing ERC20 token with mint/burn exposed
-        address _elevatedMinterBurner,
-        address _lzEndpoint, // Local LayerZero endpoint
-        address _owner // Contract owner
-    ) OFTAdapter(_token, _lzEndpoint, _owner) Ownable(_owner) {
+    constructor(address _token, address _elevatedMinterBurner, address _lzEndpoint, address _owner)
+        OFTAdapter(_token, _lzEndpoint, _owner)
+        Ownable(_owner)
+    {
         tokenOFT = _token;
         elevatedMinterBurner = _elevatedMinterBurner;
     }
@@ -66,5 +64,9 @@ contract OFTKAIAadapter is OFTAdapter, ReentrancyGuard {
             IElevatedMintableBurnable(elevatedMinterBurner).burn(_from, amountSentLD);
         }
         emit Debit(_from, _amountLD);
+    }
+
+    function setElevatedMinterBurner(address _elevatedMinterBurner) external onlyOwner {
+        elevatedMinterBurner = _elevatedMinterBurner;
     }
 }

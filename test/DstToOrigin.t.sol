@@ -13,10 +13,13 @@ import {ExecutorConfig} from "@layerzerolabs/lz-evm-messagelib-v2/contracts/Send
 import {MessagingFee} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
 import {OFTUSDTadapter} from "../src/layerzero/OFTUSDTAdapter.sol";
 import {SendParam} from "@layerzerolabs/oft-evm/contracts/interfaces/IOFT.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {OAppAdapter} from "../src/layerzero/messages/OAppAdapter.sol";
 
 contract DstToOriginTest is Test, Helper {
     using OptionsBuilder for bytes;
 
+    OAppAdapter public oappAdapter;
     OAppSupplyLiquidityUSDT public oappSupplyLiquidityUSDT;
 
     address public owner = vm.envAddress("PUBLIC_KEY");
@@ -45,7 +48,7 @@ contract DstToOriginTest is Test, Helper {
     function setUp() public {
         vm.createSelectFork(vm.rpcUrl("base_mainnet"));
         console.log("sel", vm.createSelectFork(vm.rpcUrl("base_mainnet")));
-        deal(BASE_USDT, owner, 1000000000000000000000000000000000000000);
+        deal(BASE_USDTK, owner, 1000000000000000000000000000000000000000);
         vm.startPrank(owner);
         _getUtils();
         _deployOApp();
@@ -84,7 +87,12 @@ contract DstToOriginTest is Test, Helper {
     }
 
     function _deployOApp() internal {
-        oappSupplyLiquidityUSDT = new OAppSupplyLiquidityUSDT(KAIA_LZ_ENDPOINT, owner);
+        oappAdapter = new OAppAdapter();
+        if (block.chainid == 8217) {
+            oappSupplyLiquidityUSDT = new OAppSupplyLiquidityUSDT(KAIA_LZ_ENDPOINT, owner);
+        } else if (block.chainid == 8453) {
+            oappSupplyLiquidityUSDT = new OAppSupplyLiquidityUSDT(BASE_LZ_ENDPOINT, owner);
+        }
     }
 
     function _setLibraries() internal {
@@ -156,13 +164,12 @@ contract DstToOriginTest is Test, Helper {
     // forge test -vvvv --match-test test_SupplyLiquidityCrosschain
     function test_SupplyLiquidityCrosschain() public {
         vm.startPrank(owner);
-        MessagingFee memory feeMessage =
-            oappSupplyLiquidityUSDT.quoteSendString(KAIA_EID, KAIA_lendingPool, owner, KAIA_USDT, 1e6, "", false);
+        oappSupplyLiquidityUSDT.setOFTaddress(BASE_OFT_USDTK_ADAPTER);
 
         bytes memory extraOptions = OptionsBuilder.newOptions().addExecutorLzReceiveOption(65000, 0);
         SendParam memory sendParam = SendParam({
             dstEid: KAIA_EID,
-            to: _addressToBytes32(address(oappSupplyLiquidityUSDT)), //OAPP DST
+            to: _addressToBytes32(address(KAIA_oappSupplyLiquidityUSDT)), //OAPP DST
             amountLD: 1e6,
             minAmountLD: 1e6, // 0% slippage tolerance
             extraOptions: extraOptions,
@@ -170,10 +177,29 @@ contract DstToOriginTest is Test, Helper {
             oftCmd: ""
         });
         MessagingFee memory feeBridge = OFTUSDTadapter(BASE_OFT_USDTK_ADAPTER).quoteSend(sendParam, false);
-        console.log("feeMessage", feeMessage.nativeFee);
-        console.log("feeBridge", feeBridge.nativeFee);
-        // oappSupplyLiquidityUSDT.sendString(KAIA_EID, KAIA_lendingPool, owner, KAIA_lendingPool, 1e6, "", false);
-        console.log("SupplyLiquidityCrosschain");
+
+        MessagingFee memory feeMessage =
+            oappSupplyLiquidityUSDT.quoteSendString(KAIA_EID, KAIA_lendingPool, owner, KAIA_MOCK_USDT, 1e6, "", false);
+
+        IERC20(BASE_USDTK).approve(address(oappAdapter), 1e6);
+        OAppAdapter(address(oappAdapter)).sendBridge{value: feeBridge.nativeFee + feeMessage.nativeFee}(
+            address(oappSupplyLiquidityUSDT),
+            BASE_OFT_USDTK_ADAPTER,
+            KAIA_lendingPool,
+            BASE_USDTK,
+            KAIA_MOCK_USDT,
+            address(oappSupplyLiquidityUSDT),
+            KAIA_EID,
+            1e6,
+            feeBridge.nativeFee,
+            feeMessage.nativeFee
+        );
+        // console.log("feeMessage", feeMessage.nativeFee);
+        // console.log("feeBridge", feeBridge.nativeFee);
+        // oappSupplyLiquidityUSDT.sendString{value: feeMessage.nativeFee + feeBridge.nativeFee}(
+        //     KAIA_EID, KAIA_lendingPool, owner, KAIA_MOCK_USDT, KAIA_oappSupplyLiquidityUSDT, 1e6, 0, ""
+        // );
+        // console.log("SupplyLiquidityCrosschain");
         vm.stopPrank();
     }
 

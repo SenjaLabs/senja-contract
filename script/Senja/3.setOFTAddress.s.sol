@@ -9,8 +9,10 @@ contract SetOFTAddress is Script, Helper {
     function run() public {
         vm.createSelectFork(vm.rpcUrl("kaia_mainnet"));
         vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
+        console.log("oftaddress of kaia_usdt before set: ", IFactory(address(KAIA_lendingPoolFactoryProxy)).oftAddress(KAIA_USDT));
         IFactory(address(KAIA_lendingPoolFactoryProxy)).setOftAddress(KAIA_USDT, KAIA_OFT_USDT_ADAPTER);
-        IFactory(address(KAIA_lendingPoolFactoryProxy)).setOftAddress(KAIA_USDT, KAIA_OFT_USDT_STARGATE_ADAPTER);
+        console.log("oftaddress of kaia_usdt after set: ", IFactory(address(KAIA_lendingPoolFactoryProxy)).oftAddress(KAIA_USDT));
+        IFactory(address(KAIA_lendingPoolFactoryProxy)).setOftAddress(KAIA_USDT_STARGATE, KAIA_OFT_USDT_STARGATE_ADAPTER);
         IFactory(address(KAIA_lendingPoolFactoryProxy)).setOftAddress(KAIA_KAIA, KAIA_OFT_WKAIA_ADAPTER);
         IFactory(address(KAIA_lendingPoolFactoryProxy)).setOftAddress(KAIA_WKAIA, KAIA_OFT_WKAIA_ADAPTER);
         IFactory(address(KAIA_lendingPoolFactoryProxy)).setOftAddress(KAIA_WETH, KAIA_OFT_WETH_ADAPTER);

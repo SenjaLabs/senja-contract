@@ -34,6 +34,9 @@ contract SetPeers is Script, Helper {
         // WETH Adapter peers
         MyOApp(BASE_OFT_WETHK_ADAPTER).setPeer(BASE_EID, bytes32(uint256(uint160(BASE_OFT_WETHK_ADAPTER))));
         MyOApp(BASE_OFT_WETHK_ADAPTER).setPeer(KAIA_EID, bytes32(uint256(uint160(KAIA_OFT_WETH_ADAPTER))));
+
+        MyOApp(BASE_OFT_MOCK_USDT_ADAPTER).setPeer(BASE_EID, bytes32(uint256(uint160(BASE_OFT_MOCK_USDT_ADAPTER))));
+        MyOApp(BASE_OFT_MOCK_USDT_ADAPTER).setPeer(KAIA_EID, bytes32(uint256(uint160(KAIA_OFT_MOCK_USDT_ADAPTER))));
         
         vm.stopBroadcast();
     }
@@ -59,8 +62,8 @@ contract SetPeers is Script, Helper {
         MyOApp(KAIA_OFT_WBTC_ADAPTER).setPeer(KAIA_EID, bytes32(uint256(uint160(KAIA_OFT_WBTC_ADAPTER))));
 
         // WETH Adapter peers
-        MyOApp(KAIA_OFT_WETH_ADAPTER).setPeer(BASE_EID, bytes32(uint256(uint160(BASE_OFT_WETHK_ADAPTER))));
-        MyOApp(KAIA_OFT_WETH_ADAPTER).setPeer(KAIA_EID, bytes32(uint256(uint160(KAIA_OFT_WETH_ADAPTER))));
+        MyOApp(KAIA_OFT_MOCK_USDT_ADAPTER).setPeer(BASE_EID, bytes32(uint256(uint160(BASE_OFT_MOCK_USDT_ADAPTER))));
+        MyOApp(KAIA_OFT_MOCK_USDT_ADAPTER).setPeer(KAIA_EID, bytes32(uint256(uint160(KAIA_OFT_MOCK_USDT_ADAPTER))));
         
         vm.stopBroadcast();
     }

@@ -83,3 +83,4 @@ contract SetLibraries is Script, Helper {
 }
 // RUN
 // forge script SetLibraries --broadcast -vvv
+// forge script SetLibraries -vvv

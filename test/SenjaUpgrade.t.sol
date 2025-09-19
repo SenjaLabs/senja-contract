@@ -2,9 +2,13 @@
 pragma solidity ^0.8.0;
 
 import {Test, console} from "forge-std/Test.sol";
+import {LendingPool} from "../src/LendingPool.sol";
+import {LendingPoolRouter} from "../src/LendingPoolRouter.sol";
 import {LendingPoolFactory} from "../src/LendingPoolFactory.sol";
 import {LendingPoolRouterDeployer} from "../src/LendingPoolRouterDeployer.sol";
 import {Helper} from "../script/L0/Helper.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {Position} from "../src/Position.sol";
 
 // RUN
 // forge test --match-contract SenjaUpgradeTest --match-test test_upgrade_contract -vvv
@@ -73,12 +77,48 @@ contract SenjaUpgradeTest is Test, Helper {
         LendingPoolFactory(KAIA_lendingPoolFactoryProxy).setLendingPoolRouterDeployer(address(lendingPoolRouterDeployer));
         console.log("****************************");
 
-        LendingPoolFactory(KAIA_lendingPoolFactoryProxy).createLendingPool(KAIA_USDT, KAIA_WKAIA, 8e17);
         (address c3, address b3, address lp3) = LendingPoolFactory(KAIA_lendingPoolFactoryProxy).pools(3);
         console.log("pools[3] collateral", c3);
         console.log("pools[3] borrow", b3);
         console.log("pools[3] lp", lp3);
         console.log("lendingPoolRouterDeployer", LendingPoolFactory(KAIA_lendingPoolFactoryProxy).lendingPoolRouterDeployer());
+        console.log("****************************");
+        console.log("****************************");
+        (address c4, address b4, address lp4) = LendingPoolFactory(KAIA_lendingPoolFactoryProxy).pools(4);
+        console.log("pools[4] collateral", c4);
+        console.log("pools[4] borrow", b4);
+        console.log("pools[4] lp", lp4);
+        vm.stopPrank();
+    }
+
+    // RUN
+    // forge test --match-contract SenjaUpgradeTest --match-test test_swap_collateral -vvv
+    function test_swap_collateral() public {
+        vm.startPrank(vm.envAddress("PUBLIC_KEY"));
+        address user = vm.envAddress("PUBLIC_KEY");
+        console.log("****************************");
+        (address c4, address b4, address lp4) = LendingPoolFactory(KAIA_lendingPoolFactoryProxy).pools(4);
+        console.log("pools[4] collateral", c4);
+        console.log("pools[4] borrow", b4);
+        console.log("pools[4] lp", lp4);
+
+        console.log("position deployer", LendingPoolFactory(KAIA_lendingPoolFactoryProxy).positionDeployer());
+        address router = LendingPool(payable(lp4)).router();
+        address position = LendingPoolRouter(router).addressPositions(user);
+
+        deal(c4, user, 100_000e18);
+        IERC20(c4).approve(lp4, 100_000e18);
+        LendingPool(payable(lp4)).supplyCollateral(100_000e18, user);
+        position = LendingPoolRouter(router).addressPositions(user);
+        console.log("position", position);
+        Position(payable(position)).swapTokenByPosition(c4, b4, 100_000e18, 500);
+        deal(b4, position, 100_000e18);
+        Position(payable(position)).swapTokenByPosition(b4, KAIA_MOCK_WETH, 10_000e6, 10000);
+        // check balance
+        console.log("balance of c4", IERC20(c4).balanceOf(position));
+        console.log("balance of b4", IERC20(b4).balanceOf(position));
+        console.log("balance of weth", IERC20(KAIA_MOCK_WETH).balanceOf(position));
+
         vm.stopPrank();
     }
 }

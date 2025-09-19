@@ -14,14 +14,9 @@ contract SetEnforcedOptions is Script, Helper {
 
     uint16 SEND = 1; // Message type for sendString function
 
-    function setUp() public {
-        // vm.createSelectFork(vm.rpcUrl("base_sepolia"));
-        // vm.createSelectFork(vm.rpcUrl("arb_sepolia"));
-    }
-
     function run() external {
         deployBASE();
-        // deployKAIA();
+        deployKAIA();
         // optimism
         // hyperevm
     }
@@ -43,6 +38,7 @@ contract SetEnforcedOptions is Script, Helper {
         MyOApp(BASE_OFT_WKAIAK_ADAPTER).setEnforcedOptions(enforcedOptions);
         MyOApp(BASE_OFT_WBTCK_ADAPTER).setEnforcedOptions(enforcedOptions);
         MyOApp(BASE_OFT_WETHK_ADAPTER).setEnforcedOptions(enforcedOptions);
+        MyOApp(BASE_OFT_MOCK_USDT_ADAPTER).setEnforcedOptions(enforcedOptions);
         vm.stopBroadcast();
 
         console.log("deployed on ChainId: ", block.chainid);
@@ -66,6 +62,7 @@ contract SetEnforcedOptions is Script, Helper {
         MyOApp(KAIA_OFT_WKAIA_ADAPTER).setEnforcedOptions(enforcedOptions);
         MyOApp(KAIA_OFT_WBTC_ADAPTER).setEnforcedOptions(enforcedOptions);
         MyOApp(KAIA_OFT_WETH_ADAPTER).setEnforcedOptions(enforcedOptions);
+        MyOApp(KAIA_OFT_MOCK_USDT_ADAPTER).setEnforcedOptions(enforcedOptions);
         vm.stopBroadcast();
 
         console.log("deployed on ChainId: ", block.chainid);

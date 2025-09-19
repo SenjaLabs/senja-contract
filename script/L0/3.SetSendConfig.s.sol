@@ -124,3 +124,4 @@ contract SetSendConfig is Script, Helper {
 
 // RUN
 // forge script SetSendConfig --broadcast -vvv
+// forge script SetSendConfig -vvv

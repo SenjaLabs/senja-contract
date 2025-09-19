@@ -6,8 +6,6 @@ import {OAppOptionsType3} from "@layerzerolabs/oapp-evm/contracts/oapp/libs/OApp
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ILendingPool} from "../../interfaces/ILendingPool.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {OFTadapter} from "../OFTAdapter.sol";
-import {SendParam} from "@layerzerolabs/oft-evm/contracts/interfaces/IOFT.sol";
 import {OptionsBuilder} from "@layerzerolabs/oapp-evm/contracts/oapp/libs/OptionsBuilder.sol";
 import {ILPRouter} from "../../interfaces/ILPRouter.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -18,6 +16,7 @@ contract OAppSupplyLiquidityUSDT is OApp, OAppOptionsType3 {
 
     error InsufficientBalance();
     error InsufficientNativeFee();
+    error OnlyOApp();
 
     bytes public lastMessage;
     address public factory;
@@ -48,22 +47,17 @@ contract OAppSupplyLiquidityUSDT is OApp, OAppOptionsType3 {
 
     function sendString(
         uint32 _dstEid,
-        address _lendingPool,
+        address _lendingPoolDst,
         address _user,
         address _tokendst,
-        address _oappaddressdst,
         uint256 _amount,
-        uint256 _slippageTolerance,
+        uint256 _oappFee,
         bytes calldata _options
     ) external payable {
-        uint256 oftNativeFee = _quoteOftNativeFee(_dstEid, _oappaddressdst, _amount, _slippageTolerance);
-        uint256 lzNativeFee = _quoteLzNativeFee(_dstEid, _lendingPool, _user, _tokendst, _amount, _options);
-
-        if (msg.value < oftNativeFee + lzNativeFee) revert InsufficientNativeFee();
-
-        _performOftSend(_dstEid, _oappaddressdst, _user, _amount, _slippageTolerance, oftNativeFee);
-        _performLzSend(_dstEid, _lendingPool, _user, _tokendst, _amount, _options, lzNativeFee);
-        emit SendLiquidityFromSrc(_lendingPool, _user, _tokendst, _amount);
+        bytes memory lzOptions = combineOptions(_dstEid, SEND, _options);
+        bytes memory message = abi.encode(_lendingPoolDst, _user, _tokendst, _amount);
+        _lzSend(_dstEid, message, lzOptions, MessagingFee(_oappFee, 0), payable(_user));
+        emit SendLiquidityFromSrc(_lendingPoolDst, _user, _tokendst, _amount);
     }
 
     function _lzReceive(Origin calldata, bytes32, bytes calldata _message, address, bytes calldata) internal override {
@@ -82,76 +76,6 @@ contract OAppSupplyLiquidityUSDT is OApp, OAppOptionsType3 {
         IERC20(borrowToken).approve(_lendingPool, _amount);
         ILendingPool(_lendingPool).supplyLiquidity(_user, _amount);
         emit ExecuteLiquidity(_lendingPool, borrowToken, _user, _amount);
-    }
-
-    function _quoteOftNativeFee(uint32 _dstEid, address _oappaddressdst, uint256 _amount, uint256 _slippageTolerance)
-        internal
-        view
-        returns (uint256)
-    {
-        OFTadapter oft = OFTadapter(oftaddress);
-        bytes memory extraOptions = OptionsBuilder.newOptions().addExecutorLzReceiveOption(65000, 0);
-        SendParam memory sendParam = SendParam({
-            dstEid: _dstEid,
-            to: addressToBytes32(_oappaddressdst),
-            amountLD: _amount,
-            minAmountLD: _amount * (100 - _slippageTolerance) / 100,
-            extraOptions: extraOptions,
-            composeMsg: "",
-            oftCmd: ""
-        });
-        return oft.quoteSend(sendParam, false).nativeFee;
-    }
-
-    function _quoteLzNativeFee(
-        uint32 _dstEid,
-        address _lendingPool,
-        address _user,
-        address _tokendst,
-        uint256 _amount,
-        bytes calldata _options
-    ) internal view returns (uint256) {
-        bytes memory lzOptions = combineOptions(_dstEid, SEND, _options);
-        bytes memory payload = abi.encode(_lendingPool, _user, _tokendst, _amount);
-        return _quote(_dstEid, payload, lzOptions, false).nativeFee;
-    }
-
-    function _performOftSend(
-        uint32 _dstEid,
-        address _oappaddressdst,
-        address _user,
-        uint256 _amount,
-        uint256 _slippageTolerance,
-        uint256 _oftNativeFee
-    ) internal {
-        OFTadapter oft = OFTadapter(oftaddress);
-        bytes memory extraOptions = OptionsBuilder.newOptions().addExecutorLzReceiveOption(65000, 0);
-        SendParam memory sendParam = SendParam({
-            dstEid: _dstEid,
-            to: addressToBytes32(_oappaddressdst),
-            amountLD: _amount,
-            minAmountLD: _amount * (100 - _slippageTolerance) / 100,
-            extraOptions: extraOptions,
-            composeMsg: "",
-            oftCmd: ""
-        });
-        IERC20(oft.tokenOFT()).safeTransferFrom(_user, address(this), _amount);
-        IERC20(oft.tokenOFT()).approve(oftaddress, _amount);
-        oft.send{value: _oftNativeFee}(sendParam, MessagingFee(_oftNativeFee, 0), _user);
-    }
-
-    function _performLzSend(
-        uint32 _dstEid,
-        address _lendingPool,
-        address _user,
-        address _tokendst,
-        uint256 _amount,
-        bytes calldata _options,
-        uint256 _lzNativeFee
-    ) internal {
-        bytes memory lzOptions = combineOptions(_dstEid, SEND, _options);
-        bytes memory payload = abi.encode(_lendingPool, _user, _tokendst, _amount);
-        _lzSend(_dstEid, payload, lzOptions, MessagingFee(_lzNativeFee, 0), payable(_user));
     }
 
     // SRC

@@ -67,3 +67,4 @@ contract SenjaCoreContracts is Script, Helper {
 
 // RUN
 // forge script SenjaCoreContracts --broadcast -vvv
+// forge script SenjaCoreContracts -vvv

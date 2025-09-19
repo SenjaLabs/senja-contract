@@ -111,3 +111,4 @@ contract SetReceiveConfig is Script, Helper {
 
 // RUN
 // forge script SetReceiveConfig --broadcast -vvv
+// forge script SetReceiveConfig -vvv

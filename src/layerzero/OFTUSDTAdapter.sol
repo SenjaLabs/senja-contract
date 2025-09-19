@@ -65,4 +65,8 @@ contract OFTUSDTadapter is OFTAdapter, ReentrancyGuard {
         }
         emit Debit(_from, _amountLD);
     }
+
+    function setElevatedMinterBurner(address _elevatedMinterBurner) external onlyOwner {
+        elevatedMinterBurner = _elevatedMinterBurner;
+    }
 }

@@ -30,8 +30,8 @@ contract DeployOFT is Script, Helper {
     OFTWETHadapter public oftwethadapter;
 
     function run() public {
-        // deployBASE();
-        deployKAIA();
+        deployBASE();
+        // deployKAIA();
         // optimism
         // hyperevm
     }
@@ -41,43 +41,43 @@ contract DeployOFT is Script, Helper {
         vm.startBroadcast(privateKey);
         console.log("deployed on ChainId: ", block.chainid);
 
-        usdtk = new USDTk();
-        console.log("address public BASE_USDTK =", address(usdtk), ";");
-        elevatedminterburner = new ElevatedMinterBurner(address(usdtk), owner);
+        // usdtk = new USDTk();
+        console.log("address public BASE_USDTK =", address(BASE_USDTK), ";");
+        elevatedminterburner = new ElevatedMinterBurner(address(BASE_USDTK), owner);
         console.log("address public BASE_ELEVATED_MINTER_BURNER =", address(elevatedminterburner), ";");
-        oftusdtadapter = new OFTUSDTadapter(address(usdtk), address(elevatedminterburner), BASE_LZ_ENDPOINT, owner);
+        oftusdtadapter = new OFTUSDTadapter(address(BASE_USDTK), address(elevatedminterburner), BASE_LZ_ENDPOINT, owner);
         console.log("address public BASE_OFT_USDTK_ADAPTER =", address(oftusdtadapter), ";");
         elevatedminterburner.setOperator(address(oftusdtadapter), true);
 
-        kaiak = new KAIAk();
-        console.log("address public BASE_KAIAK =", address(kaiak), ";");
-        elevatedminterburner = new ElevatedMinterBurner(address(kaiak), owner);
+        // kaiak = new KAIAk();
+        console.log("address public BASE_KAIAK =", address(BASE_KAIAK), ";");
+        elevatedminterburner = new ElevatedMinterBurner(address(BASE_KAIAK), owner);
         console.log("address public BASE_ELEVATED_MINTER_BURNER =", address(elevatedminterburner), ";");
-        oftkaiaadapter = new OFTKAIAadapter(address(kaiak), address(elevatedminterburner), BASE_LZ_ENDPOINT, owner);
+        oftkaiaadapter = new OFTKAIAadapter(address(BASE_KAIAK), address(elevatedminterburner), BASE_LZ_ENDPOINT, owner);
         console.log("address public BASE_OFT_KAIAK_ADAPTER =", address(oftkaiaadapter), ";");
         elevatedminterburner.setOperator(address(oftkaiaadapter), true);
 
-        wkaiak = new WKAIAk();
-        console.log("address public BASE_WKAIAK =", address(wkaiak), ";");
-        elevatedminterburner = new ElevatedMinterBurner(address(wkaiak), owner);
+        // wkaiak = new WKAIAk();
+        console.log("address public BASE_WKAIAK =", address(BASE_WKAIAK), ";");
+        elevatedminterburner = new ElevatedMinterBurner(address(BASE_WKAIAK), owner);
         console.log("address public BASE_ELEVATED_MINTER_BURNER =", address(elevatedminterburner), ";");
-        oftkaiaadapter = new OFTKAIAadapter(address(wkaiak), address(elevatedminterburner), BASE_LZ_ENDPOINT, owner);
+        oftkaiaadapter = new OFTKAIAadapter(address(BASE_WKAIAK), address(elevatedminterburner), BASE_LZ_ENDPOINT, owner);
         console.log("address public BASE_OFT_WKAIAK_ADAPTER =", address(oftkaiaadapter), ";");
         elevatedminterburner.setOperator(address(oftkaiaadapter), true);
 
-        wbtck = new WBTCk();
-        console.log("address public BASE_WBTCK =", address(wbtck), ";");
-        elevatedminterburner = new ElevatedMinterBurner(address(wbtck), owner);
+        // wbtck = new WBTCk();
+        console.log("address public BASE_WBTCK =", address(BASE_WBTCK), ";");
+        elevatedminterburner = new ElevatedMinterBurner(address(BASE_WBTCK), owner);
         console.log("address public BASE_ELEVATED_MINTER_BURNER =", address(elevatedminterburner), ";");
-        oftwbtcadapter = new OFTWBTCadapter(address(wbtck), address(elevatedminterburner), BASE_LZ_ENDPOINT, owner);
+        oftwbtcadapter = new OFTWBTCadapter(address(BASE_WBTCK), address(elevatedminterburner), BASE_LZ_ENDPOINT, owner);
         console.log("address public BASE_OFT_WBTCK_ADAPTER =", address(oftwbtcadapter), ";");
         elevatedminterburner.setOperator(address(oftwbtcadapter), true);
 
-        wethk = new WETHk();
-        console.log("address public BASE_WETHK =", address(wethk), ";");
-        elevatedminterburner = new ElevatedMinterBurner(address(wethk), owner);
+        // wethk = new WETHk();
+        console.log("address public BASE_WETHK =", address(BASE_WETHK), ";");
+        elevatedminterburner = new ElevatedMinterBurner(address(BASE_WETHK), owner);
         console.log("address public BASE_ELEVATED_MINTER_BURNER =", address(elevatedminterburner), ";");
-        oftwethadapter = new OFTWETHadapter(address(wethk), address(elevatedminterburner), BASE_LZ_ENDPOINT, owner);
+        oftwethadapter = new OFTWETHadapter(address(BASE_WETHK), address(elevatedminterburner), BASE_LZ_ENDPOINT, owner);
         console.log("address public BASE_OFT_WETHK_ADAPTER =", address(oftwethadapter), ";");
         elevatedminterburner.setOperator(address(oftwethadapter), true);
 
@@ -111,5 +111,5 @@ contract DeployOFT is Script, Helper {
 }
 // RUN
 // forge script DeployOFT --broadcast -vvv --verify --verifier etherscan --etherscan-api-key $ETHERSCAN_API_KEY
-// forge script DeployOFT --broadcast -vvv --verify
 // forge script DeployOFT --broadcast -vvv
+// forge script DeployOFT -vvv
