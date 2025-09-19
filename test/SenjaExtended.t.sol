@@ -462,19 +462,19 @@ contract SenjaExtendedTest is Test, Helper {
 
         vm.startPrank(alice);
         IERC20(USDT).approve(lendingPool, 10e6);
-        ILendingPool(lendingPool).repayWithSelectedToken(10e6, USDT, false, alice);
+        ILendingPool(lendingPool).repayWithSelectedToken(10e6, USDT, false, alice, 500);
         IERC20(USDT).approve(lendingPool, 10e6);
-        ILendingPool(lendingPool).repayWithSelectedToken(10e6, USDT, false, alice);
+        ILendingPool(lendingPool).repayWithSelectedToken(10e6, USDT, false, alice, 500);
         // For WKAIA repayment, send native KAIA which gets auto-wrapped
         IERC20(WKAIA).approve(lendingPool2, 5 ether);
-        ILendingPool(lendingPool2).repayWithSelectedToken(5 ether, WKAIA, false, alice);
+        ILendingPool(lendingPool2).repayWithSelectedToken(5 ether, WKAIA, false, alice, 500);
         IERC20(WKAIA).approve(lendingPool2, 5 ether);
-        ILendingPool(lendingPool2).repayWithSelectedToken(5 ether, WKAIA, false, alice);
+        ILendingPool(lendingPool2).repayWithSelectedToken(5 ether, WKAIA, false, alice, 500);
 
         IERC20(USDT).approve(lendingPool3, 10e6);
-        ILendingPool(lendingPool3).repayWithSelectedToken(10e6, USDT, false, alice);
+        ILendingPool(lendingPool3).repayWithSelectedToken(10e6, USDT, false, alice, 500);
         IERC20(USDT).approve(lendingPool3, 10e6);
-        ILendingPool(lendingPool3).repayWithSelectedToken(10e6, USDT, false, alice);
+        ILendingPool(lendingPool3).repayWithSelectedToken(10e6, USDT, false, alice, 500);
         vm.stopPrank();
 
         assertEq(ILPRouter(_router(lendingPool)).userBorrowShares(alice), 0);

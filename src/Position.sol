@@ -47,7 +47,8 @@ contract Position is ReentrancyGuard {
     error TransferFailed();
     /// @notice Error thrown when an invalid parameter is provided
     error InvalidParameter();
-    /// @notice The collateral token address for this position
+    /// @notice Error thrown when oracle on token is not set
+    error OracleOnTokenNotSet();
 
     address public owner;
     address public lpAddress;
@@ -183,7 +184,9 @@ contract Position is ReentrancyGuard {
         uint256 balances = IERC20(_tokenIn).balanceOf(address(this));
         if (amountIn == 0) revert ZeroAmount();
         if (balances < amountIn) revert InsufficientBalance();
-        if (msg.sender != owner) revert NotForSwap();
+        if (_tokenIn == _tokenOut) revert InvalidParameter();
+        if(IFactory(_factory()).tokenDataStream(_tokenIn) == address(0) || IFactory(_factory()).tokenDataStream(_tokenOut) == address(0)) revert OracleOnTokenNotSet();
+        if (msg.sender != owner && msg.sender != lpAddress) revert NotForSwap();
         if (slippageTolerance > 10000) revert InvalidParameter(); // Max 100% slippage
 
         // Perform DragonSwap with slippage protection
@@ -196,18 +199,19 @@ contract Position is ReentrancyGuard {
      * @notice Repays a loan using a selected token
      * @param amount The amount to repay
      * @param _token The address of the token to use for repayment
+     * @param slippageTolerance Slippage tolerance in basis points (e.g., 500 = 5%)
      * @dev Only authorized contracts can call this function
      * @dev If the selected token is not the borrow asset, it will be swapped first
      * @dev Any excess tokens after repayment are swapped back to the original token
      */
-    function repayWithSelectedToken(uint256 amount, address _token) public payable {
+    function repayWithSelectedToken(uint256 amount, address _token, uint256 slippageTolerance) public payable {
         _onlyAuthorizedWithdrawal();
 
         uint256 balance = IERC20(_token).balanceOf(address(this));
         if (balance < amount) revert InsufficientBalance();
 
         if (_token != _borrowToken()) {
-            uint256 amountOut = swapTokenByPosition(_token, _borrowToken(), balance, 500); // 5% slippage
+            uint256 amountOut = swapTokenByPosition(_token, _borrowToken(), balance, slippageTolerance);
             if (amountOut < amount) revert InsufficientBalance();
 
             IERC20(_token).approve(lpAddress, amount);
@@ -215,7 +219,7 @@ contract Position is ReentrancyGuard {
 
             uint256 remaining = amountOut - amount;
             if (remaining > 0) {
-                swapTokenByPosition(_borrowToken(), _token, remaining, 500); // 5% slippage
+                swapTokenByPosition(_borrowToken(), _token, remaining, slippageTolerance);
             }
         } else {
             IERC20(_token).approve(lpAddress, amount);

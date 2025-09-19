@@ -75,10 +75,11 @@ interface IPosition {
      * @dev Repays debt using selected token
      * @param amount Amount to repay
      * @param _token Address of the token used for repayment
+     * @param slippageTolerance Slippage tolerance in basis points (e.g., 500 = 5%)
      * @notice This function allows users to repay their debt
      * @custom:security Users must approve tokens before calling this function
      */
-    function repayWithSelectedToken(uint256 amount, address _token) external;
+    function repayWithSelectedToken(uint256 amount, address _token, uint256 slippageTolerance) external;
     
     /**
      * @dev Calculates token conversion rates

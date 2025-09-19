@@ -42,34 +42,53 @@ contract UpgradeContract is Script, Helper {
     }
 
     function _setContract() internal {
+        // _setupLendingPoolRouterDeployer();
+        // _setupLiquidatorAndIsHealthy();
+        _setupPositionDeployer();
+        // _setupProtocol();
+        _setupLendingPoolDeployer();
+        _createLendingPool();
+    }
+
+    function _setupLendingPoolRouterDeployer() internal {
         lendingPoolRouterDeployer = new LendingPoolRouterDeployer();
         lendingPoolRouterDeployer.setFactory(KAIA_lendingPoolFactoryProxy);
         LendingPoolFactory(KAIA_lendingPoolFactoryProxy).setLendingPoolRouterDeployer(
             address(lendingPoolRouterDeployer)
         );
         console.log("address public KAIA_lendingPoolRouterDeployer =", address(lendingPoolRouterDeployer), ";");
+    }
 
+    function _setupLiquidatorAndIsHealthy() internal {
         liquidator = new Liquidator();
         liquidator.setFactory(KAIA_lendingPoolFactoryProxy);
         isHealthy = new IsHealthy(address(liquidator));
         LendingPoolFactory(KAIA_lendingPoolFactoryProxy).setIsHealthy(address(isHealthy));
         console.log("address public KAIA_liquidator =", address(liquidator), ";");
         console.log("address public KAIA_isHealthy =", address(isHealthy), ";");
+    }
 
+    function _setupPositionDeployer() internal {
         positionDeployer = new PositionDeployer();
         LendingPoolFactory(KAIA_lendingPoolFactoryProxy).setPositionDeployer(address(positionDeployer));
         console.log("address public KAIA_positionDeployer =", address(positionDeployer), ";");
+    }
 
+    function _setupProtocol() internal {
         protocol = new Protocol();
         LendingPoolFactory(KAIA_lendingPoolFactoryProxy).setProtocol(address(protocol));
         console.log("address public KAIA_protocol =", address(protocol), ";");
+    }
 
+    function _setupLendingPoolDeployer() internal {
         lendingPoolDeployer = new LendingPoolDeployer();
         lendingPoolDeployer.setFactory(KAIA_lendingPoolFactoryProxy);
         LendingPoolFactory(KAIA_lendingPoolFactoryProxy).setLendingPoolDeployer(address(lendingPoolDeployer));
         console.log("address public KAIA_lendingPoolDeployer =", address(lendingPoolDeployer), ";");
+    }
 
-        LendingPoolFactory(KAIA_lendingPoolFactoryProxy).createLendingPool(KAIA_MOCK_WKAIA, KAIA_MOCK_USDT, 86e16);
+    function _createLendingPool() internal {
+        LendingPoolFactory(KAIA_lendingPoolFactoryProxy).createLendingPool(KAIA_MOCK_WKAIA, KAIA_MOCK_USDT, 886e15);
     }
 }
 

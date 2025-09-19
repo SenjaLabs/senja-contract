@@ -46,10 +46,11 @@ interface ILendingPool {
      * @param _token Address of the token used for repayment
      * @param _fromPosition Whether to repay from position balance
      * @param _user Address of the user repaying the debt
+     * @param _slippageTolerance Slippage tolerance in basis points (e.g., 500 = 5%)
      * @notice This function allows users to repay their borrowed debt
      * @custom:security Users must approve tokens before calling this function
      */
-    function repayWithSelectedToken(uint256 _shares, address _token, bool _fromPosition, address _user) external payable;
+    function repayWithSelectedToken(uint256 _shares, address _token, bool _fromPosition, address _user, uint256 _slippageTolerance) external payable;
     
     /**
      * @dev Withdraws supplied liquidity by redeeming shares

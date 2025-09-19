@@ -181,8 +181,8 @@ contract DstToOriginTest is Test, Helper {
         MessagingFee memory feeMessage =
             oappSupplyLiquidityUSDT.quoteSendString(KAIA_EID, KAIA_lendingPool, owner, KAIA_MOCK_USDT, 1e6, "", false);
 
-        IERC20(BASE_USDTK).approve(address(oappAdapter), 1e6);
-        OAppAdapter(address(oappAdapter)).sendBridge{value: feeBridge.nativeFee + feeMessage.nativeFee}(
+        IERC20(BASE_USDTK).approve(BASE_oappAdapter, 1e6);
+        OAppAdapter(BASE_oappAdapter).sendBridge{value: feeBridge.nativeFee + feeMessage.nativeFee}(
             address(oappSupplyLiquidityUSDT),
             BASE_OFT_USDTK_ADAPTER,
             KAIA_lendingPool,

@@ -266,7 +266,7 @@ contract LendingPool is ReentrancyGuard {
      * @custom:throws amountSharesInvalid if shares exceed user's borrow shares.
      * @custom:emits RepayByPosition when repayment is successful.
      */
-    function repayWithSelectedToken(uint256 shares, address _token, bool _fromPosition, address _user)
+    function repayWithSelectedToken(uint256 shares, address _token, bool _fromPosition, address _user, uint256 _slippageTolerance)
         public
         payable
         positionRequired(_user)
@@ -287,7 +287,7 @@ contract LendingPool is ReentrancyGuard {
                 IERC20(_borrowToken()).safeTransferFrom(_user, address(this), borrowAmount);
             }
         } else {
-            IPosition(_addressPositions(_user)).repayWithSelectedToken(borrowAmount, _token);
+            IPosition(_addressPositions(_user)).repayWithSelectedToken(borrowAmount, _token, _slippageTolerance);
         }
 
         emit RepayByPosition(_user, borrowAmount, shares);
