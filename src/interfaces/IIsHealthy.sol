@@ -1,21 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 
-/*
-██╗██████╗░██████╗░░█████╗░███╗░░██╗
-██║██╔══██╗██╔══██╗██╔══██╗████╗░██║
-██║██████╦╝██████╔╝███████║██╔██╗██║
-██║██╔══██╗██╔══██╗██╔══██║██║╚████║
-██║██████╦╝██║░░██║██║░░██║██║░╚███║
-╚═╝╚═════╝░╚═╝░░╚═╝╚═╝░░╚═╝╚═╝░░╚══╝
-*/
-
 /**
  * @title IIsHealthy
  * @dev Interface for health check functionality in lending pools
  * @notice This interface defines the contract for checking the health status of lending positions
- * @author Ibran Team
- * @custom:security-contact security@ibran.com
+ * @author Senja Team
  * @custom:version 1.0.0
  */
 interface IIsHealthy {

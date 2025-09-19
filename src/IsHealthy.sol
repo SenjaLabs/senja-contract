@@ -6,18 +6,9 @@ import {IOracle} from "./interfaces/IOracle.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {IPosition} from "./interfaces/IPosition.sol";
 
-/*
-██╗██████╗░██████╗░░█████╗░███╗░░██╗
-██║██╔══██╗██╔══██╗██╔══██╗████╗░██║
-██║██████╦╝██████╔╝███████║██╔██╗██║
-██║██╔══██╗██╔══██╗██╔══██║██║╚████║
-██║██████╦╝██║░░██║██║░░██║██║░╚███║
-╚═╝╚═════╝░╚═╝░░╚═╝╚═╝░░╚═╝╚═╝░░╚══╝
-*/
-
 /**
  * @title IsHealthy
- * @author Ibran Protocol
+ * @author Senja Protocol
  * @notice A contract that validates the health status of lending positions
  * @dev This contract checks if a user's position is healthy by comparing
  *      the total collateral value against the borrowed amount and LTV ratio

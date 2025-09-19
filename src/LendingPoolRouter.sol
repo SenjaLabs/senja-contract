@@ -7,7 +7,7 @@ import {IPositionDeployer} from "./interfaces/IPositionDeployer.sol";
 
 /**
  * @title LendingPoolRouter
- * @author Ibran Protocol
+ * @author Senja Protocol
  * @notice Router contract that manages lending pool operations and state
  * @dev This contract handles the core logic for supply, borrow, and interest calculations
  */

@@ -3,18 +3,9 @@ pragma solidity ^0.8.13;
 
 import {LendingPool} from "./LendingPool.sol";
 
-/*
-██╗██████╗░██████╗░░█████╗░███╗░░██╗
-██║██╔══██╗██╔══██╗██╔══██╗████╗░██║
-██║██████╦╝██████╔╝███████║██╔██╗██║
-██║██╔══██╗██╔══██╗██╔══██║██║╚████║
-██║██████╦╝██║░░██║██║░░██║██║░╚███║
-╚═╝╚═════╝░╚═╝░░╚═╝╚═╝░░╚═╝╚═╝░░╚══╝
-*/
-
 /**
  * @title LendingPoolDeployer
- * @author Ibran Protocol
+ * @author Senja Protocol
  * @notice A factory contract for deploying new LendingPool instances
  * @dev This contract is responsible for creating new lending pools with specified parameters
  *

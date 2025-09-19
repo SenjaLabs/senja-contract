@@ -4,21 +4,11 @@ pragma solidity ^0.8.20;
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IOrakl} from "./interfaces/IOrakl.sol";
 
-/*
-██╗██████╗░██████╗░░█████╗░███╗░░██╗
-██║██╔══██╗██╔══██╗██╔══██╗████╗░██║
-██║██████╦╝██████╔╝███████║██╔██╗██║
-██║██╔══██╗██╔══██╗██╔══██║██║╚████║
-██║██████╦╝██║░░██║██║░░██║██║░╚███║
-╚═╝╚═════╝░╚═╝░░╚═╝╚═╝░░╚═╝╚═╝░░╚══╝
-*/
-
 /**
  * @title Pricefeed
  * @dev Mock price feed contract for testing purposes
  * @notice This contract simulates Chainlink-style price feed functionality
- * @author Ibran Team
- * @custom:security-contact security@ibran.com
+ * @author Senja Team
  * @custom:version 1.0.0
  */
 contract Oracle is Ownable {

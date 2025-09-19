@@ -1,21 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 
-/*
-██╗██████╗░██████╗░░█████╗░███╗░░██╗
-██║██╔══██╗██╔══██╗██╔══██╗████╗░██║
-██║██████╦╝██████╔╝███████║██╔██╗██║
-██║██╔══██╗██╔══██╗██╔══██║██║╚████║
-██║██████╦╝██║░░██║██║░░██║██║░╚███║
-╚═╝╚═════╝░╚═╝░░╚═╝╚═╝░░╚═╝╚═╝░░╚══╝
-*/
-
 /**
  * @title IOracle
  * @dev Interface for price oracle functionality
  * @notice This interface defines the contract for price feeds and token calculations
- * @author Ibran Team
- * @custom:security-contact security@ibran.com
+ * @author Senja Team
  * @custom:version 1.0.0
  */
 interface IOracle {

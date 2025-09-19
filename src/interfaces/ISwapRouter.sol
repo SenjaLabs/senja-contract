@@ -1,21 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 
-/*
-██╗██████╗░██████╗░░█████╗░███╗░░██╗
-██║██╔══██╗██╔══██╗██╔══██╗████╗░██║
-██║██████╦╝██████╔╝███████║██╔██╗██║
-██║██╔══██╗██╔══██╗██╔══██║██║╚████║
-██║██████╦╝██║░░██║██║░░██║██║░╚███║
-╚═╝╚═════╝░╚═╝░░╚═╝╚═╝░░╚═╝╚═╝░░╚══╝
-*/
-
 /**
  * @title ISwapRouter
  * @dev Interface for Uniswap V3 swap router functionality
  * @notice This interface defines the contract for token swapping operations
- * @author Ibran Team
- * @custom:security-contact security@ibran.com
+ * @author Senja Team
  * @custom:version 1.0.0
  */
 interface ISwapRouter {

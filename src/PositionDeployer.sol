@@ -5,7 +5,7 @@ import {Position} from "./Position.sol";
 
 /**
  * @title PositionDeployer
- * @author Ibran Protocol
+ * @author Senja Protocol
  * @notice A factory contract for deploying new Position instances
  * @dev This contract is responsible for creating new positions with specified parameters
  *

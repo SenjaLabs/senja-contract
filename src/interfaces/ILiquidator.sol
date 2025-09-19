@@ -5,8 +5,7 @@ pragma solidity ^0.8.13;
  * @title ILiquidator
  * @dev Interface for liquidation functionality
  * @notice This interface defines the contract for liquidating unhealthy positions
- * @author Ibran Team
- * @custom:security-contact security@ibran.com
+ * @author Senja Team
  * @custom:version 1.0.0
  */
 interface ILiquidator {

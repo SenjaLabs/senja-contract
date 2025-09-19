@@ -11,7 +11,6 @@ import {SetConfigParam} from "@layerzerolabs/lz-evm-protocol-v2/contracts/interf
 import {UlnConfig} from "@layerzerolabs/lz-evm-messagelib-v2/contracts/uln/UlnBase.sol";
 import {ExecutorConfig} from "@layerzerolabs/lz-evm-messagelib-v2/contracts/SendLibBase.sol";
 import {OAppAdapter} from "../../src/layerzero/messages/OAppAdapter.sol";
-import {OFTUSDTadapter} from "../../src/layerzero/OFTUSDTadapter.sol";
 
 contract CrosschainMessage is Script, Helper {
     using OptionsBuilder for bytes;

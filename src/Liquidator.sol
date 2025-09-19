@@ -12,18 +12,9 @@ import {ILPRouter} from "./interfaces/ILPRouter.sol";
 import {IDragonSwap} from "./interfaces/IDragonSwap.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
-/*
-██╗██████╗░██████╗░░█████╗░███╗░░██╗
-██║██╔══██╗██╔══██╗██╔══██╗████╗░██║
-██║██████╦╝██████╔╝███████║██╔██╗██║
-██║██╔══██╗██╔══██╗██╔══██║██║╚████║
-██║██████╦╝██║░░██║██║░░██║██║░╚███║
-╚═╝╚═════╝░╚═╝░░╚═╝╚═╝░░╚═╝╚═╝░░╚══╝
-*/
-
 /**
  * @title Liquidator
- * @author Ibran Protocol
+ * @author Senja Protocol
  * @notice A contract that handles liquidation of unhealthy lending positions
  * @dev This contract provides both DEX and MEV liquidation options
  */
