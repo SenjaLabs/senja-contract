@@ -10,7 +10,7 @@ contract USDTk is ERC20, Ownable {
     error NotOperator();
 
     constructor() ERC20("USD Tether representative", "USDTk") Ownable(msg.sender) {}
-    
+
     modifier onlyOperator() {
         _onlyOperator();
         _;
@@ -23,7 +23,7 @@ contract USDTk is ERC20, Ownable {
     function decimals() public pure override returns (uint8) {
         return 6;
     }
-    
+
     function setOperator(address _operator, bool _isOperator) public onlyOwner {
         operator[_operator] = _isOperator;
     }

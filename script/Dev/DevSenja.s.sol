@@ -115,8 +115,7 @@ contract DevSenja is Script, Helper {
 
         elevatedminterburner = new ElevatedMinterBurner(KAIA_MOCK_WKAIA, owner);
         console.log("address public KAIA_MOCK_WKAIA_ELEVATED_MINTER_BURNER =", address(elevatedminterburner), ";");
-        oftkaiaadapter =
-            new OFTKAIAadapter(KAIA_MOCK_WKAIA, address(elevatedminterburner), KAIA_LZ_ENDPOINT, owner);
+        oftkaiaadapter = new OFTKAIAadapter(KAIA_MOCK_WKAIA, address(elevatedminterburner), KAIA_LZ_ENDPOINT, owner);
         console.log("address public KAIA_OFT_MOCK_WKAIA_ADAPTER =", address(oftkaiaadapter), ";");
         elevatedminterburner.setOperator(address(oftkaiaadapter), true);
         oftwkaia = address(oftkaiaadapter);

@@ -65,12 +65,11 @@ contract OAppRepayDebtUSDT is OApp, OAppOptionsType3 {
         emit SendRepayDebtFromSrc(_lendingPool, _user, _tokendst, _amount);
     }
 
-    function _quoteOftNativeFee(
-        uint32 _dstEid,
-        address _oappaddressdst,
-        uint256 _amount,
-        uint256 _slippageTolerance
-    ) internal view returns (uint256) {
+    function _quoteOftNativeFee(uint32 _dstEid, address _oappaddressdst, uint256 _amount, uint256 _slippageTolerance)
+        internal
+        view
+        returns (uint256)
+    {
         OFTadapter oft = OFTadapter(oftaddress);
         bytes memory extraOptions = OptionsBuilder.newOptions().addExecutorLzReceiveOption(65000, 0);
         SendParam memory sendParam = SendParam({
@@ -135,7 +134,6 @@ contract OAppRepayDebtUSDT is OApp, OAppOptionsType3 {
         bytes memory payload = abi.encode(_lendingPool, _user, _tokendst, _amount);
         _lzSend(_dstEid, payload, lzOptions, MessagingFee(_lzNativeFee, 0), payable(_user));
     }
-
 
     function _lzReceive(Origin calldata, bytes32, bytes calldata _message, address, bytes calldata) internal override {
         (address _lendingPool, address _user, address _token, uint256 _amount) =

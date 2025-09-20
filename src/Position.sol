@@ -185,7 +185,10 @@ contract Position is ReentrancyGuard {
         if (amountIn == 0) revert ZeroAmount();
         if (balances < amountIn) revert InsufficientBalance();
         if (_tokenIn == _tokenOut) revert InvalidParameter();
-        if(IFactory(_factory()).tokenDataStream(_tokenIn) == address(0) || IFactory(_factory()).tokenDataStream(_tokenOut) == address(0)) revert OracleOnTokenNotSet();
+        if (
+            IFactory(_factory()).tokenDataStream(_tokenIn) == address(0)
+                || IFactory(_factory()).tokenDataStream(_tokenOut) == address(0)
+        ) revert OracleOnTokenNotSet();
         if (msg.sender != owner && msg.sender != lpAddress) revert NotForSwap();
         if (slippageTolerance > 10000) revert InvalidParameter(); // Max 100% slippage
 

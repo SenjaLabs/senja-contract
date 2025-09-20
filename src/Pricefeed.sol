@@ -12,37 +12,37 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
  */
 contract Pricefeed is Ownable {
     // ============ State Variables ============
-    
+
     /**
      * @dev Address of the token this price feed tracks
      */
     address public token;
-    
+
     /**
      * @dev Current round ID for the price feed
      */
     uint80 public roundId;
-    
+
     /**
      * @dev Current price of the token
      */
     uint256 public price;
-    
+
     /**
      * @dev Timestamp when the current round started
      */
     uint256 public startedAt;
-    
+
     /**
      * @dev Timestamp when the price was last updated
      */
     uint256 public updatedAt;
-    
+
     /**
      * @dev Round ID in which the answer was computed
      */
     uint80 public answeredInRound;
-    
+
     /**
      * @dev Number of decimal places for the price
      */

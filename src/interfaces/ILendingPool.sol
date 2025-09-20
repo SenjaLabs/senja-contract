@@ -38,7 +38,9 @@ interface ILendingPool {
      * @notice This function allows users to borrow against their collateral
      * @custom:security Users must have sufficient collateral to borrow
      */
-    function borrowDebt(uint256 _amount, uint256 _chainId, uint32 _dstEid, uint128 _addExecutorLzReceiveOption) external payable;
+    function borrowDebt(uint256 _amount, uint256 _chainId, uint32 _dstEid, uint128 _addExecutorLzReceiveOption)
+        external
+        payable;
 
     /**
      * @dev Repays debt using selected token
@@ -50,8 +52,14 @@ interface ILendingPool {
      * @notice This function allows users to repay their borrowed debt
      * @custom:security Users must approve tokens before calling this function
      */
-    function repayWithSelectedToken(uint256 _shares, address _token, bool _fromPosition, address _user, uint256 _slippageTolerance) external payable;
-    
+    function repayWithSelectedToken(
+        uint256 _shares,
+        address _token,
+        bool _fromPosition,
+        address _user,
+        uint256 _slippageTolerance
+    ) external payable;
+
     /**
      * @dev Withdraws supplied liquidity by redeeming shares
      * @param _shares Number of shares to redeem for underlying tokens
@@ -75,8 +83,8 @@ interface ILendingPool {
      * @return liquidatedAmount Amount of debt repaid through liquidation
      * @notice Anyone can call this function to liquidate unhealthy positions
      */
-    function liquidateByDEX(address borrower, uint256 liquidationIncentive) 
-        external 
+    function liquidateByDEX(address borrower, uint256 liquidationIncentive)
+        external
         returns (uint256 liquidatedAmount);
 
     /**
@@ -86,9 +94,7 @@ interface ILendingPool {
      * @param liquidationIncentive The liquidation incentive in basis points
      * @notice Liquidator pays debt and receives collateral with incentive
      */
-    function liquidateByMEV(address borrower, uint256 repayAmount, uint256 liquidationIncentive) 
-        external 
-        payable;
+    function liquidateByMEV(address borrower, uint256 repayAmount, uint256 liquidationIncentive) external payable;
 
     /**
      * @dev Checks if a borrower's position is liquidatable
@@ -97,8 +103,8 @@ interface ILendingPool {
      * @return borrowValue The current borrow value in USD
      * @return collateralValue The current collateral value in USD
      */
-    function checkLiquidation(address borrower) 
-        external 
-        view 
+    function checkLiquidation(address borrower)
+        external
+        view
         returns (bool isLiquidatable, uint256 borrowValue, uint256 collateralValue);
 }

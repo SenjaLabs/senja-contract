@@ -17,7 +17,7 @@ interface ITokenSwap {
      * @custom:security Only authorized addresses should be able to mint tokens
      */
     function mint(address _to, uint256 _amount) external;
-    
+
     /**
      * @dev Burns tokens from the caller's balance
      * @param _amount Amount of tokens to burn
@@ -25,7 +25,7 @@ interface ITokenSwap {
      * @custom:security Users can only burn their own tokens
      */
     function burn(uint256 _amount) external;
-    
+
     /**
      * @dev Grants mint and burn roles to a specified address
      * @param _to Address to grant the roles to
@@ -33,7 +33,7 @@ interface ITokenSwap {
      * @custom:security Only the contract owner should be able to grant roles
      */
     function grantMintAndBurnRoles(address _to) external;
-    
+
     /**
      * @dev Mints mock tokens for testing purposes
      * @param _to Address to receive the minted mock tokens
@@ -42,7 +42,7 @@ interface ITokenSwap {
      * @custom:security This function should only be available in test environments
      */
     function mintMock(address _to, uint256 _amount) external;
-    
+
     /**
      * @dev Burns mock tokens for testing purposes
      * @param _amount Amount of mock tokens to burn
@@ -50,7 +50,7 @@ interface ITokenSwap {
      * @custom:security This function should only be available in test environments
      */
     function burnMock(uint256 _amount) external;
-    
+
     /**
      * @dev Returns the bridge token sender for a specific chain and index
      * @param _chainId Chain ID for the bridge
@@ -58,7 +58,7 @@ interface ITokenSwap {
      * @return Address of the bridge token sender
      */
     function bridgeTokenSenders(uint256 _chainId, uint256 _index) external view returns (address);
-    
+
     /**
      * @dev Adds a new bridge token sender
      * @param _bridgeTokenSender Address of the bridge token sender to add
@@ -66,7 +66,7 @@ interface ITokenSwap {
      * @custom:security Only authorized addresses should be able to add bridge token senders
      */
     function addBridgeTokenSender(address _bridgeTokenSender) external;
-    
+
     /**
      * @dev Returns the number of bridge token senders for a specific chain
      * @param _chainId Chain ID to query

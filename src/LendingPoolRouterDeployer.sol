@@ -14,8 +14,7 @@ contract LendingPoolRouterDeployer is Ownable {
     LendingPoolRouter public router;
     address public factory;
 
-    constructor() Ownable(msg.sender) {
-    }
+    constructor() Ownable(msg.sender) {}
 
     modifier onlyFactory() {
         _onlyFactory();
@@ -31,11 +30,12 @@ contract LendingPoolRouterDeployer is Ownable {
         emit LendingPoolRouterDeployed(address(router), _collateralToken, _borrowToken, _ltv);
         return address(router);
     }
+
     function setFactory(address _factory) public onlyOwner {
         factory = _factory;
     }
+
     function _onlyFactory() internal view {
         if (msg.sender != factory) revert OnlyFactoryCanCall();
     }
-
 }

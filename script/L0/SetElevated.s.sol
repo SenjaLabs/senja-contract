@@ -31,7 +31,6 @@ contract SetElevated is Script, Helper {
     function _setOperator() internal {
         USDTk(BASE_USDTK).setOperator(BASE_USDTK_ELEVATED_MINTER_BURNER, true);
         USDTk(BASE_USDTK).setOperator(BASE_OFT_USDTK_ADAPTER, true);
-
     }
 }
 

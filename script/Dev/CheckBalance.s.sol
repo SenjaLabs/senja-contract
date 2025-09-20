@@ -9,7 +9,9 @@ contract CheckBalance is Script, Helper {
     function run() external {
         vm.createSelectFork(vm.rpcUrl("kaia_mainnet"));
         vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
-        console.log("balance of KAIA_OFT_MOCK_USDT_ADAPTER", IERC20(KAIA_MOCK_USDT).balanceOf(KAIA_OFT_MOCK_USDT_ADAPTER));
+        console.log(
+            "balance of KAIA_OFT_MOCK_USDT_ADAPTER", IERC20(KAIA_MOCK_USDT).balanceOf(KAIA_OFT_MOCK_USDT_ADAPTER)
+        );
         vm.stopBroadcast();
     }
 }

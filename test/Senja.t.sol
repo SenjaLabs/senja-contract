@@ -563,75 +563,75 @@ contract SenjaTest is Test, Helper {
     function test_comprehensive_collateral_swap_repay() public {
         // Step 1: Supply liquidity to enable borrowing
         test_supply_liquidity();
-        
+
         // Step 2: Supply collateral
         test_supply_collateral();
-        
+
         // Step 3: Borrow debt
         vm.startPrank(alice);
         ILendingPool(lendingPool).borrowDebt(50e6, block.chainid, KAIA_EID, 65000);
         vm.stopPrank();
-        
+
         // Verify initial state
         assertEq(ILPRouter(_router(lendingPool)).userBorrowShares(alice), 50e6);
         assertEq(ILPRouter(_router(lendingPool)).totalBorrowAssets(), 50e6);
-        
+
         // Get position address
         address position = _addressPosition(lendingPool, alice);
-        
+
         // Step 4: Test swapping collateral (WKAIA) to borrow token (USDT) with high slippage
         vm.startPrank(alice);
-        
+
         // Check initial balances
         console.log("Initial WKAIA in position:", IERC20(WKAIA).balanceOf(position));
         console.log("Initial USDT in position:", IERC20(USDT).balanceOf(position));
-        
+
         // Swap WKAIA to USDT with 10000 slippage tolerance (100%)
         IPosition(position).swapTokenByPosition(WKAIA, USDT, 100 ether, 10000);
-        
+
         // Check balances after swap
         console.log("Final WKAIA in position:", IERC20(WKAIA).balanceOf(position));
         console.log("Final USDT in position:", IERC20(USDT).balanceOf(position));
-        
+
         vm.stopPrank();
-        
+
         // Step 5: Test swapping collateral to WETH (simulated with WKAIA)
         vm.startPrank(alice);
-        
+
         // Check balances before second swap
         console.log("Before second swap - WKAIA:", IERC20(WKAIA).balanceOf(position));
         console.log("Before second swap - USDT:", IERC20(USDT).balanceOf(position));
-        
+
         // Swap USDT back to WKAIA (simulating WETH) with high slippage
         IPosition(position).swapTokenByPosition(USDT, WKAIA, 10e6, 10000);
-        
+
         // Check balances after second swap
         console.log("After second swap - WKAIA:", IERC20(WKAIA).balanceOf(position));
         console.log("After second swap - USDT:", IERC20(USDT).balanceOf(position));
-        
+
         vm.stopPrank();
-        
+
         // Step 6: Test repaying using collateral with high slippage tolerance
         vm.startPrank(alice);
-        
+
         // Check balances before repayment
         console.log("Before repayment - WKAIA:", IERC20(WKAIA).balanceOf(position));
         console.log("Before repayment - USDT:", IERC20(USDT).balanceOf(position));
-        
+
         // Repay using USDT directly
         IERC20(USDT).approve(lendingPool, 5e6);
         ILendingPool(lendingPool).repayWithSelectedToken(5e6, USDT, false, alice, 500);
-        
+
         // Check balances after repayment
         console.log("After repayment - WKAIA:", IERC20(WKAIA).balanceOf(position));
         console.log("After repayment - USDT:", IERC20(USDT).balanceOf(position));
-        
+
         vm.stopPrank();
-        
+
         // Verify repayment worked
         assertLt(ILPRouter(_router(lendingPool)).userBorrowShares(alice), 50e6);
         assertLt(ILPRouter(_router(lendingPool)).totalBorrowAssets(), 50e6);
-        
+
         console.log("Remaining borrow shares:", ILPRouter(_router(lendingPool)).userBorrowShares(alice));
         console.log("Remaining total borrow assets:", ILPRouter(_router(lendingPool)).totalBorrowAssets());
     }
@@ -642,32 +642,32 @@ contract SenjaTest is Test, Helper {
         // Setup: Supply liquidity, collateral, and borrow
         test_supply_liquidity();
         test_supply_collateral();
-        
+
         vm.startPrank(alice);
         ILendingPool(lendingPool).borrowDebt(20e6, block.chainid, KAIA_EID, 65000);
         vm.stopPrank();
-        
+
         address position = _addressPosition(lendingPool, alice);
-        
+
         // Test repaying with USDT directly (no swap needed)
         vm.startPrank(alice);
-        
+
         // Check initial state
         console.log("Initial WKAIA in position:", IERC20(WKAIA).balanceOf(position));
         console.log("Initial USDT in position:", IERC20(USDT).balanceOf(position));
         console.log("Initial borrow shares:", ILPRouter(_router(lendingPool)).userBorrowShares(alice));
-        
+
         // Repay using USDT directly (this should work without swapping)
         IERC20(USDT).approve(lendingPool, 10e6);
         ILendingPool(lendingPool).repayWithSelectedToken(10e6, USDT, false, alice, 500);
-        
+
         // Check final state
         console.log("Final WKAIA in position:", IERC20(WKAIA).balanceOf(position));
         console.log("Final USDT in position:", IERC20(USDT).balanceOf(position));
         console.log("Final borrow shares:", ILPRouter(_router(lendingPool)).userBorrowShares(alice));
-        
+
         vm.stopPrank();
-        
+
         // Verify some repayment occurred
         assertLt(ILPRouter(_router(lendingPool)).userBorrowShares(alice), 20e6);
     }
@@ -676,31 +676,31 @@ contract SenjaTest is Test, Helper {
     // forge test --match-test test_swap_with_extreme_slippage -vvv
     function test_swap_with_extreme_slippage() public {
         test_supply_collateral();
-        
+
         address position = _addressPosition(lendingPool, alice);
-        
+
         vm.startPrank(alice);
-        
+
         // Test with maximum slippage tolerance (10000 = 100%)
         uint256 swapAmount = 50 ether;
-        
+
         console.log("Testing swap with 10000 slippage tolerance (100%)");
         console.log("Initial WKAIA:", IERC20(WKAIA).balanceOf(position));
         console.log("Initial USDT:", IERC20(USDT).balanceOf(position));
-        
+
         // This should work even with extreme slippage
         IPosition(position).swapTokenByPosition(WKAIA, USDT, swapAmount, 10000);
 
         console.log("After swap WKAIA:", IERC20(WKAIA).balanceOf(position));
         console.log("After swap USDT:", IERC20(USDT).balanceOf(position));
-        
+
         // Test swapping back (use a smaller amount that's available)
         uint256 usdtAmount = 5e6; // Use 5 USDT instead of 10
         IPosition(position).swapTokenByPosition(USDT, WKAIA, usdtAmount, 10000);
-        
+
         console.log("After swap back WKAIA:", IERC20(WKAIA).balanceOf(position));
         console.log("After swap back USDT:", IERC20(USDT).balanceOf(position));
-        
+
         vm.stopPrank();
     }
 
@@ -710,78 +710,78 @@ contract SenjaTest is Test, Helper {
         // Setup: Supply liquidity, collateral, and borrow
         test_supply_liquidity();
         test_supply_collateral();
-        
+
         vm.startPrank(alice);
         ILendingPool(lendingPool).borrowDebt(20e6, block.chainid, KAIA_EID, 65000);
         vm.stopPrank();
-        
+
         address position = _addressPosition(lendingPool, alice);
-        
+
         // First, swap some WKAIA to USDT in the position
         vm.startPrank(alice);
-        
+
         console.log("Before swap - WKAIA:", IERC20(WKAIA).balanceOf(position));
         console.log("Before swap - USDT:", IERC20(USDT).balanceOf(position));
         console.log("Before swap - borrow shares:", ILPRouter(_router(lendingPool)).userBorrowShares(alice));
-        
+
         // Swap WKAIA to USDT with high slippage tolerance
         IPosition(position).swapTokenByPosition(WKAIA, USDT, 100 ether, 10000);
-        
+
         console.log("After swap - WKAIA:", IERC20(WKAIA).balanceOf(position));
         console.log("After swap - USDT:", IERC20(USDT).balanceOf(position));
-        
+
         vm.stopPrank();
-        
+
         // Now test repayment using the position's repayWithSelectedToken function
         // This should work because the position has USDT and can repay directly
         vm.startPrank(alice);
-        
+
         // The position should have USDT now, so we can repay directly
         // But we need to call this through the lending pool, not directly on position
         IERC20(USDT).approve(lendingPool, 10e6);
         ILendingPool(lendingPool).repayWithSelectedToken(10e6, USDT, false, alice, 500);
-        
+
         console.log("After repayment - WKAIA:", IERC20(WKAIA).balanceOf(position));
         console.log("After repayment - USDT:", IERC20(USDT).balanceOf(position));
         console.log("After repayment - borrow shares:", ILPRouter(_router(lendingPool)).userBorrowShares(alice));
-        
+
         vm.stopPrank();
-        
+
         // Verify repayment occurred
         assertLt(ILPRouter(_router(lendingPool)).userBorrowShares(alice), 20e6);
     }
 
     // RUN
-    // forge test --match-test test_position_repay_with_collateral_swap -vvv --TODO: 
+    // forge test --match-test test_position_repay_with_collateral_swap -vvv --TODO:
     function test_position_repay_with_collateral_swap() public {
         // Setup: Supply liquidity, collateral, and borrow
         test_supply_liquidity();
         test_supply_collateral();
-        
+
         vm.startPrank(alice);
         ILendingPool(lendingPool).borrowDebt(20e6, block.chainid, KAIA_EID, 65000);
         vm.stopPrank();
-        
+
         address position = _addressPosition(lendingPool, alice);
-        
+
         // Test repaying using WKAIA collateral through lending pool
         // The lending pool should call the position's repayWithSelectedToken function
         vm.startPrank(alice);
-        
+
         console.log("Before repayment - WKAIA:", IERC20(WKAIA).balanceOf(position));
         console.log("Before repayment - USDT:", IERC20(USDT).balanceOf(position));
         console.log("Before repayment - borrow shares:", ILPRouter(_router(lendingPool)).userBorrowShares(alice));
-        
+
         // Call repayWithSelectedToken through lending pool with WKAIA
         // This should trigger internal swap from WKAIA to USDT in the position
         ILendingPool(lendingPool).repayWithSelectedToken(10e6, WKAIA, false, alice, 10000);
-        
+
         console.log("After repayment - WKAIA:", IERC20(WKAIA).balanceOf(position));
         console.log("After repayment - USDT:", IERC20(USDT).balanceOf(position));
         console.log("After repayment - borrow shares:", ILPRouter(_router(lendingPool)).userBorrowShares(alice));
-        
+
         vm.stopPrank();
-        
+
         // Verify repayment occurred
         assertLt(ILPRouter(_router(lendingPool)).userBorrowShares(alice), 20e6);
     }
@@ -793,23 +793,23 @@ contract SenjaTest is Test, Helper {
         // The repayWithSelectedToken function calls swapTokenByPosition internally
         // but swapTokenByPosition has _onlyAuthorizedSwap() modifier that doesn't allow
         // the Position contract itself to call it
-        
+
         test_supply_liquidity();
         test_supply_collateral();
-        
+
         vm.startPrank(alice);
         ILendingPool(lendingPool).borrowDebt(20e6, block.chainid, KAIA_EID, 65000);
         vm.stopPrank();
-        
+
         address position = _addressPosition(lendingPool, alice);
-        
+
         console.log("Position address:", position);
         console.log("WKAIA in position:", IERC20(WKAIA).balanceOf(position));
         console.log("USDT in position:", IERC20(USDT).balanceOf(position));
-        
+
         // Try to call swapTokenByPosition directly from the position (this should fail)
         vm.startPrank(alice);
-        
+
         // This will fail with NotForSwap() because the position contract is not authorized
         // to call its own swapTokenByPosition function
         try IPosition(position).swapTokenByPosition(WKAIA, USDT, 100 ether, 10000) {
@@ -817,9 +817,9 @@ contract SenjaTest is Test, Helper {
         } catch Error(string memory reason) {
             console.log("Direct swap failed as expected:", reason);
         }
-        
+
         vm.stopPrank();
-        
+
         // The issue is that repayWithSelectedToken calls swapTokenByPosition internally
         // but swapTokenByPosition has _onlyAuthorizedSwap() modifier that only allows
         // calls from lending pool, IsHealthy, or Liquidator contracts
@@ -827,48 +827,48 @@ contract SenjaTest is Test, Helper {
     }
 
     // RUN
-    // forge test --match-test test_position_repay_collateral_direct -vvv --TODO: 
+    // forge test --match-test test_position_repay_collateral_direct -vvv --TODO:
     function test_position_repay_collateral_direct() public {
         // Setup: Supply liquidity, collateral, and borrow
         test_supply_liquidity();
         test_supply_collateral();
-        
+
         vm.startPrank(alice);
         ILendingPool(lendingPool).borrowDebt(15e6, block.chainid, KAIA_EID, 65000);
         vm.stopPrank();
-        
+
         address position = _addressPosition(lendingPool, alice);
-        
+
         // Test repaying using WKAIA collateral with high slippage tolerance
         vm.startPrank(alice);
-        
+
         console.log("Initial state:");
         console.log("WKAIA in position:", IERC20(WKAIA).balanceOf(position));
         console.log("USDT in position:", IERC20(USDT).balanceOf(position));
         console.log("Borrow shares:", ILPRouter(_router(lendingPool)).userBorrowShares(alice));
         console.log("Total borrow assets:", ILPRouter(_router(lendingPool)).totalBorrowAssets());
-        
+
         // Repay using WKAIA collateral through lending pool - this should swap internally
         // The position contract should handle the swap from WKAIA to USDT
         ILendingPool(lendingPool).repayWithSelectedToken(5e6, WKAIA, false, alice, 10000);
-        
+
         console.log("After first repayment:");
         console.log("WKAIA in position:", IERC20(WKAIA).balanceOf(position));
         console.log("USDT in position:", IERC20(USDT).balanceOf(position));
         console.log("Borrow shares:", ILPRouter(_router(lendingPool)).userBorrowShares(alice));
         console.log("Total borrow assets:", ILPRouter(_router(lendingPool)).totalBorrowAssets());
-        
+
         // Try another repayment with WKAIA
         ILendingPool(lendingPool).repayWithSelectedToken(5e6, WKAIA, false, alice, 10000);
-        
+
         console.log("After second repayment:");
         console.log("WKAIA in position:", IERC20(WKAIA).balanceOf(position));
         console.log("USDT in position:", IERC20(USDT).balanceOf(position));
         console.log("Borrow shares:", ILPRouter(_router(lendingPool)).userBorrowShares(alice));
         console.log("Total borrow assets:", ILPRouter(_router(lendingPool)).totalBorrowAssets());
-        
+
         vm.stopPrank();
-        
+
         // Verify repayments occurred
         assertLt(ILPRouter(_router(lendingPool)).userBorrowShares(alice), 15e6);
         assertLt(ILPRouter(_router(lendingPool)).totalBorrowAssets(), 15e6);

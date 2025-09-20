@@ -36,7 +36,6 @@ contract SendOFT is Script, Helper {
         //*******
         //***************************
 
-
         vm.startBroadcast(privateKey);
         OFTadapter oft = OFTadapter(oftAddress);
         // Build send parameters

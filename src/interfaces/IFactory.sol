@@ -15,15 +15,15 @@ interface IFactory {
      * @return Address of the data stream contract
      */
     function tokenDataStream(address _token) external view returns (address);
-    
+
     function positionDeployer() external view returns (address);
-    
+
     /**
      * @dev Returns the owner address of the factory
      * @return Address of the factory owner
      */
     function owner() external view returns (address);
-    
+
     /**
      * @dev Returns the address of the health check contract
      * @return Address of the isHealthy contract
@@ -35,7 +35,7 @@ interface IFactory {
     function oftAddress(address _token) external view returns (address);
 
     function WKAIA() external view returns (address);
-    
+
     /**
      * @dev Adds a token data stream to the factory
      * @param _token Address of the token
@@ -44,7 +44,7 @@ interface IFactory {
      * @custom:security Only the owner should be able to add data streams
      */
     function addTokenDataStream(address _token, address _dataStream) external;
-    
+
     /**
      * @dev Creates a new lending pool
      * @param _collateralToken Address of the collateral token
@@ -57,25 +57,25 @@ interface IFactory {
     function createLendingPool(address _collateralToken, address _borrowToken, uint256 _ltv)
         external
         returns (address);
-    
+
     /**
      * @dev Returns the protocol contract address
      * @return Address of the protocol contract
      */
     function protocol() external view returns (address);
-    
+
     /**
      * @dev Returns the total number of pools created
      * @return Number of lending pools created by this factory
      */
     function poolCount() external view returns (uint256);
-    
+
     /**
      * @dev Returns the helper contract address
      * @return Address of the helper contract
      */
     function helper() external view returns (address);
-    
+
     /**
      * @dev Returns the interest rate model address for a specific lending pool
      * @param lendingPool Address of the lending pool

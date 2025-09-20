@@ -18,7 +18,7 @@ contract SetPeers is Script, Helper {
     function deployBASE() public {
         vm.createSelectFork(vm.rpcUrl("base_mainnet"));
         vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
-        
+
         // USDT Adapter peers
         MyOApp(BASE_OFT_USDTK_ADAPTER).setPeer(BASE_EID, bytes32(uint256(uint160(BASE_OFT_USDTK_ADAPTER))));
         MyOApp(BASE_OFT_USDTK_ADAPTER).setPeer(KAIA_EID, bytes32(uint256(uint160(KAIA_OFT_USDT_ADAPTER))));
@@ -37,21 +37,23 @@ contract SetPeers is Script, Helper {
 
         MyOApp(BASE_OFT_MOCK_USDT_ADAPTER).setPeer(BASE_EID, bytes32(uint256(uint160(BASE_OFT_MOCK_USDT_ADAPTER))));
         MyOApp(BASE_OFT_MOCK_USDT_ADAPTER).setPeer(KAIA_EID, bytes32(uint256(uint160(KAIA_OFT_MOCK_USDT_ADAPTER))));
-        
+
         vm.stopBroadcast();
     }
 
     function deployKAIA() public {
         vm.createSelectFork(vm.rpcUrl("kaia_mainnet"));
         vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
-        
+
         // USDT Adapter peers
         MyOApp(KAIA_OFT_USDT_ADAPTER).setPeer(BASE_EID, bytes32(uint256(uint160(BASE_OFT_USDTK_ADAPTER))));
         MyOApp(KAIA_OFT_USDT_ADAPTER).setPeer(KAIA_EID, bytes32(uint256(uint160(KAIA_OFT_USDT_ADAPTER))));
 
         // USDT Stargate Adapter peers
         MyOApp(KAIA_OFT_USDT_STARGATE_ADAPTER).setPeer(BASE_EID, bytes32(uint256(uint160(BASE_OFT_USDTK_ADAPTER))));
-        MyOApp(KAIA_OFT_USDT_STARGATE_ADAPTER).setPeer(KAIA_EID, bytes32(uint256(uint160(KAIA_OFT_USDT_STARGATE_ADAPTER))));
+        MyOApp(KAIA_OFT_USDT_STARGATE_ADAPTER).setPeer(
+            KAIA_EID, bytes32(uint256(uint160(KAIA_OFT_USDT_STARGATE_ADAPTER)))
+        );
 
         // WKAIA Adapter peers
         MyOApp(KAIA_OFT_WKAIA_ADAPTER).setPeer(BASE_EID, bytes32(uint256(uint160(BASE_OFT_WKAIAK_ADAPTER))));
@@ -64,7 +66,7 @@ contract SetPeers is Script, Helper {
         // WETH Adapter peers
         MyOApp(KAIA_OFT_MOCK_USDT_ADAPTER).setPeer(BASE_EID, bytes32(uint256(uint160(BASE_OFT_MOCK_USDT_ADAPTER))));
         MyOApp(KAIA_OFT_MOCK_USDT_ADAPTER).setPeer(KAIA_EID, bytes32(uint256(uint160(KAIA_OFT_MOCK_USDT_ADAPTER))));
-        
+
         vm.stopBroadcast();
     }
 }

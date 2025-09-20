@@ -68,8 +68,9 @@ contract SendMessage is Script, Helper {
         });
         MessagingFee memory feeBridge = OFTUSDTadapter(BASE_OFT_MOCK_USDT_ADAPTER).quoteSend(sendParam, false);
 
-        MessagingFee memory feeMessage =
-            OAppSupplyLiquidityUSDT(BASE_oappSupplyLiquidityUSDT).quoteSendString(KAIA_EID, KAIA_lendingPool, owner, KAIA_MOCK_USDT, amount, "", false);
+        MessagingFee memory feeMessage = OAppSupplyLiquidityUSDT(BASE_oappSupplyLiquidityUSDT).quoteSendString(
+            KAIA_EID, KAIA_lendingPool, owner, KAIA_MOCK_USDT, amount, "", false
+        );
 
         IERC20(BASE_MOCK_USDT).approve(oappAdapter, amount);
         OAppAdapter(oappAdapter).sendBridge{value: feeBridge.nativeFee + feeMessage.nativeFee}(
@@ -97,7 +98,10 @@ contract SendMessage is Script, Helper {
         } else if (block.chainid == 8217) {
             console.log("tokenOFT", OFTUSDTadapter(KAIA_OFT_MOCK_USDT_ADAPTER).tokenOFT());
             console.log("elevated", OFTUSDTadapter(KAIA_OFT_MOCK_USDT_ADAPTER).elevatedMinterBurner());
-            console.log("elevated operator", ElevatedMinterBurner(KAIA_MOCK_USDT_ELEVATED_MINTER_BURNER).operators(KAIA_OFT_MOCK_USDT_ADAPTER));
+            console.log(
+                "elevated operator",
+                ElevatedMinterBurner(KAIA_MOCK_USDT_ELEVATED_MINTER_BURNER).operators(KAIA_OFT_MOCK_USDT_ADAPTER)
+            );
         }
     }
 

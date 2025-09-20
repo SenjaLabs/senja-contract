@@ -128,11 +128,7 @@ contract LendingPoolRouter {
         userCollateral[_user] += _amount;
     }
 
-    function withdrawCollateral(uint256 _amount, address _user)
-        public
-        onlyLendingPool
-        returns (uint256)
-    {
+    function withdrawCollateral(uint256 _amount, address _user) public onlyLendingPool returns (uint256) {
         if (userCollateral[_user] < _amount) revert InsufficientCollateral();
 
         userCollateral[_user] -= _amount;
@@ -324,7 +320,7 @@ contract LendingPoolRouter {
         uint256 sharesToRemove = 0;
         if (totalBorrowAssets > 0 && totalBorrowShares > 0) {
             sharesToRemove = (_repayAmount * totalBorrowShares) / totalBorrowAssets;
-            
+
             // Ensure we don't remove more shares than the user has
             if (sharesToRemove > userBorrowShares[_user]) {
                 sharesToRemove = userBorrowShares[_user];
@@ -336,7 +332,7 @@ contract LendingPoolRouter {
 
         // Update user's borrow state
         userBorrowShares[_user] -= sharesToRemove;
-        
+
         // Update total borrow state
         totalBorrowShares -= sharesToRemove;
         totalBorrowAssets -= _repayAmount;
@@ -345,7 +341,7 @@ contract LendingPoolRouter {
         userCollateral[_user] = 0;
 
         // Note: userSupplyShares[_user] is NOT touched - liquidity provision is separate from borrowing
-        
+
         // Emit liquidation event (optional - can be handled by IsHealthy contract)
         emit PositionLiquidated(_user, sharesToRemove, _repayAmount);
     }
@@ -361,7 +357,7 @@ contract LendingPoolRouter {
         userCollateral[_user] = 0;
         // In emergency, also reset supply shares if needed
         // userSupplyShares[_user] = 0; // Uncomment if needed
-        
+
         emit EmergencyPositionReset(_user);
     }
 
@@ -373,7 +369,7 @@ contract LendingPoolRouter {
      */
     function reduceUserCollateral(address _user, uint256 _amount) external {
         require(msg.sender == addressPositions[_user], "Not user's position");
-        
+
         if (_amount > userCollateral[_user]) {
             userCollateral[_user] = 0;
         } else {
@@ -387,7 +383,7 @@ contract LendingPoolRouter {
     /// @param sharesRemoved The amount of borrow shares removed
     /// @param debtRepaid The amount of debt repaid
     event PositionLiquidated(address indexed user, uint256 sharesRemoved, uint256 debtRepaid);
-    
+
     /// @notice Emitted when a position is reset in emergency
     /// @param user The address of the user whose position was reset
     event EmergencyPositionReset(address indexed user);

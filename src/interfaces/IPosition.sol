@@ -15,21 +15,21 @@ interface IPosition {
      * @notice This function tracks the number of positions or operations
      */
     function counter() external view returns (uint256);
-    
+
     /**
      * @dev Returns the ID of a token in the token list
      * @param _token Address of the token
      * @return The ID of the token in the list
      */
     function tokenListsId(address _token) external view returns (uint256);
-    
+
     /**
      * @dev Returns the token address at a specific index
      * @param _index The index in the token list
      * @return The address of the token at the specified index
      */
     function tokenLists(uint256 _index) external view returns (address);
-    
+
     /**
      * @dev Lists a trading position for a token
      * @param _token Address of the token to list
@@ -39,7 +39,7 @@ interface IPosition {
      * @custom:security Only authorized users should be able to list positions
      */
     function listingTradingPosition(address _token, uint256 _price, string memory _name) external;
-    
+
     /**
      * @dev Buys a trading position
      * @param _price Price to pay for the position
@@ -48,7 +48,7 @@ interface IPosition {
      * @custom:security Buyers must have sufficient funds to complete the purchase
      */
     function buyTradingPosition(uint256 _price, address _buyer) external;
-    
+
     /**
      * @dev Withdraws collateral from a position
      * @param amount Amount of collateral to withdraw
@@ -57,7 +57,7 @@ interface IPosition {
      * @custom:security Users can only withdraw their own collateral
      */
     function withdrawCollateral(uint256 amount, address _user, bool unwrapToNative) external;
-    
+
     /**
      * @dev Swaps tokens within a position
      * @param _tokenIn Address of the input token
@@ -70,7 +70,7 @@ interface IPosition {
     function swapTokenByPosition(address _tokenIn, address _tokenOut, uint256 amountIn, uint256 slippageTolerance)
         external
         returns (uint256 amountOut);
-    
+
     /**
      * @dev Repays debt using selected token
      * @param amount Amount to repay
@@ -80,7 +80,7 @@ interface IPosition {
      * @custom:security Users must approve tokens before calling this function
      */
     function repayWithSelectedToken(uint256 amount, address _token, uint256 slippageTolerance) external;
-    
+
     /**
      * @dev Calculates token conversion rates
      * @param _tokenIn Address of the input token
@@ -98,7 +98,7 @@ interface IPosition {
         address _tokenInPrice,
         address _tokenOutPrice
     ) external view returns (uint256);
-    
+
     /**
      * @dev Gets the value of a token
      * @param token Address of the token

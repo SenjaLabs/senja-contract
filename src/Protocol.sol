@@ -17,31 +17,31 @@ import {IDragonSwap} from "./interfaces/IDragonSwap.sol";
  */
 contract Protocol is ReentrancyGuard, Ownable {
     using SafeERC20 for IERC20;
-    
+
     // WKAIA contract address on Kaia mainnet
     address public constant WKAIA = 0x19Aac5f612f524B754CA7e7c41cbFa2E981A4432;
-    
+
     // DragonSwap router address on Kaia mainnet
     address public constant DRAGON_SWAP_ROUTER = 0xA324880f884036E3d21a09B90269E1aC57c7EC8a;
-    
+
     // Buyback configuration
     uint256 public constant PROTOCOL_SHARE = 95; // 95% for protocol (locked)
-    uint256 public constant OWNER_SHARE = 5;     // 5% for owner
+    uint256 public constant OWNER_SHARE = 5; // 5% for owner
     uint256 public constant PERCENTAGE_DIVISOR = 100;
-    
+
     // State variables for buyback tracking
     mapping(address => uint256) public protocolLockedBalance; // Token => locked amount for protocol
     mapping(address => uint256) public ownerAvailableBalance; // Token => available amount for owner
 
     // ============ Errors ============
-    
+
     /**
      * @dev Error thrown when there are insufficient tokens for withdrawal
      * @param token Address of the token with insufficient balance
      * @param amount Amount that was attempted to withdraw
      */
     error InsufficientBalance(address token, uint256 amount);
-    
+
     /**
      * @dev Error thrown when swap fails
      * @param tokenIn Address of the input token
@@ -49,36 +49,36 @@ contract Protocol is ReentrancyGuard, Ownable {
      * @param amountIn Amount of input tokens
      */
     error SwapFailed(address tokenIn, address tokenOut, uint256 amountIn);
-    
+
     /**
      * @dev Error thrown when insufficient output amount is received
      * @param expectedMinimum Expected minimum output amount
      * @param actualOutput Actual output amount received
      */
     error InsufficientOutputAmount(uint256 expectedMinimum, uint256 actualOutput);
-    
+
     /**
      * @dev Error thrown when invalid token address is provided
      */
     error InvalidTokenAddress();
-    
+
     /**
      * @dev Error thrown when amount is zero or invalid
      */
     error InvalidAmount();
-    
+
     /**
      * @dev Error thrown when deadline has passed
      */
     error DeadlinePassed();
-    
+
     /**
      * @dev Error thrown when trying to swap WKAIA for WKAIA
      */
     error CannotSwapWKAIAForWKAIA();
 
     // ============ Events ============
-    
+
     /**
      * @dev Emitted when buyback is executed
      * @param tokenIn Address of the input token used for buyback
@@ -119,7 +119,6 @@ contract Protocol is ReentrancyGuard, Ownable {
         revert("Fallback not allowed");
     }
 
-    
     /**
      * @dev Executes buyback using protocol's accumulated balance
      * @param tokenIn Address of the token to use for buyback
@@ -131,16 +130,14 @@ contract Protocol is ReentrancyGuard, Ownable {
      * @notice Uses protocol's balance to buy WKAIA, splits 95% to protocol (locked) and 5% to owner
      * @custom:security Only the owner can execute buyback
      */
-    function executeBuyback(
-        address tokenIn,
-        uint256 amountIn,
-        uint256 amountOutMinimum,
-        uint24 fee,
-        uint256 deadline
-    ) external nonReentrant returns (uint256 totalWkaiaReceived) {
+    function executeBuyback(address tokenIn, uint256 amountIn, uint256 amountOutMinimum, uint24 fee, uint256 deadline)
+        external
+        nonReentrant
+        returns (uint256 totalWkaiaReceived)
+    {
         return _executeBuyback(tokenIn, amountIn, amountOutMinimum, fee, deadline);
     }
-    
+
     /**
      * @dev Internal function to execute buyback using protocol's accumulated balance
      * @param tokenIn Address of the token to use for buyback
@@ -151,32 +148,29 @@ contract Protocol is ReentrancyGuard, Ownable {
      * @return totalWkaiaReceived Total amount of WKAIA received from buyback
      * @notice Uses protocol's balance to buy WKAIA, splits 95% to protocol (locked) and 5% to owner
      */
-    function _executeBuyback(
-        address tokenIn,
-        uint256 amountIn,
-        uint256 amountOutMinimum,
-        uint24 fee,
-        uint256 deadline
-    ) internal returns (uint256 totalWkaiaReceived) {
+    function _executeBuyback(address tokenIn, uint256 amountIn, uint256 amountOutMinimum, uint24 fee, uint256 deadline)
+        internal
+        returns (uint256 totalWkaiaReceived)
+    {
         // Validate inputs
         if (tokenIn == address(0)) revert InvalidTokenAddress();
         if (amountIn == 0) revert InvalidAmount();
         if (deadline <= block.timestamp) revert DeadlinePassed();
         if (tokenIn == WKAIA) revert CannotSwapWKAIAForWKAIA();
-        
+
         // Check if protocol has sufficient balance
         uint256 protocolBalance = IERC20(tokenIn).balanceOf(address(this));
         if (protocolBalance < amountIn) {
             revert InsufficientBalance(tokenIn, amountIn);
         }
-        
+
         // Calculate shares
         uint256 protocolAmount = (amountIn * PROTOCOL_SHARE) / PERCENTAGE_DIVISOR;
         uint256 ownerAmount = amountIn - protocolAmount; // Remaining amount for owner
-        
+
         // Approve DragonSwap router to spend tokens
         IERC20(tokenIn).approve(DRAGON_SWAP_ROUTER, amountIn);
-        
+
         // Prepare swap parameters for protocol share
         IDragonSwap.ExactInputSingleParams memory params = IDragonSwap.ExactInputSingleParams({
             tokenIn: tokenIn,
@@ -188,7 +182,7 @@ contract Protocol is ReentrancyGuard, Ownable {
             amountOutMinimum: (amountOutMinimum * PROTOCOL_SHARE) / PERCENTAGE_DIVISOR,
             sqrtPriceLimitX96: 0 // No price limit
         });
-        
+
         // Execute swap for protocol share
         uint256 protocolWkaiaReceived;
         try IDragonSwap(DRAGON_SWAP_ROUTER).exactInputSingle(params) returns (uint256 _amountOut) {
@@ -196,10 +190,10 @@ contract Protocol is ReentrancyGuard, Ownable {
         } catch {
             revert SwapFailed(tokenIn, WKAIA, protocolAmount);
         }
-        
+
         // Update protocol locked balance
         protocolLockedBalance[WKAIA] += protocolWkaiaReceived;
-        
+
         // If there's an owner amount, execute swap for owner
         uint256 ownerWkaiaReceived = 0;
         if (ownerAmount > 0) {
@@ -207,7 +201,7 @@ contract Protocol is ReentrancyGuard, Ownable {
             params.amountIn = ownerAmount;
             params.recipient = owner();
             params.amountOutMinimum = (amountOutMinimum * OWNER_SHARE) / PERCENTAGE_DIVISOR;
-            
+
             try IDragonSwap(DRAGON_SWAP_ROUTER).exactInputSingle(params) returns (uint256 _amountOut) {
                 ownerWkaiaReceived = _amountOut;
                 ownerAvailableBalance[WKAIA] += ownerWkaiaReceived;
@@ -215,19 +209,13 @@ contract Protocol is ReentrancyGuard, Ownable {
                 revert SwapFailed(tokenIn, WKAIA, ownerAmount);
             }
         }
-        
+
         totalWkaiaReceived = protocolWkaiaReceived + ownerWkaiaReceived;
-        
+
         // Emit buyback event
-        emit BuybackExecuted(
-            tokenIn,
-            amountIn,
-            protocolAmount,
-            ownerAmount,
-            totalWkaiaReceived
-        );
+        emit BuybackExecuted(tokenIn, amountIn, protocolAmount, ownerAmount, totalWkaiaReceived);
     }
-    
+
     /**
      * @dev Executes buyback with default deadline (1 hour)
      * @param tokenIn Address of the token to use for buyback
@@ -236,12 +224,11 @@ contract Protocol is ReentrancyGuard, Ownable {
      * @param fee Fee tier for the swap (0.05% = 500, 0.3% = 3000, 1% = 10000)
      * @return totalWkaiaReceived Total amount of WKAIA received from buyback
      */
-    function executeBuybackSimple(
-        address tokenIn,
-        uint256 amountIn,
-        uint256 amountOutMinimum,
-        uint24 fee
-    ) external onlyOwner returns (uint256 totalWkaiaReceived) {
+    function executeBuybackSimple(address tokenIn, uint256 amountIn, uint256 amountOutMinimum, uint24 fee)
+        external
+        onlyOwner
+        returns (uint256 totalWkaiaReceived)
+    {
         return _executeBuyback(tokenIn, amountIn, amountOutMinimum, fee, block.timestamp + 3600);
     }
 
@@ -259,7 +246,7 @@ contract Protocol is ReentrancyGuard, Ownable {
             if (IERC20(WKAIA).balanceOf(address(this)) < amount) {
                 revert InsufficientBalance(token, amount);
             }
-            
+
             if (unwrapToNative) {
                 // Unwrap WKAIA to native KAIA and send to owner
                 IWKAIA(WKAIA).withdraw(amount);
@@ -277,7 +264,7 @@ contract Protocol is ReentrancyGuard, Ownable {
             IERC20(token).safeTransfer(msg.sender, amount);
         }
     }
-    
+
     /**
      * @dev Withdraws tokens from the protocol contract (backward compatibility)
      * @param token Address of the token to withdraw
@@ -287,7 +274,7 @@ contract Protocol is ReentrancyGuard, Ownable {
     function withdraw(address token, uint256 amount) public nonReentrant onlyOwner {
         withdraw(token, amount, false);
     }
-    
+
     /**
      * @dev Withdraws owner's available balance
      * @param token Address of the token to withdraw
@@ -299,9 +286,9 @@ contract Protocol is ReentrancyGuard, Ownable {
         if (amount > ownerAvailableBalance[token]) {
             revert InsufficientBalance(token, amount);
         }
-        
+
         ownerAvailableBalance[token] -= amount;
-        
+
         if (token == WKAIA) {
             // Handle WKAIA withdrawal
             if (unwrapToNative) {
@@ -318,7 +305,7 @@ contract Protocol is ReentrancyGuard, Ownable {
             IERC20(token).safeTransfer(msg.sender, amount);
         }
     }
-    
+
     /**
      * @dev Withdraws owner's available balance (backward compatibility)
      * @param token Address of the token to withdraw
@@ -328,7 +315,7 @@ contract Protocol is ReentrancyGuard, Ownable {
     function withdrawOwnerBalance(address token, uint256 amount) public onlyOwner {
         withdrawOwnerBalance(token, amount, false);
     }
-    
+
     /**
      * @dev Gets the total protocol locked balance for a token
      * @param token Address of the token
@@ -337,7 +324,7 @@ contract Protocol is ReentrancyGuard, Ownable {
     function getProtocolLockedBalance(address token) public view returns (uint256) {
         return protocolLockedBalance[token];
     }
-    
+
     /**
      * @dev Gets the owner's available balance for a token
      * @param token Address of the token
@@ -346,7 +333,7 @@ contract Protocol is ReentrancyGuard, Ownable {
     function getOwnerAvailableBalance(address token) public view returns (uint256) {
         return ownerAvailableBalance[token];
     }
-    
+
     /**
      * @dev Gets the total protocol balance (locked + available) for a token
      * @param token Address of the token

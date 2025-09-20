@@ -7,7 +7,7 @@ import {HelperUtils} from "../../src/HelperUtils.sol";
 
 contract DeployHelperUtils is Script, Helper {
     HelperUtils public helperUtils;
-    
+
     function run() public {
         vm.createSelectFork(vm.rpcUrl("kaia_mainnet"));
         vm.startBroadcast(vm.envUint("PRIVATE_KEY"));

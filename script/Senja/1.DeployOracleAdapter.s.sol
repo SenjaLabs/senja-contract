@@ -7,6 +7,7 @@ import {Oracle} from "../../src/Oracle.sol";
 
 contract DeployOracleAdapter is Script, Helper {
     Oracle public oracle;
+
     function run() public {
         vm.createSelectFork(vm.rpcUrl("kaia_mainnet"));
 

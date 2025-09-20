@@ -17,7 +17,7 @@ interface ILPDeployer {
      * @custom:security Only authorized addresses should be able to call this function
      */
     function deployLendingPool(address router) external returns (address);
-    
+
     /**
      * @dev Sets the factory address for the deployer
      * @param factory Address of the lending pool factory

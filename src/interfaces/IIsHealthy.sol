@@ -68,12 +68,9 @@ interface IIsHealthy {
      * @param liquidationIncentive The liquidation incentive in basis points
      * @return liquidatedAmount Amount of debt repaid
      */
-    function liquidateByDEX(
-        address borrower,
-        address lendingPoolRouter,
-        address factory,
-        uint256 liquidationIncentive
-    ) external returns (uint256 liquidatedAmount);
+    function liquidateByDEX(address borrower, address lendingPoolRouter, address factory, uint256 liquidationIncentive)
+        external
+        returns (uint256 liquidatedAmount);
 
     /**
      * @dev Liquidates a position using MEV (external liquidator buys collateral)

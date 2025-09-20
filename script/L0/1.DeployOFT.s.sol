@@ -61,7 +61,8 @@ contract DeployOFT is Script, Helper {
         console.log("address public BASE_WKAIAK =", address(BASE_WKAIAK), ";");
         elevatedminterburner = new ElevatedMinterBurner(address(BASE_WKAIAK), owner);
         console.log("address public BASE_ELEVATED_MINTER_BURNER =", address(elevatedminterburner), ";");
-        oftkaiaadapter = new OFTKAIAadapter(address(BASE_WKAIAK), address(elevatedminterburner), BASE_LZ_ENDPOINT, owner);
+        oftkaiaadapter =
+            new OFTKAIAadapter(address(BASE_WKAIAK), address(elevatedminterburner), BASE_LZ_ENDPOINT, owner);
         console.log("address public BASE_OFT_WKAIAK_ADAPTER =", address(oftkaiaadapter), ";");
         elevatedminterburner.setOperator(address(oftkaiaadapter), true);
 

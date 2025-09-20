@@ -57,14 +57,10 @@ contract LendingPoolDeployer {
      *
      * @custom:security This function should only be called by the factory contract
      */
-    function deployLendingPool(address _router)
-        public
-        onlyFactory
-        returns (address)
-    {
+    function deployLendingPool(address _router) public onlyFactory returns (address) {
         // Deploy the LendingPool with the provided router
         LendingPool lendingPool = new LendingPool(_router);
-        
+
         return address(lendingPool);
     }
 

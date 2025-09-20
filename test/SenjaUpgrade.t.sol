@@ -34,7 +34,9 @@ contract SenjaUpgradeTest is Test, Helper {
         console.log("protocol", LendingPoolFactory(KAIA_lendingPoolFactoryProxy).protocol());
         console.log("positionDeployer", LendingPoolFactory(KAIA_lendingPoolFactoryProxy).positionDeployer());
         console.log("VERSION", LendingPoolFactory(KAIA_lendingPoolFactoryProxy).VERSION());
-        console.log("lendingPoolRouterDeployer", LendingPoolFactory(KAIA_lendingPoolFactoryProxy).lendingPoolRouterDeployer());
+        console.log(
+            "lendingPoolRouterDeployer", LendingPoolFactory(KAIA_lendingPoolFactoryProxy).lendingPoolRouterDeployer()
+        );
         console.log("USDT", LendingPoolFactory(KAIA_lendingPoolFactoryProxy).tokenDataStream(KAIA_USDT));
         console.log("WKAIA", LendingPoolFactory(KAIA_lendingPoolFactoryProxy).tokenDataStream(KAIA_WKAIA));
         console.log("KAIA", LendingPoolFactory(KAIA_lendingPoolFactoryProxy).tokenDataStream(KAIA_KAIA));
@@ -64,7 +66,9 @@ contract SenjaUpgradeTest is Test, Helper {
         console.log("protocol", LendingPoolFactory(KAIA_lendingPoolFactoryProxy).protocol());
         console.log("positionDeployer", LendingPoolFactory(KAIA_lendingPoolFactoryProxy).positionDeployer());
         console.log("VERSION", LendingPoolFactory(KAIA_lendingPoolFactoryProxy).VERSION());
-        console.log("lendingPoolRouterDeployer", LendingPoolFactory(KAIA_lendingPoolFactoryProxy).lendingPoolRouterDeployer());
+        console.log(
+            "lendingPoolRouterDeployer", LendingPoolFactory(KAIA_lendingPoolFactoryProxy).lendingPoolRouterDeployer()
+        );
         console.log("USDT", LendingPoolFactory(KAIA_lendingPoolFactoryProxy).tokenDataStream(KAIA_USDT));
         console.log("WKAIA", LendingPoolFactory(KAIA_lendingPoolFactoryProxy).tokenDataStream(KAIA_WKAIA));
         console.log("KAIA", LendingPoolFactory(KAIA_lendingPoolFactoryProxy).tokenDataStream(KAIA_KAIA));
@@ -74,14 +78,18 @@ contract SenjaUpgradeTest is Test, Helper {
         console.log("****************************");
         lendingPoolRouterDeployer = new LendingPoolRouterDeployer();
         lendingPoolRouterDeployer.setFactory(KAIA_lendingPoolFactoryProxy);
-        LendingPoolFactory(KAIA_lendingPoolFactoryProxy).setLendingPoolRouterDeployer(address(lendingPoolRouterDeployer));
+        LendingPoolFactory(KAIA_lendingPoolFactoryProxy).setLendingPoolRouterDeployer(
+            address(lendingPoolRouterDeployer)
+        );
         console.log("****************************");
 
         (address c3, address b3, address lp3) = LendingPoolFactory(KAIA_lendingPoolFactoryProxy).pools(3);
         console.log("pools[3] collateral", c3);
         console.log("pools[3] borrow", b3);
         console.log("pools[3] lp", lp3);
-        console.log("lendingPoolRouterDeployer", LendingPoolFactory(KAIA_lendingPoolFactoryProxy).lendingPoolRouterDeployer());
+        console.log(
+            "lendingPoolRouterDeployer", LendingPoolFactory(KAIA_lendingPoolFactoryProxy).lendingPoolRouterDeployer()
+        );
         console.log("****************************");
         console.log("****************************");
         (address c4, address b4, address lp4) = LendingPoolFactory(KAIA_lendingPoolFactoryProxy).pools(4);
@@ -113,7 +121,7 @@ contract SenjaUpgradeTest is Test, Helper {
         console.log("position", position);
         Position(payable(position)).swapTokenByPosition(c4, b4, 100_000e18, 500);
         deal(b4, position, 100_000e18);
-        Position(payable(position)).swapTokenByPosition(b4, KAIA_MOCK_WETH, 10_000e6, 10000);
+
         // check balance
         console.log("balance of c4", IERC20(c4).balanceOf(position));
         console.log("balance of b4", IERC20(b4).balanceOf(position));
@@ -122,5 +130,3 @@ contract SenjaUpgradeTest is Test, Helper {
         vm.stopPrank();
     }
 }
-
-

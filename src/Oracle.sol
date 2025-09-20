@@ -71,7 +71,7 @@ contract Oracle is Ownable {
      * @notice This function mimics Chainlink's latestRoundData interface
      */
     function latestRoundData() public view returns (uint80, uint256, uint256, uint256, uint80) {
-        (uint80 idRound, int256 priceAnswer, uint updated) = IOrakl(oracle).latestRoundData();
+        (uint80 idRound, int256 priceAnswer, uint256 updated) = IOrakl(oracle).latestRoundData();
         return (idRound, uint256(priceAnswer), startedAt, updated, answeredInRound);
     }
 

@@ -11,6 +11,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract DevSendOFT is Script, Helper {
     using OptionsBuilder for bytes;
+
     address toAddress = vm.envAddress("PUBLIC_KEY");
 
     function setUp() public {
@@ -37,7 +38,6 @@ contract DevSendOFT is Script, Helper {
         uint32 dstEid = BASE_EID; // dst
         //*******
         //***************************
-
 
         vm.startBroadcast(privateKey);
         OFTadapter oft = OFTadapter(oftAddress);

@@ -31,8 +31,7 @@ contract Liquidator is ReentrancyGuard, Ownable {
 
     address public factory;
 
-    constructor() Ownable(msg.sender) {
-    }
+    constructor() Ownable(msg.sender) {}
 
     /**
      * @notice Emitted when a position is liquidated
@@ -61,11 +60,11 @@ contract Liquidator is ReentrancyGuard, Ownable {
      * @param liquidationIncentive The liquidation incentive in basis points (e.g., 500 = 5%)
      * @return liquidatedAmount Amount of debt repaid
      */
-    function liquidateByDEX(
-        address borrower,
-        address lendingPoolRouter,
-        uint256 liquidationIncentive
-    ) external nonReentrant returns (uint256 liquidatedAmount) {
+    function liquidateByDEX(address borrower, address lendingPoolRouter, uint256 liquidationIncentive)
+        external
+        nonReentrant
+        returns (uint256 liquidatedAmount)
+    {
         // Validate liquidation incentive (max 50%)
         require(liquidationIncentive <= 5000, "Liquidation incentive too high");
         // Validate liquidation eligibility
@@ -73,22 +72,14 @@ contract Liquidator is ReentrancyGuard, Ownable {
         require(borrowerPosition != address(0), "No position found");
 
         // Check if position is liquidatable
-        (bool isLiquidatable, uint256 borrowValue, uint256 collateralValue) = _checkLiquidation(
-            borrower,
-            lendingPoolRouter,
-            borrowerPosition
-        );
+        (bool isLiquidatable, uint256 borrowValue, uint256 collateralValue) =
+            _checkLiquidation(borrower, lendingPoolRouter, borrowerPosition);
 
         if (!isLiquidatable) revert NotLiquidatable();
 
         // Execute DEX liquidation
         (uint256 collateralToLiquidate, uint256 actualLiquidatedAmount) = _executeDEXLiquidation(
-            borrower,
-            lendingPoolRouter,
-            borrowerPosition,
-            borrowValue,
-            collateralValue,
-            liquidationIncentive
+            borrower, lendingPoolRouter, borrowerPosition, borrowValue, collateralValue, liquidationIncentive
         );
 
         liquidatedAmount = actualLiquidatedAmount;
@@ -117,30 +108,17 @@ contract Liquidator is ReentrancyGuard, Ownable {
         require(borrowerPosition != address(0), "No position found");
 
         // Check if position is liquidatable
-        (bool isLiquidatable,,) = _checkLiquidation(
-            borrower,
-            lendingPoolRouter,
-            borrowerPosition
-        );
+        (bool isLiquidatable,,) = _checkLiquidation(borrower, lendingPoolRouter, borrowerPosition);
 
         if (!isLiquidatable) revert NotLiquidatable();
 
-        // Validate collateral availability before liquidation        
-        uint256 maxRepayAmount = _calculateMaxRepayAmount(
-            borrower,
-            lendingPoolRouter,
-            borrowerPosition
-        );
+        // Validate collateral availability before liquidation
+        uint256 maxRepayAmount = _calculateMaxRepayAmount(borrower, lendingPoolRouter, borrowerPosition);
         require(repayAmount <= maxRepayAmount, "Repay amount exceeds maximum allowed");
 
         // Execute MEV liquidation
-        uint256 collateralValue = _executeMEVLiquidation(
-            borrower,
-            lendingPoolRouter,
-            borrowerPosition,
-            repayAmount,
-            liquidationIncentive
-        );
+        uint256 collateralValue =
+            _executeMEVLiquidation(borrower, lendingPoolRouter, borrowerPosition, repayAmount, liquidationIncentive);
 
         emit PositionLiquidated(borrower, msg.sender, collateralValue, repayAmount, 1);
     }
@@ -148,11 +126,11 @@ contract Liquidator is ReentrancyGuard, Ownable {
     /**
      * @notice Checks if a position is liquidatable
      */
-    function _checkLiquidation(
-        address borrower,
-        address lendingPoolRouter,
-        address borrowerPosition
-    ) internal view returns (bool isLiquidatable, uint256 borrowValue, uint256 collateralValue) {
+    function _checkLiquidation(address borrower, address lendingPoolRouter, address borrowerPosition)
+        internal
+        view
+        returns (bool isLiquidatable, uint256 borrowValue, uint256 collateralValue)
+    {
         address borrowToken = ILPRouter(lendingPoolRouter).borrowToken();
         uint256 ltv = ILPRouter(lendingPoolRouter).ltv();
         uint256 totalBorrowAssets = ILPRouter(lendingPoolRouter).totalBorrowAssets();
@@ -161,7 +139,7 @@ contract Liquidator is ReentrancyGuard, Ownable {
 
         // Get prices and values
         (, uint256 borrowPrice,,,) = IOracle(_tokenDataStream(borrowToken)).latestRoundData();
-        
+
         collateralValue = 0;
         for (uint256 i = 1; i <= _counter(borrowerPosition); i++) {
             address token = IPosition(borrowerPosition).tokenLists(i);
@@ -175,7 +153,7 @@ contract Liquidator is ReentrancyGuard, Ownable {
         borrowValue = (borrowed * borrowAdjustedPrice) / (10 ** _tokenDecimals(borrowToken));
 
         uint256 maxBorrow = (collateralValue * ltv) / 1e18;
-        
+
         isLiquidatable = (borrowValue > collateralValue) || (borrowValue > maxBorrow);
     }
 
@@ -192,12 +170,7 @@ contract Liquidator is ReentrancyGuard, Ownable {
     ) internal returns (uint256 collateralToLiquidate, uint256 liquidatedAmount) {
         // Calculate liquidation amounts and get token addresses
         (collateralToLiquidate, liquidatedAmount) = _calculateAndExecuteSwap(
-            borrower,
-            lendingPoolRouter,
-            borrowerPosition,
-            borrowValue,
-            collateralValue,
-            liquidationIncentive
+            borrower, lendingPoolRouter, borrowerPosition, borrowValue, collateralValue, liquidationIncentive
         );
     }
 
@@ -215,12 +188,11 @@ contract Liquidator is ReentrancyGuard, Ownable {
         // Get token addresses
         address borrowToken = ILPRouter(lendingPoolRouter).borrowToken();
         address collateralToken = ILPRouter(lendingPoolRouter).collateralToken();
-        
+
         // Calculate debt to liquidate (max 50% of collateral)
-        uint256 debtToLiquidate = borrowValue > (collateralValue * 5000) / 10000 
-            ? (collateralValue * 5000) / 10000 
-            : borrowValue;
-        
+        uint256 debtToLiquidate =
+            borrowValue > (collateralValue * 5000) / 10000 ? (collateralValue * 5000) / 10000 : borrowValue;
+
         // Execute the liquidation process
         (collateralToLiquidate, liquidatedAmount) = _processLiquidation(
             borrower,
@@ -248,7 +220,7 @@ contract Liquidator is ReentrancyGuard, Ownable {
         // Get effective collateral token and validate
         address effectiveCollateralToken = collateralToken == address(1) ? _WKAIA() : collateralToken;
         uint256 totalCollateral = IERC20(effectiveCollateralToken).balanceOf(borrowerPosition);
-        
+
         if (totalCollateral == 0) revert LiquidationFailed();
 
         // Calculate collateral amount with incentive
@@ -294,7 +266,7 @@ contract Liquidator is ReentrancyGuard, Ownable {
 
         // Calculate actual liquidated amount
         actualLiquidatedAmount = amountOut > debtToLiquidate ? debtToLiquidate : amountOut;
-        
+
         // Get effective borrow token for transfers
         address effectiveBorrowToken = borrowToken == address(1) ? _WKAIA() : borrowToken;
 
@@ -306,10 +278,7 @@ contract Liquidator is ReentrancyGuard, Ownable {
 
         // Transfer any remaining tokens to protocol
         if (amountOut > actualLiquidatedAmount) {
-            IERC20(effectiveBorrowToken).safeTransfer(
-                IFactory(factory).protocol(),
-                amountOut - actualLiquidatedAmount
-            );
+            IERC20(effectiveBorrowToken).safeTransfer(IFactory(factory).protocol(), amountOut - actualLiquidatedAmount);
         }
     }
 
@@ -327,17 +296,12 @@ contract Liquidator is ReentrancyGuard, Ownable {
         address collateralToken = ILPRouter(lendingPoolRouter).collateralToken();
 
         // Calculate collateral amount to give to liquidator
-        collateralValue = _calculateCollateralForDebt(
-            borrowToken,
-            collateralToken,
-            repayAmount,
-            liquidationIncentive
-        );
+        collateralValue = _calculateCollateralForDebt(borrowToken, collateralToken, repayAmount, liquidationIncentive);
 
         // Get available collateral and cap if necessary
         address effectiveToken = collateralToken == address(1) ? _WKAIA() : collateralToken;
         uint256 availableCollateral = IERC20(effectiveToken).balanceOf(borrowerPosition);
-        
+
         if (collateralValue > availableCollateral) {
             collateralValue = availableCollateral;
         }
@@ -355,11 +319,7 @@ contract Liquidator is ReentrancyGuard, Ownable {
         }
 
         // Transfer collateral to liquidator
-        IPosition(borrowerPosition).withdrawCollateral(
-            collateralValue, 
-            msg.sender, 
-            collateralToken == address(1)
-        );
+        IPosition(borrowerPosition).withdrawCollateral(collateralValue, msg.sender, collateralToken == address(1));
 
         // Repay debt to lending pool
         if (borrowToken == address(1)) {
@@ -376,12 +336,10 @@ contract Liquidator is ReentrancyGuard, Ownable {
     /**
      * @notice Performs token swap using DragonSwap
      */
-    function _performDragonSwap(
-        address _tokenIn,
-        address _tokenOut,
-        uint256 amountIn,
-        uint256 slippageTolerance
-    ) internal returns (uint256 amountOut) {
+    function _performDragonSwap(address _tokenIn, address _tokenOut, uint256 amountIn, uint256 slippageTolerance)
+        internal
+        returns (uint256 amountOut)
+    {
         // Calculate expected amount and minimum output
         uint256 expectedAmount = _calculateExpectedAmount(_tokenIn, _tokenOut, amountIn);
         uint256 amountOutMinimum = expectedAmount * (10000 - slippageTolerance) / 10000;
@@ -408,11 +366,11 @@ contract Liquidator is ReentrancyGuard, Ownable {
     /**
      * @notice Calculates expected amount for token swap using price feeds
      */
-    function _calculateExpectedAmount(
-        address _tokenIn,
-        address _tokenOut,
-        uint256 amountIn
-    ) internal view returns (uint256 expectedAmount) {
+    function _calculateExpectedAmount(address _tokenIn, address _tokenOut, uint256 amountIn)
+        internal
+        view
+        returns (uint256 expectedAmount)
+    {
         if (_tokenIn == _tokenOut) {
             return amountIn;
         }
@@ -423,7 +381,7 @@ contract Liquidator is ReentrancyGuard, Ownable {
             // Fallback to 1:1 ratio with decimal adjustment
             uint8 tokenInDecimals = _tokenDecimals(_tokenIn);
             uint8 tokenOutDecimals = _tokenDecimals(_tokenOut);
-            
+
             if (tokenInDecimals > tokenOutDecimals) {
                 expectedAmount = amountIn / (10 ** (tokenInDecimals - tokenOutDecimals));
             } else if (tokenOutDecimals > tokenInDecimals) {
@@ -437,23 +395,23 @@ contract Liquidator is ReentrancyGuard, Ownable {
     /**
      * @notice Internal function to calculate expected amount using oracle prices
      */
-    function _calculateExpectedAmountWithOracle(
-        address _tokenIn,
-        address _tokenOut,
-        uint256 amountIn
-    ) external view returns (uint256 expectedAmount) {
+    function _calculateExpectedAmountWithOracle(address _tokenIn, address _tokenOut, uint256 amountIn)
+        external
+        view
+        returns (uint256 expectedAmount)
+    {
         require(msg.sender == address(this), "Unauthorized");
-        
+
         // Get oracle prices
         (, uint256 tokenInPrice,,,) = IOracle(_tokenDataStream(_tokenIn)).latestRoundData();
         (, uint256 tokenOutPrice,,,) = IOracle(_tokenDataStream(_tokenOut)).latestRoundData();
-        
+
         uint8 tokenInDecimals = _tokenDecimals(_tokenIn);
         uint8 tokenOutDecimals = _tokenDecimals(_tokenOut);
-        
+
         // Calculate expected amount with price normalization
-        expectedAmount = (amountIn * tokenInPrice * (10 ** tokenOutDecimals)) / 
-                        (tokenOutPrice * (10 ** tokenInDecimals));
+        expectedAmount =
+            (amountIn * tokenInPrice * (10 ** tokenOutDecimals)) / (tokenOutPrice * (10 ** tokenInDecimals));
     }
 
     /**
@@ -467,15 +425,16 @@ contract Liquidator is ReentrancyGuard, Ownable {
     ) internal view returns (uint256 collateralAmount) {
         // Get prices
         (, uint256 borrowPrice,,,) = IOracle(_tokenDataStream(borrowToken)).latestRoundData();
-        (, uint256 collateralPrice,,,) = IOracle(_tokenDataStream(collateralToken == address(1) ? _WKAIA() : collateralToken)).latestRoundData();
+        (, uint256 collateralPrice,,,) =
+            IOracle(_tokenDataStream(collateralToken == address(1) ? _WKAIA() : collateralToken)).latestRoundData();
 
         // Calculate base collateral amount
         uint256 borrowDecimals = _tokenDecimals(borrowToken);
         uint256 collateralDecimals = _tokenDecimals(collateralToken);
-        
+
         uint256 debtValueUSD = (debtAmount * borrowPrice) / (10 ** borrowDecimals);
         uint256 baseCollateralAmount = (debtValueUSD * (10 ** collateralDecimals)) / collateralPrice;
-        
+
         // Add liquidation incentive
         collateralAmount = (baseCollateralAmount * (10000 + liquidationIncentive)) / 10000;
     }
@@ -508,20 +467,20 @@ contract Liquidator is ReentrancyGuard, Ownable {
     /**
      * @notice Calculates the maximum amount that can be repaid in liquidation
      */
-    function _calculateMaxRepayAmount(
-        address borrower,
-        address lendingPoolRouter,
-        address /* borrowerPosition */
-    ) internal view returns (uint256 maxRepayAmount) {
+    function _calculateMaxRepayAmount(address borrower, address lendingPoolRouter, address /* borrowerPosition */ )
+        internal
+        view
+        returns (uint256 maxRepayAmount)
+    {
         uint256 totalBorrowAssets = ILPRouter(lendingPoolRouter).totalBorrowAssets();
         uint256 totalBorrowShares = ILPRouter(lendingPoolRouter).totalBorrowShares();
         uint256 userBorrowShares = ILPRouter(lendingPoolRouter).userBorrowShares(borrower);
-        
+
         if (totalBorrowShares == 0) return 0;
-        
+
         // Calculate user's total debt
         uint256 userDebt = (userBorrowShares * totalBorrowAssets) / totalBorrowShares;
-        
+
         // Maximum liquidation is 50% of user's debt
         maxRepayAmount = userDebt / 2;
     }
