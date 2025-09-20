@@ -21,7 +21,7 @@ jobs:
         uses: foundry-rs/foundry-toolchain@v1
 
       - name: Install Foundry from node modules
-        uses: pnpm install
+        run: npm install
 
       - name: Show Forge version
         run: forge --version
