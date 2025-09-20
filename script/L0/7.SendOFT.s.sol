@@ -8,16 +8,13 @@ import {OptionsBuilder} from "@layerzerolabs/oapp-evm/contracts/oapp/libs/Option
 import {MessagingFee} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
 import {Helper} from "./Helper.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-// import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 contract SendOFT is Script, Helper {
     using OptionsBuilder for bytes;
 
     function setUp() public {
-        // base
         vm.createSelectFork(vm.rpcUrl("kaia_mainnet"));
-        // optimism
-        // hyperliquid
     }
 
     function addressToBytes32(address _addr) internal pure returns (bytes32) {
@@ -31,8 +28,7 @@ contract SendOFT is Script, Helper {
         address oftAddress = KAIA_OFT_WKAIA_ADAPTER; // src
         address TOKEN = KAIA_WKAIA;
         uint256 amount = 1_000; // amount to send
-        // uint256 tokensToSend = amount * 10 ** IERC20Metadata(TOKEN).decimals(); // src
-        uint256 tokensToSend = amount; // src
+        uint256 tokensToSend = amount * 10 ** IERC20Metadata(TOKEN).decimals(); // src
         uint256 privateKey = vm.envUint("PRIVATE_KEY");
         //*******
         //** DESTINATION
@@ -49,7 +45,7 @@ contract SendOFT is Script, Helper {
             dstEid: dstEid,
             to: addressToBytes32(toAddress),
             amountLD: tokensToSend,
-            minAmountLD: tokensToSend, // 0% slippage tolerance
+            minAmountLD: tokensToSend,
             extraOptions: extraOptions,
             composeMsg: "",
             oftCmd: ""
@@ -64,7 +60,6 @@ contract SendOFT is Script, Helper {
         console.log("TOKEN Balance before", IERC20(TOKEN).balanceOf(toAddress));
         // Send tokens
         IERC20(TOKEN).approve(oftAddress, tokensToSend);
-        // IERC20(TOKEN).approve(KAIA_MINTER_BURNER, tokensToSend);
         oft.send{value: fee.nativeFee}(sendParam, fee, msg.sender);
         console.log("eth after", address(toAddress).balance);
         console.log("TOKEN Balance after", IERC20(TOKEN).balanceOf(toAddress));

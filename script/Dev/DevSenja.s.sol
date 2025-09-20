@@ -58,9 +58,8 @@ contract DevSenja is Script, Helper {
 
     function run() public {
         vm.createSelectFork(vm.rpcUrl("kaia_mainnet"));
-        // vm.createSelectFork(vm.rpcUrl("base_mainnet"));
         vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
-        // _deployTokens();
+        _deployTokens();
         _getUtils();
         _deployOFT();
         _setLibraries();
@@ -73,13 +72,6 @@ contract DevSenja is Script, Helper {
     }
 
     function _deployTokens() internal {
-        // mockUSDT = new MOCKUSDT();
-        // mockWKAIA = new MOCKWKAIA();
-        // IFactory(KAIA_lendingPoolFactoryProxy).addTokenDataStream(address(mockWKAIA), KAIA_kaia_usdt_adapter);
-        // IFactory(KAIA_lendingPoolFactoryProxy).addTokenDataStream(address(mockUSDT), KAIA_usdt_usd_adapter);
-        // console.log("address public KAIA_mockUSDT =", address(mockUSDT), ";");
-        // console.log("mockWKAIA deployed to =", address(mockWKAIA), ";");
-
         mockUSDT = new MOCKUSDT();
         mockWKAIA = new MOCKWKAIA();
         console.log("address public BASE_mockUSDT =", address(mockUSDT), ";");
@@ -89,7 +81,6 @@ contract DevSenja is Script, Helper {
     function _getUtils() internal {
         if (block.chainid == 8453) {
             endpoint = BASE_LZ_ENDPOINT;
-            // oapp = BASE_OAPP;
             sendLib = BASE_SEND_LIB;
             receiveLib = BASE_RECEIVE_LIB;
             srcEid = BASE_EID;
@@ -101,7 +92,6 @@ contract DevSenja is Script, Helper {
             eid1 = KAIA_EID;
         } else if (block.chainid == 8217) {
             endpoint = KAIA_LZ_ENDPOINT;
-            // oapp = KAIA_OAPP;
             sendLib = KAIA_SEND_LIB;
             receiveLib = KAIA_RECEIVE_LIB;
             srcEid = KAIA_EID;
@@ -135,7 +125,6 @@ contract DevSenja is Script, Helper {
     function _setLibraries() internal {
         ILayerZeroEndpointV2(endpoint).setSendLibrary(oftusdt, eid0, sendLib);
         ILayerZeroEndpointV2(endpoint).setSendLibrary(oftwkaia, eid0, sendLib);
-        // Set receive library for inbound messages
         ILayerZeroEndpointV2(endpoint).setReceiveLibrary(oftusdt, srcEid, receiveLib, gracePeriod);
         ILayerZeroEndpointV2(endpoint).setReceiveLibrary(oftwkaia, srcEid, receiveLib, gracePeriod);
     }
@@ -197,11 +186,8 @@ contract DevSenja is Script, Helper {
         enforcedOptions[0] = EnforcedOptionParam({eid: eid0, msgType: SEND, options: options1});
         enforcedOptions[1] = EnforcedOptionParam({eid: eid1, msgType: SEND, options: options2});
 
-        // MyOApp(KAIA_OFT_MOCK_USDT_ADAPTER).setEnforcedOptions(enforcedOptions);
-        // MyOApp(KAIA_OFT_MOCK_WKAIA_ADAPTER).setEnforcedOptions(enforcedOptions);
-        
-        MyOApp(BASE_OFT_MOCK_USDT_ADAPTER).setEnforcedOptions(enforcedOptions);
-        MyOApp(BASE_OFT_MOCK_WKAIA_ADAPTER).setEnforcedOptions(enforcedOptions);
+        MyOApp(KAIA_OFT_MOCK_USDT_ADAPTER).setEnforcedOptions(enforcedOptions);
+        MyOApp(KAIA_OFT_MOCK_WKAIA_ADAPTER).setEnforcedOptions(enforcedOptions);
     }
 
     function _setOFTAddress() internal {

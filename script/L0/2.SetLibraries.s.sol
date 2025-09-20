@@ -8,8 +8,8 @@ import {Helper} from "./Helper.sol";
 /// @title LayerZero Library Configuration Script
 /// @notice Sets up send and receive libraries for OApp messaging
 contract SetLibraries is Script, Helper {
-    uint32 dstEid0 = BASE_EID; // Destination chain EID
-    uint32 dstEid1 = KAIA_EID; // Destination chain EID
+    uint32 dstEid0 = BASE_EID;
+    uint32 dstEid1 = KAIA_EID;
 
     address endpoint;
     address oapp;
@@ -20,7 +20,7 @@ contract SetLibraries is Script, Helper {
 
     function run() external {
         deployBASE();
-        // deployKAIA();
+        deployKAIA();
         // optimism
         // hyperevm
     }

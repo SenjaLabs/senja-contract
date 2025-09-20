@@ -30,7 +30,6 @@ contract DevSendOFT is Script, Helper {
         address minterBurner = KAIA_MOCK_USDT_ELEVATED_MINTER_BURNER;
         address TOKEN = KAIA_MOCK_USDT;
         uint256 amount = 1e6; // amount to send
-        // uint256 tokensToSend = amount * 10 ** IERC20Metadata(TOKEN).decimals(); // src
         uint256 tokensToSend = amount; // src
         uint256 privateKey = vm.envUint("PRIVATE_KEY");
         //*******
@@ -42,26 +41,24 @@ contract DevSendOFT is Script, Helper {
 
         vm.startBroadcast(privateKey);
         OFTadapter oft = OFTadapter(oftAddress);
-        // Build send parameters
         bytes memory extraOptions = OptionsBuilder.newOptions().addExecutorLzReceiveOption(65000, 0);
         SendParam memory sendParam = SendParam({
             dstEid: dstEid,
             to: addressToBytes32(toAddress),
             amountLD: tokensToSend,
-            minAmountLD: tokensToSend, // 0% slippage tolerance
+            minAmountLD: tokensToSend,
             extraOptions: extraOptions,
             composeMsg: "",
             oftCmd: ""
         });
 
-        // Get fee quote
         MessagingFee memory fee = oft.quoteSend(sendParam, false);
 
         console.log("Sending tokens...");
         console.log("Fee amount:", fee.nativeFee);
         console.log("eth before", address(toAddress).balance);
         console.log("TOKEN Balance before", IERC20(TOKEN).balanceOf(toAddress));
-        // Send tokens
+
         IERC20(TOKEN).approve(oftAddress, tokensToSend);
         IERC20(TOKEN).approve(minterBurner, tokensToSend);
         oft.send{value: fee.nativeFee}(sendParam, fee, toAddress);

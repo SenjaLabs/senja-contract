@@ -11,6 +11,19 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 contract OAppAdapter is ReentrancyGuard {
+    event sendBridgeOApp(
+        address _oapp,
+        address _oft,
+        address _lendingPoolDst,
+        address _tokenSrc,
+        address _tokenDst,
+        address _toAddress,
+        uint32 _dstEid,
+        uint256 _amount,
+        uint256 _oftFee,
+        uint256 _oappFee
+    );
+
     using SafeERC20 for IERC20;
     using OptionsBuilder for bytes;
 
@@ -20,7 +33,7 @@ contract OAppAdapter is ReentrancyGuard {
         address _lendingPoolDst,
         address _tokenSrc,
         address _tokenDst,
-        address _toAddress, // oapp supply liquidity usdt
+        address _toAddress,
         uint32 _dstEid,
         uint256 _amount,
         uint256 _oftFee,
@@ -30,6 +43,9 @@ contract OAppAdapter is ReentrancyGuard {
         OFTAdapter(_oft).send{value: _oftFee}(sendParam, fee, _toAddress);
         OAppSupplyLiquidityUSDT(_oapp).sendString{value: _oappFee}(
             _dstEid, _lendingPoolDst, _toAddress, _tokenDst, _amount, _oappFee, ""
+        );
+        emit sendBridgeOApp(
+            _oapp, _oft, _lendingPoolDst, _tokenSrc, _tokenDst, _toAddress, _dstEid, _amount, _oftFee, _oappFee
         );
     }
 

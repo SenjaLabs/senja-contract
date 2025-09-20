@@ -13,8 +13,8 @@ contract SetReceiveConfig is Script, Helper {
     uint32 constant RECEIVE_CONFIG_TYPE = 2;
 
     // destination
-    uint32 eid0 = BASE_EID; // Endpoint ID for Chain B
-    uint32 eid1 = KAIA_EID; // Endpoint ID for Chain B
+    uint32 eid0 = BASE_EID;
+    uint32 eid1 = KAIA_EID;
 
     address endpoint;
     address oapp;
@@ -52,7 +52,7 @@ contract SetReceiveConfig is Script, Helper {
 
     function run() external {
         deployBASE();
-        // deployKAIA();
+        deployKAIA();
         // optimism
         // hyperevm
     }

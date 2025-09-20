@@ -194,12 +194,6 @@ contract DstToOriginTest is Test, Helper {
             feeBridge.nativeFee,
             feeMessage.nativeFee
         );
-        // console.log("feeMessage", feeMessage.nativeFee);
-        // console.log("feeBridge", feeBridge.nativeFee);
-        // oappSupplyLiquidityUSDT.sendString{value: feeMessage.nativeFee + feeBridge.nativeFee}(
-        //     KAIA_EID, KAIA_lendingPool, owner, KAIA_MOCK_USDT, KAIA_oappSupplyLiquidityUSDT, 1e6, 0, ""
-        // );
-        // console.log("SupplyLiquidityCrosschain");
         vm.stopPrank();
     }
 

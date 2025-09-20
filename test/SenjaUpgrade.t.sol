@@ -10,8 +10,6 @@ import {Helper} from "../script/L0/Helper.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Position} from "../src/Position.sol";
 
-// RUN
-// forge test --match-contract SenjaUpgradeTest --match-test test_upgrade_contract -vvv
 contract SenjaUpgradeTest is Test, Helper {
     LendingPoolFactory public newImplementation;
     LendingPoolRouterDeployer public lendingPoolRouterDeployer;
@@ -20,6 +18,8 @@ contract SenjaUpgradeTest is Test, Helper {
         vm.createSelectFork(vm.rpcUrl("kaia_mainnet"));
     }
 
+    // RUN
+    // forge test --match-contract SenjaUpgradeTest --match-test test_upgrade_contract -vvv
     function test_upgrade_contract() public {
         vm.startPrank(vm.envAddress("PUBLIC_KEY"));
         console.log("pool count", LendingPoolFactory(KAIA_lendingPoolFactoryProxy).poolCount());

@@ -873,5 +873,4 @@ contract SenjaTest is Test, Helper {
         assertLt(ILPRouter(_router(lendingPool)).userBorrowShares(alice), 15e6);
         assertLt(ILPRouter(_router(lendingPool)).totalBorrowAssets(), 15e6);
     }
-
 }

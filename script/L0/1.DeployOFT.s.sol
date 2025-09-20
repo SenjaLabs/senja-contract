@@ -31,7 +31,7 @@ contract DeployOFT is Script, Helper {
 
     function run() public {
         deployBASE();
-        // deployKAIA();
+        deployKAIA();
         // optimism
         // hyperevm
     }
@@ -41,7 +41,7 @@ contract DeployOFT is Script, Helper {
         vm.startBroadcast(privateKey);
         console.log("deployed on ChainId: ", block.chainid);
 
-        // usdtk = new USDTk();
+        usdtk = new USDTk();
         console.log("address public BASE_USDTK =", address(BASE_USDTK), ";");
         elevatedminterburner = new ElevatedMinterBurner(address(BASE_USDTK), owner);
         console.log("address public BASE_ELEVATED_MINTER_BURNER =", address(elevatedminterburner), ";");
@@ -49,7 +49,7 @@ contract DeployOFT is Script, Helper {
         console.log("address public BASE_OFT_USDTK_ADAPTER =", address(oftusdtadapter), ";");
         elevatedminterburner.setOperator(address(oftusdtadapter), true);
 
-        // kaiak = new KAIAk();
+        kaiak = new KAIAk();
         console.log("address public BASE_KAIAK =", address(BASE_KAIAK), ";");
         elevatedminterburner = new ElevatedMinterBurner(address(BASE_KAIAK), owner);
         console.log("address public BASE_ELEVATED_MINTER_BURNER =", address(elevatedminterburner), ";");
@@ -57,7 +57,7 @@ contract DeployOFT is Script, Helper {
         console.log("address public BASE_OFT_KAIAK_ADAPTER =", address(oftkaiaadapter), ";");
         elevatedminterburner.setOperator(address(oftkaiaadapter), true);
 
-        // wkaiak = new WKAIAk();
+        wkaiak = new WKAIAk();
         console.log("address public BASE_WKAIAK =", address(BASE_WKAIAK), ";");
         elevatedminterburner = new ElevatedMinterBurner(address(BASE_WKAIAK), owner);
         console.log("address public BASE_ELEVATED_MINTER_BURNER =", address(elevatedminterburner), ";");
@@ -65,7 +65,7 @@ contract DeployOFT is Script, Helper {
         console.log("address public BASE_OFT_WKAIAK_ADAPTER =", address(oftkaiaadapter), ";");
         elevatedminterburner.setOperator(address(oftkaiaadapter), true);
 
-        // wbtck = new WBTCk();
+        wbtck = new WBTCk();
         console.log("address public BASE_WBTCK =", address(BASE_WBTCK), ";");
         elevatedminterburner = new ElevatedMinterBurner(address(BASE_WBTCK), owner);
         console.log("address public BASE_ELEVATED_MINTER_BURNER =", address(elevatedminterburner), ";");
@@ -73,7 +73,7 @@ contract DeployOFT is Script, Helper {
         console.log("address public BASE_OFT_WBTCK_ADAPTER =", address(oftwbtcadapter), ";");
         elevatedminterburner.setOperator(address(oftwbtcadapter), true);
 
-        // wethk = new WETHk();
+        wethk = new WETHk();
         console.log("address public BASE_WETHK =", address(BASE_WETHK), ";");
         elevatedminterburner = new ElevatedMinterBurner(address(BASE_WETHK), owner);
         console.log("address public BASE_ELEVATED_MINTER_BURNER =", address(elevatedminterburner), ";");
@@ -95,8 +95,8 @@ contract DeployOFT is Script, Helper {
         oftusdtadapter = new OFTUSDTadapter(KAIA_USDT_STARGATE, address(0), KAIA_LZ_ENDPOINT, owner);
         console.log("address public KAIA_OFT_USDT_STARGATE_ADAPTER =", address(oftusdtadapter), ";");
 
-        // oftkaiaadapter = new OFTKAIAadapter(KAIA_KAIA, address(0), KAIA_LZ_ENDPOINT, owner);
-        // console.log("address public KAIA_OFT_KAIA_ADAPTER =", address(oftkaiaadapter), ";");
+        oftkaiaadapter = new OFTKAIAadapter(KAIA_KAIA, address(0), KAIA_LZ_ENDPOINT, owner);
+        console.log("address public KAIA_OFT_KAIA_ADAPTER =", address(oftkaiaadapter), ";");
 
         oftkaiaadapter = new OFTKAIAadapter(KAIA_WKAIA, address(0), KAIA_LZ_ENDPOINT, owner);
         console.log("address public KAIA_OFT_WKAIA_ADAPTER =", address(oftkaiaadapter), ";");

@@ -8,7 +8,6 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-/// @notice OFTAdapter uses a deployed ERC-20 token and SafeERC20 to interact with the OFTCore contract.
 contract OFTUSDTadapter is OFTAdapter, ReentrancyGuard {
     error InsufficientBalance();
 
@@ -38,12 +37,12 @@ contract OFTUSDTadapter is OFTAdapter, ReentrancyGuard {
         override
         returns (uint256 amountReceivedLD)
     {
-        if (_to == address(0x0)) _to = address(0xdead); // _mint(...) does not support address(0x0)
+        if (_to == address(0x0)) _to = address(0xdead);
         if (block.chainid == 8217) {
             if (IERC20(tokenOFT).balanceOf(address(this)) < _amountLD) revert InsufficientBalance();
             IERC20(tokenOFT).safeTransfer(_to, _amountLD);
         } else {
-            IElevatedMintableBurnable(elevatedMinterBurner).mint(_to, _amountLD); // dst kaia release pay borrow, dst other chain mint representative
+            IElevatedMintableBurnable(elevatedMinterBurner).mint(_to, _amountLD);
         }
         emit Credit(_to, _amountLD);
         return _amountLD;

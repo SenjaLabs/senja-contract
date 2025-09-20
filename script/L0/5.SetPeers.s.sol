@@ -10,7 +10,7 @@ import {Helper} from "./Helper.sol";
 contract SetPeers is Script, Helper {
     function run() external {
         deployBASE();
-        // deployKAIA();
+        deployKAIA();
         // optimism
         // hyperevm
     }

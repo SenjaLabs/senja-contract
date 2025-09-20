@@ -16,8 +16,8 @@ contract SetSendConfig is Script, Helper {
     address owner = vm.envAddress("PUBLIC_KEY");
     uint256 privateKey = vm.envUint("PRIVATE_KEY");
     // destination
-    uint32 eid0 = BASE_EID; // Endpoint ID for Chain B
-    uint32 eid1 = KAIA_EID; // Endpoint ID for Chain B
+    uint32 eid0 = BASE_EID;
+    uint32 eid1 = KAIA_EID;
 
     uint32 constant EXECUTOR_CONFIG_TYPE = 1;
     uint32 constant ULN_CONFIG_TYPE = 2;
@@ -61,7 +61,7 @@ contract SetSendConfig is Script, Helper {
     /// @notice Broadcasts transactions to set both Send ULN and Executor configurations for messages sent from Chain A to Chain B
     function run() external {
         deployBASE();
-        // deployKAIA();
+        deployKAIA();
         // optimism
         // hyperevm
     }

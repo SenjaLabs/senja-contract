@@ -16,12 +16,10 @@ contract OFTadapter is OFTAdapter, ReentrancyGuard {
 
     using SafeERC20 for IERC20;
 
-    constructor(
-        address _token, // Your existing ERC20 token with mint/burn exposed
-        address _elevatedMinterBurner,
-        address _lzEndpoint, // Local LayerZero endpoint
-        address _owner // Contract owner
-    ) OFTAdapter(_token, _lzEndpoint, _owner) Ownable(_owner) {
+    constructor(address _token, address _elevatedMinterBurner, address _lzEndpoint, address _owner)
+        OFTAdapter(_token, _lzEndpoint, _owner)
+        Ownable(_owner)
+    {
         tokenOFT = _token;
         elevatedMinterBurner = _elevatedMinterBurner;
     }
@@ -32,12 +30,12 @@ contract OFTadapter is OFTAdapter, ReentrancyGuard {
         override
         returns (uint256 amountReceivedLD)
     {
-        if (_to == address(0x0)) _to = address(0xdead); // _mint(...) does not support address(0x0)
+        if (_to == address(0x0)) _to = address(0xdead);
         if (block.chainid == 8217) {
             if (IERC20(tokenOFT).balanceOf(address(this)) < _amountLD) revert InsufficientBalance();
             IERC20(tokenOFT).safeTransfer(_to, _amountLD);
         } else {
-            IElevatedMintableBurnable(elevatedMinterBurner).mint(_to, _amountLD); // dst kaia release pay borrow, dst other chain mint representative
+            IElevatedMintableBurnable(elevatedMinterBurner).mint(_to, _amountLD);
         }
         return _amountLD;
     }

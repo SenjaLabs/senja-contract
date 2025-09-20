@@ -15,7 +15,7 @@ contract SetElevated is Script, Helper {
         vm.createSelectFork(vm.rpcUrl("base_mainnet"));
         vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
 
-        // _setElevated();
+        _setElevated();
         _setOperator();
 
         vm.stopBroadcast();
