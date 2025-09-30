@@ -9,6 +9,7 @@ import {LendingPoolRouterDeployer} from "../src/LendingPoolRouterDeployer.sol";
 import {Helper} from "../script/L0/Helper.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Position} from "../src/Position.sol";
+import {HelperUtils} from "../src/HelperUtils.sol";
 
 contract SenjaUpgradeTest is Test, Helper {
     LendingPoolFactory public newImplementation;
@@ -128,5 +129,23 @@ contract SenjaUpgradeTest is Test, Helper {
         console.log("balance of weth", IERC20(KAIA_MOCK_WETH).balanceOf(position));
 
         vm.stopPrank();
+    }
+
+    // RUN
+    // forge test --match-contract SenjaUpgradeTest --match-test test_position_balance -vvv
+    function test_position_balance() public {
+        address user = vm.envAddress("PUBLIC_KEY");
+        // console.log(
+        // HelperUtils(KAIA_HELPER_UTILS).getCollateralBalance(0xf3a9A94A4c7F37eBCeC38E3A665cd1D980287D4A, user)
+        // );
+        address lp = 0xf3a9A94A4c7F37eBCeC38E3A665cd1D980287D4A;
+        address router = LendingPool(payable(lp)).router();
+        address position = LendingPoolRouter(router).addressPositions(user);
+        console.log(position);
+        console.log("KAIA_WETH: ", IERC20(KAIA_WETH).balanceOf(position));
+        console.log("KAIA_WBTC", IERC20(KAIA_WBTC).balanceOf(position));
+        console.log("KAIA_USDT", IERC20(KAIA_USDT).balanceOf(position));
+        console.log("KAIA_KAIA", position.balance);
+        console.log("KAIA_WKAIA", IERC20(KAIA_WKAIA).balanceOf(position));
     }
 }

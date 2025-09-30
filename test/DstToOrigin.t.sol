@@ -205,13 +205,6 @@ contract DstToOriginTest is Test, Helper {
     }
 
     function _addressToBytes32(address _address) internal pure returns (bytes32) {
-        
-        
-        
-        Token(address).owner();
-
-
-
         return bytes32(uint256(uint160(_address)));
     }
 }
