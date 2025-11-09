@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.22;
+pragma solidity ^0.8.30;
 
 import {Script} from "forge-std/Script.sol";
 import {ILayerZeroEndpointV2} from "@layerzerolabs/lz-evm-protocol-v2/contracts/interfaces/ILayerZeroEndpointV2.sol";
-import {Helper} from "./Helper.sol";
+import {Helper} from "../DevTools/Helper.sol";
 
 /// @title LayerZero Library Configuration Script
 /// @notice Sets up send and receive libraries for OApp messaging

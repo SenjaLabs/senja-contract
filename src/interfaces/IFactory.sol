@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.30;
 
 /**
  * @title IFactory
@@ -34,7 +34,7 @@ interface IFactory {
 
     function oftAddress(address _token) external view returns (address);
 
-    function WKAIA() external view returns (address);
+    function WRAPPED_NATIVE() external view returns (address);
 
     /**
      * @dev Adds a token data stream to the factory

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.22;
+pragma solidity ^0.8.30;
 
 import {Script, console} from "forge-std/Script.sol";
-import {Helper} from "../L0/Helper.sol";
+import {Helper} from "../DevTools/Helper.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 interface IToken {
@@ -11,8 +11,7 @@ interface IToken {
 }
 
 contract MintToken is Script, Helper {
-    // address public minter = vm.envAddress("PUBLIC_KEY");
-    address public minter = KAIA_OFT_MOCK_USDT_ADAPTER;
+    address public minter = vm.envAddress("PUBLIC_KEY");
     address public token = KAIA_MOCK_USDT;
     uint256 public amount = 100_000;
 

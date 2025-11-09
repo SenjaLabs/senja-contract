@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.23;
+pragma solidity ^0.8.30;
 
 import {ILendingPool} from "./interfaces/ILendingPool.sol";
 import {IPosition} from "./interfaces/IPosition.sol";
@@ -30,9 +30,9 @@ contract HelperUtils {
         address borrowToken = _borrowToken(_lendingPool);
         uint256 totalLiquidity;
 
-        if (borrowToken == _WKAIA()) {
-            // Handle WKAIA token
-            totalLiquidity = IERC20(_WKAIA()).balanceOf(_lendingPool);
+        if (borrowToken == _WRAPPED_NATIVE()) {
+            // Handle Wrapped Native token
+            totalLiquidity = IERC20(_WRAPPED_NATIVE()).balanceOf(_lendingPool);
         } else {
             // Handle ERC20 tokens
             totalLiquidity = IERC20(borrowToken).balanceOf(_lendingPool);
@@ -86,10 +86,10 @@ contract HelperUtils {
             uint256 tokenBalance;
             uint256 tokenDecimals;
 
-            if (token == _WKAIA()) {
-                // Handle WKAIA token
-                tokenBalance = IERC20(_WKAIA()).balanceOf(userPosition);
-                tokenDecimals = 18; // WKAIA uses 18 decimals
+            if (token == _WRAPPED_NATIVE()) {
+                // Handle Wrapped Native token
+                tokenBalance = IERC20(_WRAPPED_NATIVE()).balanceOf(userPosition);
+                tokenDecimals = 18; // Wrapped Native uses 18 decimals
             } else {
                 // Handle ERC20 tokens
                 tokenBalance = IERC20(token).balanceOf(userPosition);
@@ -97,14 +97,14 @@ contract HelperUtils {
             }
 
             if (token != address(0)) {
-                // Include all tokens including WKAIA
+                // Include all tokens including Wrapped Native
                 collateralValue += (getTokenValue(token) * tokenBalance / 10 ** tokenDecimals);
             }
         }
 
         // Calculate borrowed value
         uint256 borrowAssets = ((userBorrowShares * totalBorrowAssets) / totalBorrowShares);
-        uint256 borrowDecimals = borrowToken == _WKAIA() ? 18 : IERC20Metadata(borrowToken).decimals();
+        uint256 borrowDecimals = borrowToken == _WRAPPED_NATIVE() ? 18 : IERC20Metadata(borrowToken).decimals();
         uint256 borrowValue = getTokenValue(borrowToken) * borrowAssets / 10 ** borrowDecimals;
         // Health Factor = (Collateral Value * LTV) / Borrowed Value
         uint256 ltv = _ltv(_lendingPool);
@@ -253,7 +253,7 @@ contract HelperUtils {
     function getTotalLiquidity(address _lendingPool) public view returns (uint256 totalLiquidity) {
         address borrowToken = ILPRouter(_router(_lendingPool)).borrowToken();
         if (borrowToken == address(1)) {
-            totalLiquidity = IERC20(_WKAIA()).balanceOf(_lendingPool);
+            totalLiquidity = IERC20(_WRAPPED_NATIVE()).balanceOf(_lendingPool);
         } else {
             totalLiquidity = IERC20(borrowToken).balanceOf(_lendingPool);
         }
@@ -268,7 +268,7 @@ contract HelperUtils {
         address collateralToken = ILPRouter(_router(_lendingPool)).collateralToken();
         address addressPosition = ILPRouter(_router(_lendingPool)).addressPositions(_user);
         if (collateralToken == address(1)) {
-            collateralBalance = IERC20(_WKAIA()).balanceOf(addressPosition);
+            collateralBalance = IERC20(_WRAPPED_NATIVE()).balanceOf(addressPosition);
         } else {
             collateralBalance = IERC20(collateralToken).balanceOf(addressPosition);
         }
@@ -288,9 +288,9 @@ contract HelperUtils {
         address _tokenOutPrice = _tokenDataStream(borrowToken);
 
         uint256 collateralBalance;
-        if (collateralToken == _WKAIA()) {
-            // Handle WKAIA token
-            collateralBalance = IERC20(_WKAIA()).balanceOf(addressPosition);
+        if (collateralToken == _WRAPPED_NATIVE()) {
+            // Handle Wrapped Native token
+            collateralBalance = IERC20(_WRAPPED_NATIVE()).balanceOf(addressPosition);
         } else {
             // Handle ERC20 tokens
             collateralBalance = IERC20(collateralToken).balanceOf(addressPosition);
@@ -348,7 +348,7 @@ contract HelperUtils {
         return bytes32(uint256(uint160(_address)));
     }
 
-    function _WKAIA() internal view returns (address) {
-        return IFactory(factory).WKAIA();
+    function _WRAPPED_NATIVE() internal view returns (address) {
+        return IFactory(factory).WRAPPED_NATIVE();
     }
 }

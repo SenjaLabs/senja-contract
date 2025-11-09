@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.22;
+pragma solidity ^0.8.30;
 
 interface IMintableBurnable {
     function burn(address _from, uint256 _amount) external;

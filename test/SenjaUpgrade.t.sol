@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.30;
 
 import {Test, console} from "forge-std/Test.sol";
 import {LendingPool} from "../src/LendingPool.sol";
 import {LendingPoolRouter} from "../src/LendingPoolRouter.sol";
 import {LendingPoolFactory} from "../src/LendingPoolFactory.sol";
 import {LendingPoolRouterDeployer} from "../src/LendingPoolRouterDeployer.sol";
-import {Helper} from "../script/L0/Helper.sol";
+import {Helper} from "../script/DevTools/Helper.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Position} from "../src/Position.sol";
-import {HelperUtils} from "../src/HelperUtils.sol";
+// import {HelperUtils} from "../src/HelperUtils.sol";
 
 contract SenjaUpgradeTest is Test, Helper {
     LendingPoolFactory public newImplementation;
@@ -34,7 +34,6 @@ contract SenjaUpgradeTest is Test, Helper {
         console.log("lendingPoolDeployer", LendingPoolFactory(KAIA_lendingPoolFactoryProxy).lendingPoolDeployer());
         console.log("protocol", LendingPoolFactory(KAIA_lendingPoolFactoryProxy).protocol());
         console.log("positionDeployer", LendingPoolFactory(KAIA_lendingPoolFactoryProxy).positionDeployer());
-        console.log("VERSION", LendingPoolFactory(KAIA_lendingPoolFactoryProxy).VERSION());
         console.log(
             "lendingPoolRouterDeployer", LendingPoolFactory(KAIA_lendingPoolFactoryProxy).lendingPoolRouterDeployer()
         );
@@ -66,7 +65,6 @@ contract SenjaUpgradeTest is Test, Helper {
         console.log("lendingPoolDeployer", LendingPoolFactory(KAIA_lendingPoolFactoryProxy).lendingPoolDeployer());
         console.log("protocol", LendingPoolFactory(KAIA_lendingPoolFactoryProxy).protocol());
         console.log("positionDeployer", LendingPoolFactory(KAIA_lendingPoolFactoryProxy).positionDeployer());
-        console.log("VERSION", LendingPoolFactory(KAIA_lendingPoolFactoryProxy).VERSION());
         console.log(
             "lendingPoolRouterDeployer", LendingPoolFactory(KAIA_lendingPoolFactoryProxy).lendingPoolRouterDeployer()
         );
@@ -133,7 +131,7 @@ contract SenjaUpgradeTest is Test, Helper {
 
     // RUN
     // forge test --match-contract SenjaUpgradeTest --match-test test_position_balance -vvv
-    function test_position_balance() public {
+    function test_position_balance() public view {
         address user = vm.envAddress("PUBLIC_KEY");
         // console.log(
         // HelperUtils(KAIA_HELPER_UTILS).getCollateralBalance(0xf3a9A94A4c7F37eBCeC38E3A665cd1D980287D4A, user)

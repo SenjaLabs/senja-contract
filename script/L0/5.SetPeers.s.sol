@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.22;
+pragma solidity ^0.8.30;
 
 import {Script} from "forge-std/Script.sol";
 import {MyOApp} from "../../src/layerzero/MyOApp.sol";
-import {Helper} from "./Helper.sol";
+import {Helper} from "../DevTools/Helper.sol";
 
 /// @title LayerZero OApp Peer Configuration Script
 /// @notice Sets up peer connections between OApp deployments on different chains

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.30;
 
 /**
  * @title ILiquidator
@@ -10,7 +10,7 @@ pragma solidity ^0.8.13;
  */
 interface ILiquidator {
     /**
-     * @dev Liquidates a position using DEX (DragonSwap)
+     * @dev Liquidates a position using DEX
      * @param borrower The address of the borrower to liquidate
      * @param lendingPoolRouter The address of the lending pool router
      * @param factory The address of the factory

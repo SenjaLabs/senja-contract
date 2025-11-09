@@ -1,36 +1,37 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.30;
 
 import {Test, console} from "forge-std/Test.sol";
 import {Protocol} from "../src/Protocol.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {Helper} from "../script/DevTools/Helper.sol";
 
 /**
  * @title ProtocolTest
  * @dev Test contract for Protocol buyback functionality
- * @notice Tests the buyback mechanism using real tokens on forked Kaia mainnet
+ * @notice Tests the buyback mechanism using real tokens
  */
 // RUN
 // forge test -vvv --match-contract ProtocolTest
-contract ProtocolTest is Test {
+contract ProtocolTest is Test, Helper {
     Protocol public protocol;
 
-    // Real token addresses on Kaia mainnet
-    address public constant USDT = 0xd077A400968890Eacc75cdc901F0356c943e4fDb;
-    address public constant WETH = 0x98A8345bB9D3DDa9D808Ca1c9142a28F6b0430E1;
-    address public constant WBTC = 0x981846bE8d2d697f4dfeF6689a161A25FfbAb8F9;
-    address public constant WKAIA = 0x19Aac5f612f524B754CA7e7c41cbFa2E981A4432;
+    // Real token addresses
+    address public USDT;
+    address public WETH;
+    address public WBTC;
+    address public WNative;
 
     address public user = address(0x1);
     address public owner = address(0x2);
 
     // Test amounts
     uint256 public constant SWAP_AMOUNT = 100 * 10 ** 6; // 100 USDT (6 decimals)
-    uint256 public constant MIN_OUTPUT = 1 * 10 ** 18; // 1 WKAIA (18 decimals)
+    uint256 public constant MIN_OUTPUT = 1 * 10 ** 18; // 1 WNative (18 decimals)
 
     function setUp() public {
-        // Fork Kaia mainnet to get real token contracts and DragonSwap
         vm.createSelectFork("kaia_mainnet");
+        _getUtils();
 
         // Deploy protocol contract
         protocol = new Protocol();
@@ -39,40 +40,48 @@ contract ProtocolTest is Test {
         vm.deal(user, 1 ether);
     }
 
-    function testRealTokenAddresses() public {
-        // Test that real token addresses are correctly defined
-        assertEq(USDT, 0xd077A400968890Eacc75cdc901F0356c943e4fDb);
-        assertEq(WETH, 0x98A8345bB9D3DDa9D808Ca1c9142a28F6b0430E1);
-        assertEq(WBTC, 0x981846bE8d2d697f4dfeF6689a161A25FfbAb8F9);
-        assertEq(WKAIA, 0x19Aac5f612f524B754CA7e7c41cbFa2E981A4432);
+    function _getUtils() internal {
+        if (block.chainid == 8217) {
+            USDT = KAIA_USDT;
+            WETH = KAIA_WETH;
+            WBTC = KAIA_WBTC;
+            WNative = KAIA_WKAIA;
+        } else if (block.chainid == 8453) {
+            USDT = BASE_USDT;
+            WETH = BASE_WETH;
+            WBTC = BASE_WBTC;
+            WNative = BASE_WETH;
+        }
+    }
 
+    function testRealTokenAddresses() public view {
         console.log("Real USDT address:", USDT);
         console.log("Real WETH address:", WETH);
         console.log("Real WBTC address:", WBTC);
-        console.log("Real WKAIA address:", WKAIA);
+        console.log("Real WNative address:", WNative);
     }
 
-    function testProtocolConstants() public {
+    function testProtocolConstants() public view {
         // Test that constants are set correctly
-        assertEq(protocol.WKAIA(), 0x19Aac5f612f524B754CA7e7c41cbFa2E981A4432);
-        assertEq(protocol.DRAGON_SWAP_ROUTER(), 0xA324880f884036E3d21a09B90269E1aC57c7EC8a);
+        assertEq(protocol.WRAPPED_NATIVE(), 0x19Aac5f612f524B754CA7e7c41cbFa2E981A4432);
+        assertEq(protocol.DEX_ROUTER(), 0xA324880f884036E3d21a09B90269E1aC57c7EC8a);
     }
 
     function testReceiveFunction() public {
-        // Test that the contract can receive ETH and wrap it to WKAIA
+        // Test that the contract can receive ETH and wrap it to WNative
         uint256 ethAmount = 1 ether;
 
         // Send ETH to the contract
         (bool success,) = address(protocol).call{value: ethAmount}("");
 
-        // The transaction should succeed and wrap ETH to WKAIA
+        // The transaction should succeed and wrap ETH to WNative
         assertTrue(success);
 
-        // Check that the contract balance is 0 (ETH was wrapped to WKAIA)
+        // Check that the contract balance is 0 (ETH was wrapped to WNative)
         assertEq(address(protocol).balance, 0);
     }
 
-    function testBuybackConstants() public {
+    function testBuybackConstants() public view {
         // Test that buyback constants are correctly defined
         assertEq(protocol.PROTOCOL_SHARE(), 95);
         assertEq(protocol.OWNER_SHARE(), 5);
@@ -92,9 +101,9 @@ contract ProtocolTest is Test {
         vm.expectRevert(Protocol.DeadlinePassed.selector);
         protocol.executeBuyback(USDT, SWAP_AMOUNT, MIN_OUTPUT, 3000, block.timestamp - 1);
 
-        // Test swapping WKAIA for WKAIA
-        vm.expectRevert(Protocol.CannotSwapWKAIAForWKAIA.selector);
-        protocol.executeBuyback(WKAIA, SWAP_AMOUNT, MIN_OUTPUT, 3000, block.timestamp + 3600);
+        // Test swapping WNative for WNative
+        vm.expectRevert(Protocol.CannotSwapWNativeForWNative.selector);
+        protocol.executeBuyback(WNative, SWAP_AMOUNT, MIN_OUTPUT, 3000, block.timestamp + 3600);
     }
 
     function testBuybackInsufficientBalance() public {
@@ -113,16 +122,16 @@ contract ProtocolTest is Test {
         protocol.executeBuybackSimple(USDT, SWAP_AMOUNT, MIN_OUTPUT, 3000);
     }
 
-    function testBalanceTracking() public {
+    function testBalanceTracking() public view {
         // Test that balance tracking functions work
         assertEq(protocol.getProtocolLockedBalance(USDT), 0);
         assertEq(protocol.getOwnerAvailableBalance(USDT), 0);
         assertEq(protocol.getTotalProtocolBalance(USDT), 0);
 
-        // Test with WKAIA
-        assertEq(protocol.getProtocolLockedBalance(WKAIA), 0);
-        assertEq(protocol.getOwnerAvailableBalance(WKAIA), 0);
-        assertEq(protocol.getTotalProtocolBalance(WKAIA), 0);
+        // Test with WNative
+        assertEq(protocol.getProtocolLockedBalance(WNative), 0);
+        assertEq(protocol.getOwnerAvailableBalance(WNative), 0);
+        assertEq(protocol.getTotalProtocolBalance(WNative), 0);
     }
 
     function testOwnerWithdrawBalance() public {
@@ -166,15 +175,15 @@ contract ProtocolTest is Test {
             console.log("Buyback succeeded with real USDT!");
 
             // Check that balances were updated
-            uint256 protocolWkaiaBalance = protocol.getProtocolLockedBalance(WKAIA);
-            uint256 ownerWkaiaBalance = protocol.getOwnerAvailableBalance(WKAIA);
+            uint256 protocolWkaiaBalance = protocol.getProtocolLockedBalance(WNative);
+            uint256 ownerWkaiaBalance = protocol.getOwnerAvailableBalance(WNative);
 
-            console.log("Protocol WKAIA balance:", protocolWkaiaBalance);
-            console.log("Owner WKAIA balance:", ownerWkaiaBalance);
+            console.log("Protocol WNative balance:", protocolWkaiaBalance);
+            console.log("Owner WNative balance:", ownerWkaiaBalance);
 
             // Verify the 95%/5% split
-            assertTrue(protocolWkaiaBalance > 0, "Protocol should have received WKAIA");
-            assertTrue(ownerWkaiaBalance > 0, "Owner should have received WKAIA");
+            assertTrue(protocolWkaiaBalance > 0, "Protocol should have received WNative");
+            assertTrue(ownerWkaiaBalance > 0, "Owner should have received WNative");
 
             // Check that protocol balance is approximately 95% of total
             uint256 totalWkaia = protocolWkaiaBalance + ownerWkaiaBalance;
@@ -182,7 +191,7 @@ contract ProtocolTest is Test {
             uint256 tolerance = totalWkaia / 100; // 1% tolerance
 
             assertApproxEqAbs(
-                protocolWkaiaBalance, expectedProtocolShare, tolerance, "Protocol should receive ~95% of WKAIA"
+                protocolWkaiaBalance, expectedProtocolShare, tolerance, "Protocol should receive ~95% of WNative"
             );
         } catch Error(string memory reason) {
             console.log("Buyback failed with reason:", reason);
@@ -193,7 +202,7 @@ contract ProtocolTest is Test {
 
     function testExecuteBuybackWithRealTokenSimulation() public {
         // For this test, we'll simulate having real USDT by using vm.etch to modify the USDT contract
-        // This is more complex but tests the actual DragonSwap integration
+        // This is more complex but tests the actual DEX integration
 
         uint256 testAmount = 100 * 10 ** 6; // 100 USDT
 
@@ -213,21 +222,21 @@ contract ProtocolTest is Test {
             // If protocol somehow has USDT, test the actual swap
             console.log("Protocol has sufficient USDT, testing real swap");
 
-            // This would test the actual DragonSwap integration
+            // This would test the actual DEX integration
             // Note: This might fail due to liquidity or other factors
             try protocol.executeBuyback(USDT, testAmount, MIN_OUTPUT, 3000, block.timestamp + 3600) {
                 console.log("Real buyback succeeded!");
 
                 // Check that balances were updated
-                uint256 protocolWkaiaBalance = protocol.getProtocolLockedBalance(WKAIA);
-                uint256 ownerWkaiaBalance = protocol.getOwnerAvailableBalance(WKAIA);
+                uint256 protocolWkaiaBalance = protocol.getProtocolLockedBalance(WNative);
+                uint256 ownerWkaiaBalance = protocol.getOwnerAvailableBalance(WNative);
 
-                console.log("Protocol WKAIA balance:", protocolWkaiaBalance);
-                console.log("Owner WKAIA balance:", ownerWkaiaBalance);
+                console.log("Protocol WNative balance:", protocolWkaiaBalance);
+                console.log("Owner WNative balance:", ownerWkaiaBalance);
 
                 // Verify the 95%/5% split
-                assertTrue(protocolWkaiaBalance > 0, "Protocol should have received WKAIA");
-                assertTrue(ownerWkaiaBalance > 0, "Owner should have received WKAIA");
+                assertTrue(protocolWkaiaBalance > 0, "Protocol should have received WNative");
+                assertTrue(ownerWkaiaBalance > 0, "Owner should have received WNative");
 
                 // Check that protocol balance is approximately 95% of total
                 uint256 totalWkaia = protocolWkaiaBalance + ownerWkaiaBalance;
@@ -235,7 +244,7 @@ contract ProtocolTest is Test {
                 uint256 tolerance = totalWkaia / 100; // 1% tolerance
 
                 assertApproxEqAbs(
-                    protocolWkaiaBalance, expectedProtocolShare, tolerance, "Protocol should receive ~95% of WKAIA"
+                    protocolWkaiaBalance, expectedProtocolShare, tolerance, "Protocol should receive ~95% of WNative"
                 );
             } catch {
                 console.log("Real buyback failed - likely due to liquidity or other factors");
@@ -245,7 +254,7 @@ contract ProtocolTest is Test {
 
     function testExecuteBuybackWithSimulatedUSDTBalance() public {
         // This test simulates giving the protocol USDT balance using vm.deal
-        // to test the actual buyback functionality with real DragonSwap
+        // to test the actual buyback functionality with real DEX
 
         uint256 testAmount = 1000 * 10 ** 6; // 1000 USDT
         address bob = address(0x5678);
@@ -278,15 +287,15 @@ contract ProtocolTest is Test {
             console.log("Buyback succeeded with simulated USDT balance!");
 
             // Check that balances were updated
-            uint256 protocolWkaiaBalance = protocol.getProtocolLockedBalance(WKAIA);
-            uint256 ownerWkaiaBalance = protocol.getOwnerAvailableBalance(WKAIA);
+            uint256 protocolWkaiaBalance = protocol.getProtocolLockedBalance(WNative);
+            uint256 ownerWkaiaBalance = protocol.getOwnerAvailableBalance(WNative);
 
-            console.log("Protocol WKAIA balance:", protocolWkaiaBalance);
-            console.log("Owner WKAIA balance:", ownerWkaiaBalance);
+            console.log("Protocol WNative balance:", protocolWkaiaBalance);
+            console.log("Owner WNative balance:", ownerWkaiaBalance);
 
             // Verify the 95%/5% split
-            assertTrue(protocolWkaiaBalance > 0, "Protocol should have received WKAIA");
-            assertTrue(ownerWkaiaBalance > 0, "Owner should have received WKAIA");
+            assertTrue(protocolWkaiaBalance > 0, "Protocol should have received WNative");
+            assertTrue(ownerWkaiaBalance > 0, "Owner should have received WNative");
 
             // Check that protocol balance is approximately 95% of total
             uint256 totalWkaia = protocolWkaiaBalance + ownerWkaiaBalance;
@@ -294,15 +303,15 @@ contract ProtocolTest is Test {
             uint256 tolerance = totalWkaia / 100; // 1% tolerance
 
             assertApproxEqAbs(
-                protocolWkaiaBalance, expectedProtocolShare, tolerance, "Protocol should receive ~95% of WKAIA"
+                protocolWkaiaBalance, expectedProtocolShare, tolerance, "Protocol should receive ~95% of WNative"
             );
         } catch Error(string memory reason) {
             console.log("Buyback failed with reason:", reason);
-            // This might fail due to DragonSwap liquidity or other factors
+            // This might fail due to DEX liquidity or other factors
             // But we've tested that the protocol can detect and use the USDT balance
         } catch {
             console.log("Buyback failed with unknown error");
-            // This might fail due to DragonSwap liquidity or other factors
+            // This might fail due to DEX liquidity or other factors
         }
     }
 }

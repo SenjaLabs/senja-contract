@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.30;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -9,7 +9,7 @@ import {IOracle} from "./interfaces/IOracle.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {IPosition} from "./interfaces/IPosition.sol";
 import {ILPRouter} from "./interfaces/ILPRouter.sol";
-import {IDragonSwap} from "./interfaces/IDragonSwap.sol";
+import {IDexRouter} from "./interfaces/IDexRouter.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
@@ -21,8 +21,8 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 contract Liquidator is ReentrancyGuard, Ownable {
     using SafeERC20 for IERC20;
 
-    // DragonSwap router address on Kaia mainnet
-    address public constant DRAGON_SWAP_ROUTER = 0xA324880f884036E3d21a09B90269E1aC57c7EC8a;
+    // DEX router address
+    address public constant DEX_ROUTER = 0xA324880f884036E3d21a09B90269E1aC57c7EC8a;
 
     error NotLiquidatable();
     error LiquidationFailed();
@@ -54,7 +54,7 @@ contract Liquidator is ReentrancyGuard, Ownable {
     }
 
     /**
-     * @notice Liquidates a position using DEX (DragonSwap)
+     * @notice Liquidates a position using DEX (DEX)
      * @param borrower The address of the borrower to liquidate
      * @param lendingPoolRouter The address of the lending pool router
      * @param liquidationIncentive The liquidation incentive in basis points (e.g., 500 = 5%)
@@ -218,7 +218,7 @@ contract Liquidator is ReentrancyGuard, Ownable {
         uint256 liquidationIncentive
     ) internal returns (uint256 collateralToLiquidate, uint256 liquidatedAmount) {
         // Get effective collateral token and validate
-        address effectiveCollateralToken = collateralToken == address(1) ? _WKAIA() : collateralToken;
+        address effectiveCollateralToken = collateralToken == address(1) ? _WRAPPED_NATIVE() : collateralToken;
         uint256 totalCollateral = IERC20(effectiveCollateralToken).balanceOf(borrowerPosition);
 
         if (totalCollateral == 0) revert LiquidationFailed();
@@ -257,9 +257,9 @@ contract Liquidator is ReentrancyGuard, Ownable {
         IPosition(borrowerPosition).withdrawCollateral(collateralToLiquidate, address(this), false);
 
         // Swap collateral to borrow token
-        uint256 amountOut = _performDragonSwap(
+        uint256 amountOut = _performDex(
             effectiveCollateralToken,
-            borrowToken == address(1) ? _WKAIA() : borrowToken,
+            borrowToken == address(1) ? _WRAPPED_NATIVE() : borrowToken,
             collateralToLiquidate,
             1000 // 10% slippage tolerance
         );
@@ -268,7 +268,7 @@ contract Liquidator is ReentrancyGuard, Ownable {
         actualLiquidatedAmount = amountOut > debtToLiquidate ? debtToLiquidate : amountOut;
 
         // Get effective borrow token for transfers
-        address effectiveBorrowToken = borrowToken == address(1) ? _WKAIA() : borrowToken;
+        address effectiveBorrowToken = borrowToken == address(1) ? _WRAPPED_NATIVE() : borrowToken;
 
         // Repay debt to lending pool
         IERC20(effectiveBorrowToken).safeTransfer(lendingPoolRouter, actualLiquidatedAmount);
@@ -299,7 +299,7 @@ contract Liquidator is ReentrancyGuard, Ownable {
         collateralValue = _calculateCollateralForDebt(borrowToken, collateralToken, repayAmount, liquidationIncentive);
 
         // Get available collateral and cap if necessary
-        address effectiveToken = collateralToken == address(1) ? _WKAIA() : collateralToken;
+        address effectiveToken = collateralToken == address(1) ? _WRAPPED_NATIVE() : collateralToken;
         uint256 availableCollateral = IERC20(effectiveToken).balanceOf(borrowerPosition);
 
         if (collateralValue > availableCollateral) {
@@ -334,9 +334,9 @@ contract Liquidator is ReentrancyGuard, Ownable {
     }
 
     /**
-     * @notice Performs token swap using DragonSwap
+     * @notice Performs token swap using DEX
      */
-    function _performDragonSwap(address _tokenIn, address _tokenOut, uint256 amountIn, uint256 slippageTolerance)
+    function _performDex(address _tokenIn, address _tokenOut, uint256 amountIn, uint256 slippageTolerance)
         internal
         returns (uint256 amountOut)
     {
@@ -344,11 +344,11 @@ contract Liquidator is ReentrancyGuard, Ownable {
         uint256 expectedAmount = _calculateExpectedAmount(_tokenIn, _tokenOut, amountIn);
         uint256 amountOutMinimum = expectedAmount * (10000 - slippageTolerance) / 10000;
 
-        // Approve DragonSwap router
-        IERC20(_tokenIn).approve(DRAGON_SWAP_ROUTER, amountIn);
+        // Approve DEX router
+        IERC20(_tokenIn).approve(DEX_ROUTER, amountIn);
 
         // Prepare swap parameters
-        IDragonSwap.ExactInputSingleParams memory params = IDragonSwap.ExactInputSingleParams({
+        IDexRouter.ExactInputSingleParams memory params = IDexRouter.ExactInputSingleParams({
             tokenIn: _tokenIn,
             tokenOut: _tokenOut,
             fee: 1000, // 0.1% fee tier
@@ -360,7 +360,7 @@ contract Liquidator is ReentrancyGuard, Ownable {
         });
 
         // Perform the swap
-        amountOut = IDragonSwap(DRAGON_SWAP_ROUTER).exactInputSingle(params);
+        amountOut = IDexRouter(DEX_ROUTER).exactInputSingle(params);
     }
 
     /**
@@ -426,7 +426,7 @@ contract Liquidator is ReentrancyGuard, Ownable {
         // Get prices
         (, uint256 borrowPrice,,,) = IOracle(_tokenDataStream(borrowToken)).latestRoundData();
         (, uint256 collateralPrice,,,) =
-            IOracle(_tokenDataStream(collateralToken == address(1) ? _WKAIA() : collateralToken)).latestRoundData();
+            IOracle(_tokenDataStream(collateralToken == address(1) ? _WRAPPED_NATIVE() : collateralToken)).latestRoundData();
 
         // Calculate base collateral amount
         uint256 borrowDecimals = _tokenDecimals(borrowToken);
@@ -460,8 +460,8 @@ contract Liquidator is ReentrancyGuard, Ownable {
         return IPosition(addressPositions).tokenValue(token);
     }
 
-    function _WKAIA() internal view returns (address) {
-        return IFactory(factory).WKAIA();
+    function _WRAPPED_NATIVE() internal view returns (address) {
+        return IFactory(factory).WRAPPED_NATIVE();
     }
 
     /**

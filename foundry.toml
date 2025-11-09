@@ -12,20 +12,22 @@ remappings = [
     '@layerzerolabs/oapp-evm/=lib/devtools/packages/oapp-evm/',
     '@layerzero-devtools/=lib/devtools/packages/',
     'solidity-bytes-utils/=lib/solidity-bytes-utils/',
-    'forge-std/=lib/forge-std/src/'
+    'forge-std/=lib/forge-std/src/',
 ]
 
 [rpc_endpoints]
-arb_sepolia = "https://sepolia-rollup.arbitrum.io/rpc"
-base_sepolia= "https://sepolia.base.org"
-arb_mainnet = "https://arb1.arbitrum.io/rpc"
-base_mainnet = "https://base.drpc.org"
-bsc_mainnet = "https://bsc.drpc.org"
-kaia_mainnet = "https://go.getblock.io/d7094dbd80ab474ba7042603fe912332"
-pol_mainnet = "https://polygon.drpc.org"
-gnosis_mainnet = "wss://gnosis-rpc.publicnode.com"
+kaia_mainnet = "${KAIA_MAINNET_RPC}"
+base_mainnet="${BASE_MAINNET_RPC}"
+arb_mainnet="${ARB_MAINNET_RPC}"
 
 [lint]
-exclude_lints = ["mixed-case-variable", "mixed-case-function", "unsafe-typecast"]
+exclude_lints = [
+    "mixed-case-variable",
+    "mixed-case-function",
+    "unsafe-typecast",
+    "named-struct-fields",
+    "erc20-unchecked-transfer",
+    "unused-import",
+]
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options

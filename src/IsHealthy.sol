@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.30;
 
 import {IFactory} from "./interfaces/IFactory.sol";
 import {IOracle} from "./interfaces/IOracle.sol";

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.30;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -8,12 +8,11 @@ import {OptionsBuilder} from "@layerzerolabs/oapp-evm/contracts/oapp/libs/Option
 import {SendParam} from "@layerzerolabs/oft-evm/contracts/interfaces/IOFT.sol";
 import {MessagingFee} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
 import {OFTadapter} from "./layerzero/OFTadapter.sol";
-import {OFTKAIAadapter} from "./layerzero/OFTKAIAadapter.sol";
 import {IFactory} from "./interfaces/IFactory.sol";
 import {IPosition} from "./interfaces/IPosition.sol";
 import {IIsHealthy} from "./interfaces/IIsHealthy.sol";
 import {ILPRouter} from "./interfaces/ILPRouter.sol";
-import {IWKAIA} from "./interfaces/IWKAIA.sol";
+import {IWrappedNative} from "./interfaces/IWrappedNative.sol";
 import {ILiquidator} from "./interfaces/ILiquidator.sol";
 
 contract LendingPool is ReentrancyGuard {
@@ -47,6 +46,7 @@ contract LendingPool is ReentrancyGuard {
         address user, uint256 amount, uint256 shares, uint256 chainId, uint256 addExecutorLzReceiveOption
     );
     event InterestRateModelSet(address indexed oldModel, address indexed newModel);
+    event WithdrawCollateral(address user, uint256 amount);
 
     address public router;
 
@@ -79,9 +79,9 @@ contract LendingPool is ReentrancyGuard {
         uint256 shares = _supplyLiquidity(_amount, _user);
         _accrueInterest();
         if (_borrowToken() == address(1)) {
-            // Handle native KAIA by wrapping to WKAIA
+            // Handle native token by wrapping to ERC20
             if (msg.value != _amount) revert InsufficientCollateral();
-            IWKAIA(_WKAIA()).deposit{value: msg.value}();
+            IWrappedNative(_WRAPPED_NATIVE()).deposit{value: msg.value}();
         } else {
             IERC20(_borrowToken()).safeTransferFrom(_user, address(this), _amount);
         }
@@ -102,7 +102,7 @@ contract LendingPool is ReentrancyGuard {
         bool unwrapToNative = (_borrowToken() == address(1));
         if (unwrapToNative) {
             _withdrawing = true;
-            IWKAIA(_WKAIA()).withdraw(amount);
+            IWrappedNative(_WRAPPED_NATIVE()).withdraw(amount);
             (bool sent,) = msg.sender.call{value: amount}("");
             if (!sent) revert TransferFailed();
             _withdrawing = false;
@@ -138,11 +138,11 @@ contract LendingPool is ReentrancyGuard {
         if (_amount == 0) revert ZeroAmount();
         _accrueInterest();
         if (_collateralToken() == address(1)) {
-            // Handle native KAIA by wrapping to WKAIA
+            // Handle native token by wrapping to ERC20
             if (msg.value != _amount) revert InsufficientCollateral();
-            IWKAIA(_WKAIA()).deposit{value: msg.value}();
-            IERC20(_WKAIA()).approve(_addressPositions(_user), _amount);
-            IERC20(_WKAIA()).safeTransfer(_addressPositions(_user), _amount);
+            IWrappedNative(_WRAPPED_NATIVE()).deposit{value: msg.value}();
+            IERC20(_WRAPPED_NATIVE()).approve(_addressPositions(_user), _amount);
+            IERC20(_WRAPPED_NATIVE()).safeTransfer(_addressPositions(_user), _amount);
         } else {
             IERC20(_collateralToken()).safeTransferFrom(_user, _addressPositions(_user), _amount);
         }
@@ -167,7 +167,7 @@ contract LendingPool is ReentrancyGuard {
 
         uint256 userCollateralBalance;
         if (_collateralToken() == address(1)) {
-            userCollateralBalance = IERC20(_WKAIA()).balanceOf(_addressPositions(msg.sender));
+            userCollateralBalance = IERC20(_WRAPPED_NATIVE()).balanceOf(_addressPositions(msg.sender));
         } else {
             userCollateralBalance = IERC20(_collateralToken()).balanceOf(_addressPositions(msg.sender));
         }
@@ -183,16 +183,19 @@ contract LendingPool is ReentrancyGuard {
         IPosition(_addressPositions(msg.sender)).withdrawCollateral(_amount, msg.sender, unwrapToNative);
 
         if (_userBorrowShares(msg.sender) > 0) {
-            IIsHealthy(isHealthy)._isHealthy(
-                _borrowToken(),
-                _factory(),
-                _addressPositions(msg.sender),
-                _ltv(),
-                _totalBorrowAssets(),
-                _totalBorrowShares(),
-                _userBorrowShares(msg.sender)
-            );
+            IIsHealthy(isHealthy)
+                ._isHealthy(
+                    _borrowToken(),
+                    _factory(),
+                    _addressPositions(msg.sender),
+                    _ltv(),
+                    _totalBorrowAssets(),
+                    _totalBorrowShares(),
+                    _userBorrowShares(msg.sender)
+                );
         }
+
+        emit WithdrawCollateral(msg.sender, _amount);
     }
 
     /**
@@ -226,10 +229,10 @@ contract LendingPool is ReentrancyGuard {
                 oftCmd: ""
             });
             if (_borrowToken() == address(1)) {
-                IERC20(_WKAIA()).safeTransfer(_protocol(), protocolFee);
+                IERC20(_WRAPPED_NATIVE()).safeTransfer(_protocol(), protocolFee);
                 address oftAddress = IFactory(_factory()).oftAddress(_borrowToken());
-                OFTKAIAadapter oft = OFTKAIAadapter(oftAddress);
-                IERC20(_WKAIA()).approve(oftAddress, userAmount);
+                OFTadapter oft = OFTadapter(oftAddress);
+                IERC20(_WRAPPED_NATIVE()).approve(oftAddress, userAmount);
                 MessagingFee memory fee = oft.quoteSend(sendParam, false);
                 oft.send{value: fee.nativeFee}(sendParam, fee, msg.sender);
             } else {
@@ -243,7 +246,7 @@ contract LendingPool is ReentrancyGuard {
         } else {
             if (_borrowToken() == address(1)) {
                 _withdrawing = true;
-                IWKAIA(_WKAIA()).withdraw(_amount);
+                IWrappedNative(_WRAPPED_NATIVE()).withdraw(_amount);
                 (bool sent,) = _protocol().call{value: protocolFee}("");
                 (bool sent2,) = msg.sender.call{value: userAmount}("");
                 if (!sent && !sent2) revert TransferFailed();
@@ -282,7 +285,7 @@ contract LendingPool is ReentrancyGuard {
         if (_token == _borrowToken() && !_fromPosition) {
             if (_borrowToken() == address(1) && msg.value > 0) {
                 if (msg.value != borrowAmount) revert InsufficientCollateral();
-                IWKAIA(_WKAIA()).deposit{value: msg.value}();
+                IWrappedNative(_WRAPPED_NATIVE()).deposit{value: msg.value}();
             } else {
                 IERC20(_borrowToken()).safeTransferFrom(_user, address(this), borrowAmount);
             }
@@ -372,8 +375,8 @@ contract LendingPool is ReentrancyGuard {
         return IFactory(_factory()).protocol();
     }
 
-    function _WKAIA() internal view returns (address) {
-        return IFactory(_factory()).WKAIA();
+    function _WRAPPED_NATIVE() internal view returns (address) {
+        return IFactory(_factory()).WRAPPED_NATIVE();
     }
 
     function _liquidator() internal view returns (address) {
@@ -427,21 +430,22 @@ contract LendingPool is ReentrancyGuard {
         returns (bool isLiquidatable, uint256 borrowValue, uint256 collateralValue)
     {
         address isHealthy = IFactory(_factory()).isHealthy();
-        return IIsHealthy(isHealthy).checkLiquidation(
-            _borrowToken(),
-            _factory(),
-            _addressPositions(borrower),
-            _ltv(),
-            _totalBorrowAssets(),
-            _totalBorrowShares(),
-            _userBorrowShares(borrower)
-        );
+        return IIsHealthy(isHealthy)
+            .checkLiquidation(
+                _borrowToken(),
+                _factory(),
+                _addressPositions(borrower),
+                _ltv(),
+                _totalBorrowAssets(),
+                _totalBorrowShares(),
+                _userBorrowShares(borrower)
+            );
     }
 
     receive() external payable {
         // Only auto-wrap if this is the native token lending pool and not during withdrawal
         if (msg.value > 0 && !_withdrawing && (_borrowToken() == address(1) || _collateralToken() == address(1))) {
-            IWKAIA(_WKAIA()).deposit{value: msg.value}();
+            IWrappedNative(_WRAPPED_NATIVE()).deposit{value: msg.value}();
         } else if (msg.value > 0 && _withdrawing) {
             // During withdrawal, don't wrap - just pass through
             return;

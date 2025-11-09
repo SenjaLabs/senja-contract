@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.22;
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.30;
 
 import {IMintableBurnable} from "../interfaces/IMintableBurnable.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";

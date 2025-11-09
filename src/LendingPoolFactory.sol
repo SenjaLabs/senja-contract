@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.30;
 
 import {ILPDeployer} from "./interfaces/ILPDeployer.sol";
 import {ILPRouterDeployer} from "./interfaces/ILPRouterDeployer.sol";
@@ -94,7 +94,7 @@ contract LendingPoolFactory is
 
     address public positionDeployer;
 
-    address public constant WKAIA = 0x19Aac5f612f524B754CA7e7c41cbFa2E981A4432;
+    address public constant WRAPPED_NATIVE = 0x19Aac5f612f524B754CA7e7c41cbFa2E981A4432;
 
     /// @notice Mapping from token address to its data stream address
     mapping(address => address) public tokenDataStream;
@@ -108,9 +108,6 @@ contract LendingPoolFactory is
 
     /// @notice Total number of pools created
     uint256 public poolCount;
-
-    /// @notice VERSION Upgraded
-    uint8 public constant VERSION = 2;
 
     /// @notice The address of the lending pool deployer contract
     address public lendingPoolRouterDeployer;
