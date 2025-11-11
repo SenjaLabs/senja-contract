@@ -16,6 +16,7 @@ remappings = [
 ]
 
 [rpc_endpoints]
+kaia_testnet = "${KAIA_TESTNET_RPC}"
 kaia_mainnet = "${KAIA_MAINNET_RPC}"
 base_mainnet="${BASE_MAINNET_RPC}"
 arb_mainnet="${ARB_MAINNET_RPC}"

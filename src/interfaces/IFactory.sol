@@ -86,4 +86,10 @@ interface IFactory {
     function setOftAddress(address _token, address _oftAddress) external;
 
     function setPositionDeployer(address _positionDeployer) external;
+
+    function setWrappedNative(address _wrappedNative) external;
+
+    function setDexRouter(address _dexRouter) external;
+
+    function DEX_ROUTER() external view returns (address);
 }

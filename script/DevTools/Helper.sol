@@ -38,6 +38,8 @@ contract Helper {
     address public BASE_WETH = 0x4200000000000000000000000000000000000006;
     address public BASE_WBTC = 0x0555E30da8f98308EdB960aa94C0Db47230d2B9c;
 
+    address public KAIA_DEX_ROUTER = 0xA324880f884036E3d21a09B90269E1aC57c7EC8a;
+
     // ** SELF DEPLOYED Mainnet **
     address public KAIA_OFT_USDT_ADAPTER = 0x6D68A52Bc77F2eAc3582a7072eAd94C19B9f480c;
     address public KAIA_OFT_USDT_STARGATE_ADAPTER = 0x920Cd2F6e139b6C40053BCd5F67923d1d7Dd3140;
@@ -93,11 +95,18 @@ contract Helper {
     // *******************
 
     // *******************
-    // ORAKL
-    address public usdt_usd = 0xa7C4c292Ed720b1318F415B106a443Dc1f052994;
-    address public kaia_usdt = 0x9254CD72f207cc231A2307Eac5e4BFa316eb0c2e;
-    address public eth_usdt = 0xbF61f1F8D45EcB33006a335E7c76f306689dcAab;
-    address public btc_usdt = 0x624c060ea3fe93321e40530F3f7E587545D594aA;
+    // ORACLE - MAINNET
+    // address public usdt_usd = 0xa7C4c292Ed720b1318F415B106a443Dc1f052994;
+    // address public kaia_usdt = 0x9254CD72f207cc231A2307Eac5e4BFa316eb0c2e;
+    // address public eth_usdt = 0xbF61f1F8D45EcB33006a335E7c76f306689dcAab;
+    // address public btc_usdt = 0x624c060ea3fe93321e40530F3f7E587545D594aA;
+
+    // ORACLE - TESTNET
+    address public usdt_usd = 0x2D9A3d17400332c44ff0E2dC1b728529a33F5591;
+    address public kaia_usdt = 0xC2caA26226585F666Ec79f8eCDB0AEc17893aF1d;
+    address public eth_usdt = 0x22BE5ff1eF09ebf06995Da9050d44d23070C2142;
+    address public btc_usdt = 0x43aDD670A0E1948C90386d2b972FCAEC6CE1BE90;
+
     // *******************
 
     address public KAIA_usdt_usd_adapter = 0xC72f2eb4A97F19ecD0C10b5201676a10B6D8bB67;

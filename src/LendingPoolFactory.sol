@@ -60,6 +60,7 @@ contract LendingPoolFactory is
      * @param dataStream The address of the data stream contract
      */
     event TokenDataStreamAdded(address indexed token, address indexed dataStream);
+
     event LendingPoolDeployerSet(address indexed lendingPoolDeployer);
 
     event ProtocolSet(address indexed protocol);
@@ -69,6 +70,10 @@ contract LendingPoolFactory is
     event PositionDeployerSet(address indexed positionDeployer);
 
     event LendingPoolRouterDeployerSet(address indexed lendingPoolRouterDeployer);
+
+    event WrappedNativeSet(address indexed wrappedNative);
+
+    event DexRouterSet(address indexed dexRouter);
 
     /**
      * @notice Structure representing a lending pool
@@ -94,7 +99,9 @@ contract LendingPoolFactory is
 
     address public positionDeployer;
 
-    address public constant WRAPPED_NATIVE = 0x19Aac5f612f524B754CA7e7c41cbFa2E981A4432;
+    address public WRAPPED_NATIVE;
+
+    address public DEX_ROUTER;
 
     /// @notice Mapping from token address to its data stream address
     mapping(address => address) public tokenDataStream;
@@ -220,6 +227,16 @@ contract LendingPoolFactory is
     function setLendingPoolRouterDeployer(address _lendingPoolRouterDeployer) public onlyRole(OWNER_ROLE) {
         lendingPoolRouterDeployer = _lendingPoolRouterDeployer;
         emit LendingPoolRouterDeployerSet(_lendingPoolRouterDeployer);
+    }
+
+    function setWrappedNative(address _wrappedNative) public onlyRole(OWNER_ROLE) {
+        WRAPPED_NATIVE = _wrappedNative;
+        emit WrappedNativeSet(_wrappedNative);
+    }
+
+    function setDexRouter(address _dexRouter) public onlyRole(OWNER_ROLE) {
+        DEX_ROUTER = _dexRouter;
+        emit DexRouterSet(_dexRouter);
     }
 
     /**

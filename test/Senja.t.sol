@@ -29,6 +29,10 @@ import {IPosition} from "../src/interfaces/IPosition.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {PositionDeployer} from "../src/PositionDeployer.sol";
 import {LendingPoolRouterDeployer} from "../src/LendingPoolRouterDeployer.sol";
+import {MOCKUSDT} from "../src/MockToken/MOCKUSDT.sol";
+import {MOCKWKAIA} from "../src/MockToken/MOCKWKAIA.sol";
+
+import {MockDex} from "../src/MockDex.sol/MockDex.sol";
 
 interface IOrakl {
     function latestRoundData() external view returns (uint80, int256, uint256);
@@ -54,6 +58,9 @@ contract SenjaTest is Test, Helper {
     ElevatedMinterBurner public elevatedminterburner;
     HelperUtils public helperUtils;
     ERC1967Proxy public proxy;
+    MOCKUSDT public mockUSDT;
+    MOCKWKAIA public mockWKAIA;
+    MockDex public mockDex;
 
     address public lendingPool;
     address public lendingPool2;
@@ -62,31 +69,20 @@ contract SenjaTest is Test, Helper {
     address public owner = makeAddr("owner");
     address public alice = makeAddr("alice");
 
-    address public USDT = KAIA_USDT;
-    // address public USDT = KAIA_USDT_STARGATE; // stargate
-    address public WNative = KAIA_WKAIA;
-    address public Native = address(1);
-    // Using WNative instead of native token address(1) for better DeFi composability
-
-    // ORAKL
-    // address public usdt_usd = 0xa7C4c292Ed720b1318F415B106a443Dc1f052994;
-    // address public kaia_usdt = 0x9254CD72f207cc231A2307Eac5e4BFa316eb0c2e;
-    address public hype_usdt = 0x79e87F197FdAd9d26B5DbadB5789E8f353C421B3;
-    // address public eth_usdt = 0xbF61f1F8D45EcB33006a335E7c76f306689dcAab;
-    // address public btc_usdt = 0x624c060ea3fe93321e40530F3f7E587545D594aA;
+    address public USDT;
+    address public WNative;
+    address public Native = address(1); // Using WNative instead of native token address(1) for better DeFi composability
 
     address public usdt_usd_adapter;
     address public kaia_usdt_adapter;
-    address public hype_usdt_adapter;
     address public eth_usdt_adapter;
     address public btc_usdt_adapter;
 
     address public kaia_oftkaia_ori_adapter;
     address public kaia_oftkaia_adapter;
     address public kaia_oftusdt_adapter;
-    // LayerZero
-    uint32 dstEid0 = BASE_EID; // Destination chain EID
-    uint32 dstEid1 = KAIA_EID; // Destination chain EID
+
+    address public DEX_ROUTER;
 
     address endpoint;
     address oapp;
@@ -105,17 +101,22 @@ contract SenjaTest is Test, Helper {
     uint32 eid1;
     uint32 constant EXECUTOR_CONFIG_TYPE = 1;
     uint32 constant ULN_CONFIG_TYPE = 2;
+    uint32 constant RECEIVE_CONFIG_TYPE = 2;
 
     function setUp() public {
-        vm.createSelectFork(vm.rpcUrl("kaia_mainnet"));
+        // vm.createSelectFork(vm.rpcUrl("kaia_mainnet"));
+        vm.createSelectFork(vm.rpcUrl("kaia_testnet"));
         vm.startPrank(owner);
+        _getUtils();
         // *************** layerzero ***************
-        _deployOFT();
-        _setLibraries();
-        _setSendConfig();
-        _setReceiveConfig();
-        _setPeers();
-        _setEnforcedOptions();
+        if (block.chainid != 1001) {
+            _deployOFT();
+            _setLibraries();
+            _setSendConfig();
+            _setReceiveConfig();
+            _setPeers();
+            _setEnforcedOptions();
+        }
         // *****************************************
 
         _deployOracleAdapter();
@@ -124,7 +125,7 @@ contract SenjaTest is Test, Helper {
         lendingPool = IFactory(address(proxy)).createLendingPool(WNative, USDT, 8e17);
         lendingPool2 = IFactory(address(proxy)).createLendingPool(USDT, WNative, 8e17);
         lendingPool3 = IFactory(address(proxy)).createLendingPool(Native, USDT, 8e17);
-        _setOFTAddress();
+        if (block.chainid != 1001) _setOFTAddress();
         deal(USDT, alice, 100_000e6);
         deal(WNative, alice, 100_000 ether);
         vm.deal(alice, 100_000 ether);
@@ -134,7 +135,6 @@ contract SenjaTest is Test, Helper {
     function _getUtils() internal {
         if (block.chainid == 8453) {
             endpoint = BASE_LZ_ENDPOINT;
-            // oapp = BASE_OAPP;
             sendLib = BASE_SEND_LIB;
             receiveLib = BASE_RECEIVE_LIB;
             srcEid = BASE_EID;
@@ -146,7 +146,6 @@ contract SenjaTest is Test, Helper {
             eid1 = KAIA_EID;
         } else if (block.chainid == 8217) {
             endpoint = KAIA_LZ_ENDPOINT;
-            // oapp = KAIA_OAPP;
             sendLib = KAIA_SEND_LIB;
             receiveLib = KAIA_RECEIVE_LIB;
             srcEid = KAIA_EID;
@@ -154,45 +153,66 @@ contract SenjaTest is Test, Helper {
             dvn1 = KAIA_DVN1;
             dvn2 = KAIA_DVN2;
             executor = KAIA_EXECUTOR;
-            eid0 = BASE_EID;
-            eid1 = KAIA_EID;
+            eid0 = KAIA_EID;
+            eid1 = BASE_EID;
+            USDT = KAIA_USDT;
+            WNative = KAIA_WKAIA;
+            DEX_ROUTER = KAIA_DEX_ROUTER;
+        } else if (block.chainid == 1001) {
+            USDT = _deployMockToken("USDT");
+            WNative = _deployMockToken("WNative");
+            DEX_ROUTER = KAIA_DEX_ROUTER;
         }
+    }
+
+    function _deployMockToken(string memory _name) internal returns (address) {
+        if (keccak256(abi.encodePacked(_name)) == keccak256(abi.encodePacked("USDT"))) {
+            mockUSDT = new MOCKUSDT();
+            return address(mockUSDT);
+        } else if (keccak256(abi.encodePacked(_name)) == keccak256(abi.encodePacked("WNative"))) {
+            mockWKAIA = new MOCKWKAIA();
+            return address(mockWKAIA);
+        }
+        revert("Invalid token name");
+    }
+
+    function _deployMockDex() internal returns (address) {
+        mockDex = new MockDex(address(proxy));
+        return address(mockDex);
     }
 
     function _deployOFT() internal {
         elevatedminterburner = new ElevatedMinterBurner(USDT, owner);
-        oftusdtadapter = new OFTUSDTadapter(USDT, address(elevatedminterburner), KAIA_LZ_ENDPOINT, owner);
+        oftusdtadapter = new OFTUSDTadapter(USDT, address(elevatedminterburner), endpoint, owner);
         kaia_oftusdt_adapter = address(oftusdtadapter);
         oapp = address(oftusdtadapter);
 
         elevatedminterburner = new ElevatedMinterBurner(WNative, owner);
-        oftkaiaadapter = new OFTKAIAadapter(WNative, address(elevatedminterburner), KAIA_LZ_ENDPOINT, owner);
+        oftkaiaadapter = new OFTKAIAadapter(WNative, address(elevatedminterburner), endpoint, owner);
         kaia_oftkaia_adapter = address(oftkaiaadapter);
         oapp2 = address(oftkaiaadapter);
 
         elevatedminterburner = new ElevatedMinterBurner(WNative, owner);
-        oftkaiaadapter = new OFTKAIAadapter(WNative, address(elevatedminterburner), KAIA_LZ_ENDPOINT, owner);
+        oftkaiaadapter = new OFTKAIAadapter(WNative, address(elevatedminterburner), endpoint, owner);
         kaia_oftkaia_ori_adapter = address(oftkaiaadapter);
         oapp3 = address(oftkaiaadapter);
     }
 
     function _setLibraries() internal {
-        _getUtils();
-        ILayerZeroEndpointV2(endpoint).setSendLibrary(oapp, dstEid0, sendLib);
-        ILayerZeroEndpointV2(endpoint).setSendLibrary(oapp, dstEid1, sendLib);
+        ILayerZeroEndpointV2(endpoint).setSendLibrary(oapp, eid0, sendLib);
+        ILayerZeroEndpointV2(endpoint).setSendLibrary(oapp, eid1, sendLib);
         ILayerZeroEndpointV2(endpoint).setReceiveLibrary(oapp, srcEid, receiveLib, gracePeriod);
 
-        ILayerZeroEndpointV2(endpoint).setSendLibrary(oapp2, dstEid0, sendLib);
-        ILayerZeroEndpointV2(endpoint).setSendLibrary(oapp2, dstEid1, sendLib);
+        ILayerZeroEndpointV2(endpoint).setSendLibrary(oapp2, eid0, sendLib);
+        ILayerZeroEndpointV2(endpoint).setSendLibrary(oapp2, eid1, sendLib);
         ILayerZeroEndpointV2(endpoint).setReceiveLibrary(oapp2, srcEid, receiveLib, gracePeriod);
 
-        ILayerZeroEndpointV2(endpoint).setSendLibrary(oapp3, dstEid0, sendLib);
-        ILayerZeroEndpointV2(endpoint).setSendLibrary(oapp3, dstEid1, sendLib);
+        ILayerZeroEndpointV2(endpoint).setSendLibrary(oapp3, eid0, sendLib);
+        ILayerZeroEndpointV2(endpoint).setSendLibrary(oapp3, eid1, sendLib);
         ILayerZeroEndpointV2(endpoint).setReceiveLibrary(oapp3, srcEid, receiveLib, gracePeriod);
     }
 
     function _setSendConfig() internal {
-        _getUtils();
         UlnConfig memory uln = UlnConfig({
             confirmations: 15,
             requiredDVNCount: 2,
@@ -215,9 +235,6 @@ contract SenjaTest is Test, Helper {
     }
 
     function _setReceiveConfig() internal {
-        uint32 RECEIVE_CONFIG_TYPE = 2;
-        _getUtils();
-
         UlnConfig memory uln = UlnConfig({
             confirmations: 15,
             requiredDVNCount: 2,
@@ -256,8 +273,8 @@ contract SenjaTest is Test, Helper {
         bytes memory options2 = OptionsBuilder.newOptions().addExecutorLzReceiveOption(100000, 0);
 
         EnforcedOptionParam[] memory enforcedOptions = new EnforcedOptionParam[](2);
-        enforcedOptions[0] = EnforcedOptionParam({eid: dstEid0, msgType: SEND, options: options1});
-        enforcedOptions[1] = EnforcedOptionParam({eid: dstEid1, msgType: SEND, options: options2});
+        enforcedOptions[0] = EnforcedOptionParam({eid: eid0, msgType: SEND, options: options1});
+        enforcedOptions[1] = EnforcedOptionParam({eid: eid1, msgType: SEND, options: options2});
 
         MyOApp(oapp).setEnforcedOptions(enforcedOptions);
         MyOApp(oapp2).setEnforcedOptions(enforcedOptions);
@@ -269,8 +286,6 @@ contract SenjaTest is Test, Helper {
         usdt_usd_adapter = address(oracle);
         oracle = new Oracle(kaia_usdt);
         kaia_usdt_adapter = address(oracle);
-        oracle = new Oracle(hype_usdt);
-        hype_usdt_adapter = address(oracle);
         oracle = new Oracle(eth_usdt);
         eth_usdt_adapter = address(oracle);
         oracle = new Oracle(btc_usdt);
@@ -302,6 +317,16 @@ contract SenjaTest is Test, Helper {
         IFactory(address(proxy)).addTokenDataStream(USDT, usdt_usd_adapter);
         IFactory(address(proxy)).addTokenDataStream(WNative, kaia_usdt_adapter);
         IFactory(address(proxy)).addTokenDataStream(Native, kaia_usdt_adapter);
+
+        IFactory(address(proxy)).setWrappedNative(WNative);
+
+        // Deploy MockDex for testnet
+        if (block.chainid == 1001) {
+            _deployMockDex();
+            IFactory(address(proxy)).setDexRouter(address(mockDex));
+        } else {
+            IFactory(address(proxy)).setDexRouter(DEX_ROUTER);
+        }
     }
 
     function _setOFTAddress() internal {
@@ -336,27 +361,18 @@ contract SenjaTest is Test, Helper {
         console.log("kaia_usdt price", price);
         console.log("kaia_usdt decimals", decimals);
 
-        (, int256 price2,) = IOrakl(hype_usdt).latestRoundData();
-        uint8 decimals2 = IOrakl(hype_usdt).decimals();
-        console.log("hype_usdt price", price2);
-        console.log("hype_usdt decimals", decimals2);
-
         (, uint256 price3,,,) = IOracle(kaia_usdt_adapter).latestRoundData();
         console.log("kaia_usdt_adapter price", price3);
         uint8 decimals3 = IOracle(kaia_usdt_adapter).decimals();
         console.log("kaia_usdt_adapter decimals", decimals3);
-        (, uint256 price4,,,) = IOracle(hype_usdt_adapter).latestRoundData();
-        console.log("hype_usdt_adapter price", price4);
-        uint8 decimals4 = IOracle(hype_usdt_adapter).decimals();
-        console.log("hype_usdt_adapter decimals", decimals4);
-        (, uint256 price5,,,) = IOracle(eth_usdt_adapter).latestRoundData();
-        console.log("eth_usdt_adapter price", price5);
-        uint8 decimals5 = IOracle(eth_usdt_adapter).decimals();
-        console.log("eth_usdt_adapter decimals", decimals5);
-        (, uint256 price6,,,) = IOracle(btc_usdt_adapter).latestRoundData();
-        console.log("btc_usdt_adapter price", price6);
-        uint8 decimals6 = IOracle(btc_usdt_adapter).decimals();
-        console.log("btc_usdt_adapter decimals", decimals6);
+        (, uint256 price4,,,) = IOracle(eth_usdt_adapter).latestRoundData();
+        console.log("eth_usdt_adapter price", price4);
+        uint8 decimals4 = IOracle(eth_usdt_adapter).decimals();
+        console.log("eth_usdt_adapter decimals", decimals4);
+        (, uint256 price5,,,) = IOracle(btc_usdt_adapter).latestRoundData();
+        console.log("btc_usdt_adapter price", price5);
+        uint8 decimals5 = IOracle(btc_usdt_adapter).decimals();
+        console.log("btc_usdt_adapter decimals", decimals5);
     }
 
     // RUN
@@ -439,12 +455,12 @@ contract SenjaTest is Test, Helper {
         test_supply_collateral();
 
         vm.startPrank(alice);
-        ILendingPool(lendingPool).borrowDebt(10e6, block.chainid, KAIA_EID, 65000);
-        ILendingPool(lendingPool2).borrowDebt(5 ether, block.chainid, KAIA_EID, 65000);
-        ILendingPool(lendingPool3).borrowDebt(10e6, block.chainid, KAIA_EID, 65000);
-        ILendingPool(lendingPool).borrowDebt(10e6, block.chainid, KAIA_EID, 65000);
-        ILendingPool(lendingPool2).borrowDebt(5 ether, block.chainid, KAIA_EID, 65000);
-        ILendingPool(lendingPool3).borrowDebt(10e6, block.chainid, KAIA_EID, 65000);
+        ILendingPool(lendingPool).borrowDebt(10e6, block.chainid, eid0, 65000);
+        ILendingPool(lendingPool2).borrowDebt(5 ether, block.chainid, eid0, 65000);
+        ILendingPool(lendingPool3).borrowDebt(10e6, block.chainid, eid0, 65000);
+        ILendingPool(lendingPool).borrowDebt(10e6, block.chainid, eid0, 65000);
+        ILendingPool(lendingPool2).borrowDebt(5 ether, block.chainid, eid0, 65000);
+        ILendingPool(lendingPool3).borrowDebt(10e6, block.chainid, eid0, 65000);
         vm.stopPrank();
 
         assertEq(ILPRouter(_router(lendingPool)).userBorrowShares(alice), 2 * 10e6);
@@ -492,46 +508,48 @@ contract SenjaTest is Test, Helper {
     }
 
     // RUN
-    // forge test --match-test test_borrow_crosschain -vvv
+    // forge test --match-test test_borrow_crosschain -vvv --match-contract SenjaTest
     function test_borrow_crosschain() public {
-        test_supply_liquidity();
-        test_supply_collateral();
+        if (block.chainid != 1001) {
+            test_supply_liquidity();
+            test_supply_collateral();
 
-        // Provide enough ETH for LayerZero cross-chain fees
-        vm.deal(alice, 10 ether);
+            // Provide enough ETH for LayerZero cross-chain fees
+            vm.deal(alice, 10 ether);
 
-        vm.startPrank(alice);
+            vm.startPrank(alice);
 
-        uint256 fee = helperUtils.getFee(kaia_oftusdt_adapter, BASE_EID, alice, 10e6);
-        ILendingPool(lendingPool).borrowDebt{value: fee}(10e6, 8453, BASE_EID, 65000);
-        fee = helperUtils.getFee(kaia_oftusdt_adapter, BASE_EID, alice, 10e6);
-        ILendingPool(lendingPool).borrowDebt{value: fee}(10e6, 8453, BASE_EID, 65000);
+            uint256 fee = helperUtils.getFee(kaia_oftusdt_adapter, BASE_EID, alice, 10e6);
+            ILendingPool(lendingPool).borrowDebt{value: fee}(10e6, 8453, BASE_EID, 65000);
+            fee = helperUtils.getFee(kaia_oftusdt_adapter, BASE_EID, alice, 10e6);
+            ILendingPool(lendingPool).borrowDebt{value: fee}(10e6, 8453, BASE_EID, 65000);
 
-        fee = helperUtils.getFee(kaia_oftkaia_adapter, BASE_EID, alice, 15 ether);
-        ILendingPool(lendingPool2).borrowDebt{value: fee}(15 ether, 8453, BASE_EID, 65000);
-        fee = helperUtils.getFee(kaia_oftkaia_adapter, BASE_EID, alice, 15 ether);
-        ILendingPool(lendingPool2).borrowDebt{value: fee}(15 ether, 8453, BASE_EID, 65000);
+            fee = helperUtils.getFee(kaia_oftkaia_adapter, BASE_EID, alice, 15 ether);
+            ILendingPool(lendingPool2).borrowDebt{value: fee}(15 ether, 8453, BASE_EID, 65000);
+            fee = helperUtils.getFee(kaia_oftkaia_adapter, BASE_EID, alice, 15 ether);
+            ILendingPool(lendingPool2).borrowDebt{value: fee}(15 ether, 8453, BASE_EID, 65000);
 
-        fee = helperUtils.getFee(kaia_oftusdt_adapter, BASE_EID, alice, 10e6);
-        ILendingPool(lendingPool3).borrowDebt{value: fee}(10e6, 8453, BASE_EID, 65000);
-        fee = helperUtils.getFee(kaia_oftusdt_adapter, BASE_EID, alice, 10e6);
-        ILendingPool(lendingPool3).borrowDebt{value: fee}(10e6, 8453, BASE_EID, 65000);
+            fee = helperUtils.getFee(kaia_oftusdt_adapter, BASE_EID, alice, 10e6);
+            ILendingPool(lendingPool3).borrowDebt{value: fee}(10e6, 8453, BASE_EID, 65000);
+            fee = helperUtils.getFee(kaia_oftusdt_adapter, BASE_EID, alice, 10e6);
+            ILendingPool(lendingPool3).borrowDebt{value: fee}(10e6, 8453, BASE_EID, 65000);
 
-        vm.stopPrank();
+            vm.stopPrank();
 
-        assertEq(ILPRouter(_router(lendingPool)).userBorrowShares(alice), 2 * 10e6);
-        assertEq(ILPRouter(_router(lendingPool)).totalBorrowAssets(), 2 * 10e6);
-        assertEq(ILPRouter(_router(lendingPool)).totalBorrowShares(), 2 * 10e6);
-        assertEq(ILPRouter(_router(lendingPool2)).userBorrowShares(alice), 2 * 15 ether);
-        assertEq(ILPRouter(_router(lendingPool2)).totalBorrowAssets(), 2 * 15 ether);
-        assertEq(ILPRouter(_router(lendingPool2)).totalBorrowShares(), 2 * 15 ether);
-        assertEq(ILPRouter(_router(lendingPool3)).userBorrowShares(alice), 2 * 10e6);
-        assertEq(ILPRouter(_router(lendingPool3)).totalBorrowAssets(), 2 * 10e6);
-        assertEq(ILPRouter(_router(lendingPool3)).totalBorrowShares(), 2 * 10e6);
+            assertEq(ILPRouter(_router(lendingPool)).userBorrowShares(alice), 2 * 10e6);
+            assertEq(ILPRouter(_router(lendingPool)).totalBorrowAssets(), 2 * 10e6);
+            assertEq(ILPRouter(_router(lendingPool)).totalBorrowShares(), 2 * 10e6);
+            assertEq(ILPRouter(_router(lendingPool2)).userBorrowShares(alice), 2 * 15 ether);
+            assertEq(ILPRouter(_router(lendingPool2)).totalBorrowAssets(), 2 * 15 ether);
+            assertEq(ILPRouter(_router(lendingPool2)).totalBorrowShares(), 2 * 15 ether);
+            assertEq(ILPRouter(_router(lendingPool3)).userBorrowShares(alice), 2 * 10e6);
+            assertEq(ILPRouter(_router(lendingPool3)).totalBorrowAssets(), 2 * 10e6);
+            assertEq(ILPRouter(_router(lendingPool3)).totalBorrowShares(), 2 * 10e6);
+        }
     }
 
     // RUN
-    // forge test --match-test test_swap_collateral -vvv
+    // forge test --match-test test_swap_collateral -vvv --match-contract SenjaTest
     function test_swap_collateral() public {
         test_supply_collateral();
         vm.startPrank(alice);

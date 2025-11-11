@@ -54,9 +54,6 @@ contract Position is ReentrancyGuard {
     address public lpAddress;
     uint256 public counter;
 
-    // DEX router address
-    address public constant DEX_ROUTER = 0xA324880f884036E3d21a09B90269E1aC57c7EC8a;
-
     // Track if we're in a withdrawal operation to avoid auto-wrapping
     bool private _withdrawing;
 
@@ -373,7 +370,7 @@ contract Position is ReentrancyGuard {
         uint256 amountOutMinimum = expectedAmount * (10000 - slippageTolerance) / 10000;
 
         // Approve DEX router to spend tokens
-        IERC20(_tokenIn).approve(DEX_ROUTER, amountIn);
+        IERC20(_tokenIn).approve(_DEX_ROUTER(), amountIn);
 
         // Prepare swap parameters
         IDexRouter.ExactInputSingleParams memory params = IDexRouter.ExactInputSingleParams({
@@ -388,7 +385,7 @@ contract Position is ReentrancyGuard {
         });
 
         // Perform the swap
-        amountOut = IDexRouter(DEX_ROUTER).exactInputSingle(params);
+        amountOut = IDexRouter(_DEX_ROUTER()).exactInputSingle(params);
     }
 
     /**
@@ -480,5 +477,9 @@ contract Position is ReentrancyGuard {
         } else {
             decimals = IERC20Metadata(_token).decimals();
         }
+    }
+
+    function _DEX_ROUTER() internal view returns (address) {
+        return IFactory(_factory()).DEX_ROUTER();
     }
 }
