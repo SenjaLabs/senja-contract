@@ -68,11 +68,8 @@ contract SenjaExtendedTest is Test, Helper {
     // Using WKAIA instead of native token address(1) for better DeFi composability
 
     // ORAKL
-    // address public usdt_usd = 0xa7C4c292Ed720b1318F415B106a443Dc1f052994;
-    // address public kaia_usdt = 0x9254CD72f207cc231A2307Eac5e4BFa316eb0c2e;
+    // Using kaia_usdt (native_usdt) from Helper
     address public hype_usdt = 0x79e87F197FdAd9d26B5DbadB5789E8f353C421B3;
-    // address public eth_usdt = 0xbF61f1F8D45EcB33006a335E7c76f306689dcAab;
-    // address public btc_usdt = 0x624c060ea3fe93321e40530F3f7E587545D594aA;
 
     address public usdt_usd_adapter;
     address public kaia_usdt_adapter;
@@ -266,7 +263,7 @@ contract SenjaExtendedTest is Test, Helper {
     function _deployOracleAdapter() internal {
         oracle = new Oracle(usdt_usd);
         usdt_usd_adapter = address(oracle);
-        oracle = new Oracle(kaia_usdt);
+        oracle = new Oracle(native_usdt);
         kaia_usdt_adapter = address(oracle);
         oracle = new Oracle(hype_usdt);
         hype_usdt_adapter = address(oracle);
@@ -328,10 +325,10 @@ contract SenjaExtendedTest is Test, Helper {
     // RUN
     // forge test --match-test test_checkorakl -vvv
     function test_checkorakl() public view {
-        (, int256 price,) = IOrakl(kaia_usdt).latestRoundData();
-        uint8 decimals = IOrakl(kaia_usdt).decimals();
-        console.log("kaia_usdt price", price);
-        console.log("kaia_usdt decimals", decimals);
+        (, int256 price,) = IOrakl(native_usdt).latestRoundData();
+        uint8 decimals = IOrakl(native_usdt).decimals();
+        console.log("native_usdt price", price);
+        console.log("native_usdt decimals", decimals);
 
         (, int256 price2,) = IOrakl(hype_usdt).latestRoundData();
         uint8 decimals2 = IOrakl(hype_usdt).decimals();

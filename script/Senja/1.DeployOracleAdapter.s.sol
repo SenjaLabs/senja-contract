@@ -14,8 +14,8 @@ contract DeployOracleAdapter is Script, Helper {
         vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
         oracle = new Oracle(usdt_usd);
         console.log("address public usdt_usd_adapter =", address(oracle), ";");
-        oracle = new Oracle(kaia_usdt);
-        console.log("address public kaia_usdt_adapter =", address(oracle), ";");
+        oracle = new Oracle(native_usdt);
+        console.log("address public native_usdt_adapter =", address(oracle), ";");
         oracle = new Oracle(eth_usdt);
         console.log("address public eth_usdt_adapter =", address(oracle), ";");
         oracle = new Oracle(btc_usdt);
