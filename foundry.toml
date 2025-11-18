@@ -2,18 +2,7 @@
 src = "src"
 out = "out"
 libs = ["lib"]
-remappings = [
-    '@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/',
-    '@openzeppelin/contracts-upgradeable/=node_modules/@openzeppelin/contracts-upgradeable/',
-    '@layerzerolabs/lz-evm-messagelib-v2/=lib/layerzero-v2/packages/layerzero-v2/evm/messagelib',
-    '@layerzerolabs/lz-evm-protocol-v2/=lib/layerzero-v2/packages/layerzero-v2/evm/protocol',
-    '@layerzero-v2/=lib/LayerZero-v2/packages/layerzero-v2/',
-    '@layerzerolabs/oft-evm/=lib/devtools/packages/oft-evm/',
-    '@layerzerolabs/oapp-evm/=lib/devtools/packages/oapp-evm/',
-    '@layerzero-devtools/=lib/devtools/packages/',
-    'solidity-bytes-utils/=lib/solidity-bytes-utils/',
-    'forge-std/=lib/forge-std/src/',
-]
+remappings = []
 
 [rpc_endpoints]
 kaia_testnet = "${KAIA_TESTNET_RPC}"
