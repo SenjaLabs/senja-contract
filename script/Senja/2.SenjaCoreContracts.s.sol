@@ -12,6 +12,7 @@ import {LendingPoolFactory} from "../../src/LendingPoolFactory.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {IFactory} from "../../src/interfaces/IFactory.sol";
 import {LendingPoolRouterDeployer} from "../../src/LendingPoolRouterDeployer.sol";
+import {MockDex} from "../../src/MockDex/MockDex.sol";
 
 contract SenjaCoreContracts is Script, Helper {
     Liquidator public liquidator;
@@ -22,6 +23,7 @@ contract SenjaCoreContracts is Script, Helper {
     PositionDeployer public positionDeployer;
     LendingPoolFactory public lendingPoolFactory;
     ERC1967Proxy public proxy;
+    MockDex public mockDex;
 
     address USDT;
     address USDT_STARGATE;
@@ -31,12 +33,24 @@ contract SenjaCoreContracts is Script, Helper {
     address WBTC;
 
     address USDT_USD_ADAPTER;
-    address KAIA_USDT_ADAPTER;
+    address NATIVE_USDT_ADAPTER;
     address ETH_USDT_ADAPTER;
     address BTC_USDT_ADAPTER;
 
+    address OFT_USDT_STARGATE;
+    address OFT_USDT;
+    address OFT_NATIVE;
+    address OFT_WNATIVE;
+    address OFT_WETH;
+    address OFT_WBTC;
+
+    address factory;
+
+    string chainName;
+
     function _getUtils() internal {
-        if(block.chainid == 8217) {
+        if (block.chainid == 8217) {
+            chainName = "KAIA";
             USDT = KAIA_USDT;
             USDT_STARGATE = KAIA_USDT_STARGATE;
             WKAIA = KAIA_WKAIA;
@@ -44,11 +58,18 @@ contract SenjaCoreContracts is Script, Helper {
             WETH = KAIA_WETH;
             WBTC = KAIA_WBTC;
             USDT_USD_ADAPTER = KAIA_usdt_usd_adapter;
-            KAIA_USDT_ADAPTER = KAIA_kaia_usdt_adapter;
+            NATIVE_USDT_ADAPTER = KAIA_kaia_usdt_adapter;
             ETH_USDT_ADAPTER = KAIA_eth_usdt_adapter;
             BTC_USDT_ADAPTER = KAIA_btc_usdt_adapter;
+            OFT_USDT = KAIA_OFT_MOCK_USDT_ADAPTER;
+            OFT_NATIVE = KAIA_OFT_MOCK_WKAIA_ADAPTER;
+            OFT_WNATIVE = KAIA_OFT_MOCK_WKAIA_ADAPTER;
+            OFT_WETH;
+            OFT_WBTC;
+            factory = KAIA_lendingPoolFactoryProxy;
         }
     }
+
     function run() public {
         vm.createSelectFork(vm.rpcUrl("kaia_mainnet"));
         _getUtils();
@@ -69,26 +90,91 @@ contract SenjaCoreContracts is Script, Helper {
             address(protocol),
             address(positionDeployer)
         );
+
         proxy = new ERC1967Proxy(address(lendingPoolFactory), data);
+        factory = address(proxy);
 
-        lendingPoolDeployer.setFactory(address(proxy));
-        lendingPoolRouterDeployer.setFactory(address(proxy));
+        lendingPoolDeployer.setFactory(factory);
 
-        IFactory(address(proxy)).addTokenDataStream(USDT, USDT_USD_ADAPTER);
-        IFactory(address(proxy)).addTokenDataStream(USDT_STARGATE, USDT_USD_ADAPTER);
-        IFactory(address(proxy)).addTokenDataStream(WKAIA, KAIA_USDT_ADAPTER);
-        IFactory(address(proxy)).addTokenDataStream(KAIA, KAIA_USDT_ADAPTER);
-        IFactory(address(proxy)).addTokenDataStream(WETH, ETH_USDT_ADAPTER);
-        IFactory(address(proxy)).addTokenDataStream(WBTC, BTC_USDT_ADAPTER);
+        lendingPoolRouterDeployer.setFactory(factory);
+
+        _addTokenDataStream();
+        _deployMockDex();
+        _setDexRouter();
+        _setOftAddress();
         vm.stopBroadcast();
 
-        console.log("address public liquidator =", address(liquidator), ";");
-        console.log("address public isHealthy =", address(isHealthy), ";");
-        console.log("address public lendingPoolDeployer =", address(lendingPoolDeployer), ";");
-        console.log("address public protocol =", address(protocol), ";");
-        console.log("address public positionDeployer =", address(positionDeployer), ";");
-        console.log("address public lendingPoolFactoryImplementation =", address(lendingPoolFactory), ";");
-        console.log("address public lendingPoolFactoryProxy =", address(proxy), ";");
+        console.log("address public %s_liquidator = %s;", chainName, address(liquidator));
+        console.log("address public %s_isHealthy = %s;", chainName, address(isHealthy));
+        console.log("address public %s_lendingPoolDeployer = %s;", chainName, address(lendingPoolDeployer));
+        console.log("address public %s_protocol = %s;", chainName, address(protocol));
+        console.log("address public %s_positionDeployer = %s;", chainName, address(positionDeployer));
+        console.log("address public %s_lendingPoolFactoryImplementation = %s;", chainName, address(lendingPoolFactory));
+        console.log("address public %s_lendingPoolFactoryProxy = %s;", chainName, address(proxy));
+    }
+
+    function _addTokenDataStream() internal {
+        if (USDT_USD_ADAPTER != address(0)) {
+            IFactory(factory).addTokenDataStream(USDT, USDT_USD_ADAPTER);
+            console.log("Token data stream of USDT set to %s", USDT_USD_ADAPTER);
+        }
+        if (USDT_USD_ADAPTER != address(0)) {
+            IFactory(factory).addTokenDataStream(USDT_STARGATE, USDT_USD_ADAPTER);
+            console.log("Token data stream of USDT_STARGATE set to %s", USDT_USD_ADAPTER);
+        }
+        if (NATIVE_USDT_ADAPTER != address(0)) {
+            IFactory(factory).addTokenDataStream(WKAIA, NATIVE_USDT_ADAPTER);
+            console.log("Token data stream of WKAIA set to %s", NATIVE_USDT_ADAPTER);
+        }
+        if (NATIVE_USDT_ADAPTER != address(0)) {
+            IFactory(factory).addTokenDataStream(KAIA, NATIVE_USDT_ADAPTER);
+            console.log("Token data stream of KAIA set to %s", NATIVE_USDT_ADAPTER);
+        }
+        if (ETH_USDT_ADAPTER != address(0)) {
+            IFactory(factory).addTokenDataStream(WETH, ETH_USDT_ADAPTER);
+            console.log("Token data stream of WETH set to %s", ETH_USDT_ADAPTER);
+        }
+        if (BTC_USDT_ADAPTER != address(0)) {
+            IFactory(factory).addTokenDataStream(WBTC, BTC_USDT_ADAPTER);
+            console.log("Token data stream of WBTC set to %s", BTC_USDT_ADAPTER);
+        }
+    }
+
+    function _deployMockDex() internal {
+        mockDex = new MockDex(factory);
+        console.log("address public %s_mockDex = %s;", chainName, address(mockDex));
+    }
+
+    function _setDexRouter() internal {
+        IFactory(factory).setDexRouter(address(mockDex));
+        console.log("Dex router set to %s", address(mockDex));
+    }
+
+    function _setOftAddress() internal {
+        if (OFT_USDT != address(0)) {
+            IFactory(factory).setOftAddress(USDT, OFT_USDT);
+            console.log("OFT address of USDT set to %s", OFT_USDT);
+        }
+        if (OFT_USDT_STARGATE != address(0)) {
+            IFactory(factory).setOftAddress(USDT_STARGATE, OFT_USDT_STARGATE);
+            console.log("OFT address of USDT_STARGATE set to %s", OFT_USDT_STARGATE);
+        }
+        if (OFT_WNATIVE != address(0)) {
+            IFactory(factory).setOftAddress(WKAIA, OFT_WNATIVE);
+            console.log("OFT address of WKAIA set to %s", OFT_WNATIVE);
+        }
+        if (OFT_NATIVE != address(0)) {
+            IFactory(factory).setOftAddress(KAIA, OFT_NATIVE);
+            console.log("OFT address of KAIA set to %s", OFT_NATIVE);
+        }
+        if (OFT_WETH != address(0)) {
+            IFactory(factory).setOftAddress(WETH, OFT_WETH);
+            console.log("OFT address of WETH set to %s", OFT_WETH);
+        }
+        if (OFT_WBTC != address(0)) {
+            IFactory(factory).setOftAddress(WBTC, OFT_WBTC);
+            console.log("OFT address of WBTC set to %s", OFT_WBTC);
+        }
     }
 }
 

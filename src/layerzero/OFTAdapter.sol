@@ -9,19 +9,29 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 contract OFTadapter is OFTAdapter, ReentrancyGuard {
-    error InsufficientBalance();
+    using SafeERC20 for IERC20;
 
     address public tokenOFT;
     address public elevatedMinterBurner;
 
-    using SafeERC20 for IERC20;
+    uint8 public immutable _SHAREDDECIMALS;
 
-    constructor(address _token, address _elevatedMinterBurner, address _lzEndpoint, address _owner)
+    error InsufficientBalance();
+
+    event Credit(address to, uint256 amount);
+    event Debit(address from, uint256 amount);
+
+    constructor(address _token, address _elevatedMinterBurner, address _lzEndpoint, address _owner, uint8 _sharedDecimals)
         OFTAdapter(_token, _lzEndpoint, _owner)
         Ownable(_owner)
     {
         tokenOFT = _token;
         elevatedMinterBurner = _elevatedMinterBurner;
+        _SHAREDDECIMALS = _sharedDecimals;
+    }
+
+    function sharedDecimals() public view override returns (uint8) {
+        return _SHAREDDECIMALS;
     }
 
     function _credit(address _to, uint256 _amountLD, uint32)
@@ -37,6 +47,7 @@ contract OFTadapter is OFTAdapter, ReentrancyGuard {
         } else {
             IElevatedMintableBurnable(elevatedMinterBurner).mint(_to, _amountLD);
         }
+        emit Credit(_to, _amountLD);
         return _amountLD;
     }
 
@@ -50,7 +61,14 @@ contract OFTadapter is OFTAdapter, ReentrancyGuard {
         if (block.chainid == 8217) {
             IERC20(tokenOFT).safeTransferFrom(_from, address(this), amountSentLD);
         } else {
+            IERC20(tokenOFT).safeTransferFrom(_from, address(this), amountSentLD);
+            IERC20(tokenOFT).approve(elevatedMinterBurner, amountSentLD);
             IElevatedMintableBurnable(elevatedMinterBurner).burn(_from, amountSentLD);
         }
+        emit Debit(_from, _amountLD);
+    }
+
+    function setElevatedMinterBurner(address _elevatedMinterBurner) external onlyOwner {
+        elevatedMinterBurner = _elevatedMinterBurner;
     }
 }

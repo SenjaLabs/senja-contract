@@ -32,7 +32,7 @@ import {LendingPoolRouterDeployer} from "../src/LendingPoolRouterDeployer.sol";
 import {MOCKUSDT} from "../src/MockToken/MOCKUSDT.sol";
 import {MOCKWKAIA} from "../src/MockToken/MOCKWKAIA.sol";
 import {MOCKWETH} from "../src/MockToken/MOCKWETH.sol";
-import {MockDex} from "../src/MockDex.sol/MockDex.sol";
+import {MockDex} from "../src/MockDex/MockDex.sol";
 
 interface IOrakl {
     function latestRoundData() external view returns (uint80, int256, uint256);
@@ -104,10 +104,18 @@ contract SenjaTest is Test, Helper {
     uint32 constant ULN_CONFIG_TYPE = 2;
     uint32 constant RECEIVE_CONFIG_TYPE = 2;
 
+    uint256 supplyLiquidity;
+    uint256 withdrawLiquidity;
+    uint256 supplyCollateral;
+    uint256 withdrawCollateral;
+    uint256 borrowAmount;
+    uint256 repayDebt;
+
     function setUp() public {
-        // vm.createSelectFork(vm.rpcUrl("kaia_mainnet"));
-        vm.createSelectFork(vm.rpcUrl("base_mainnet"));
+        vm.createSelectFork(vm.rpcUrl("kaia_mainnet"));
+        // vm.createSelectFork(vm.rpcUrl("base_mainnet"));
         // vm.createSelectFork(vm.rpcUrl("kaia_testnet"));
+        // vm.createSelectFork(vm.rpcUrl("moonbeam_mainnet"));
         vm.startPrank(owner);
         _getUtils();
         // *************** layerzero ***************
@@ -147,8 +155,8 @@ contract SenjaTest is Test, Helper {
             eid0 = BASE_EID;
             eid1 = KAIA_EID;
             USDT = BASE_MOCK_USDT;
-            WNative = _deployMockToken("WNative");
-            DEX_ROUTER = _deployMockDex();
+            WNative = _deployMockToken("WETH");
+            DEX_ROUTER;
         } else if (block.chainid == 8217) {
             endpoint = KAIA_LZ_ENDPOINT;
             sendLib = KAIA_SEND_LIB;
@@ -163,7 +171,23 @@ contract SenjaTest is Test, Helper {
             USDT = KAIA_USDT;
             WNative = KAIA_WKAIA;
             DEX_ROUTER = KAIA_DEX_ROUTER;
-        } else if (block.chainid == 1001) {
+        } else if (block.chainid == 1284) {
+            endpoint = GLMR_LZ_ENDPOINT;
+            sendLib = GLMR_SEND_LIB;
+            receiveLib = GLMR_RECEIVE_LIB;
+            srcEid = GLMR_EID;
+            gracePeriod = uint32(0);
+            dvn1 = GLMR_DVN1;
+            dvn2 = GLMR_DVN2;
+            executor = GLMR_EXECUTOR;
+            eid0 = GLMR_EID;
+            eid1 = BASE_EID;
+            USDT = _deployMockToken("USDT");
+            WNative = _deployMockToken("WNative");
+            DEX_ROUTER;
+        }
+        // TESTNET
+        else if (block.chainid == 1001) {
             USDT = _deployMockToken("USDT");
             WNative = _deployMockToken("WNative");
             DEX_ROUTER = KAIA_DEX_ROUTER;
@@ -194,16 +218,19 @@ contract SenjaTest is Test, Helper {
         oftusdtadapter = new OFTUSDTadapter(USDT, address(elevatedminterburner), endpoint, owner);
         oft_usdt_adapter = address(oftusdtadapter);
         oapp = address(oftusdtadapter);
+        elevatedminterburner.setOperator(oapp, true);
 
         elevatedminterburner = new ElevatedMinterBurner(WNative, owner);
         oftkaiaadapter = new OFTKAIAadapter(WNative, address(elevatedminterburner), endpoint, owner);
         oft_native_adapter = address(oftkaiaadapter);
         oapp2 = address(oftkaiaadapter);
+        elevatedminterburner.setOperator(oapp2, true);
 
         elevatedminterburner = new ElevatedMinterBurner(WNative, owner);
         oftkaiaadapter = new OFTKAIAadapter(WNative, address(elevatedminterburner), endpoint, owner);
         oft_native_ori_adapter = address(oftkaiaadapter);
         oapp3 = address(oftkaiaadapter);
+        elevatedminterburner.setOperator(oapp3, true);
     }
 
     function _setLibraries() internal {
@@ -330,11 +357,12 @@ contract SenjaTest is Test, Helper {
 
         IFactory(address(proxy)).setWrappedNative(WNative);
 
-        // Deploy MockDex for testnet
-        if (block.chainid == 1001 || block.chainid == 8453) {
+        // Deploy MockDex for testnet, Base, and Moonbeam
+        if (block.chainid == 1001 || block.chainid == 8453 || block.chainid == 1284) {
             _deployMockDex();
             IFactory(address(proxy)).setDexRouter(address(mockDex));
         } else if (block.chainid == 8217) {
+            // KAIA mainnet uses real DEX router
             IFactory(address(proxy)).setDexRouter(DEX_ROUTER);
         } else {
             revert("Dex Unconfigured");
@@ -604,12 +632,12 @@ contract SenjaTest is Test, Helper {
 
         // Step 3: Borrow debt
         vm.startPrank(alice);
-        ILendingPool(lendingPool).borrowDebt(50e6, block.chainid, eid0, 65000);
+        ILendingPool(lendingPool).borrowDebt(10e6, block.chainid, eid0, 65000);
         vm.stopPrank();
 
         // Verify initial state
-        assertEq(ILPRouter(_router(lendingPool)).userBorrowShares(alice), 50e6);
-        assertEq(ILPRouter(_router(lendingPool)).totalBorrowAssets(), 50e6);
+        assertEq(ILPRouter(_router(lendingPool)).userBorrowShares(alice), 10e6);
+        assertEq(ILPRouter(_router(lendingPool)).totalBorrowAssets(), 10e6);
 
         // Get position address
         address position = _addressPosition(lendingPool, alice);

@@ -5,15 +5,19 @@ contract Helper {
     // ***** MAINNET *****
     address public BASE_LZ_ENDPOINT = 0x1a44076050125825900e736c501f859c50fE728c;
     address public KAIA_LZ_ENDPOINT = 0x1a44076050125825900e736c501f859c50fE728c;
+    address public GLMR_LZ_ENDPOINT = 0x1a44076050125825900e736c501f859c50fE728c;
 
     address public BASE_SEND_LIB = 0xB5320B0B3a13cC860893E2Bd79FCd7e13484Dda2;
     address public KAIA_SEND_LIB = 0x9714Ccf1dedeF14BaB5013625DB92746C1358cb4;
+    address public GLMR_SEND_LIB = 0xeac136456d078bB76f59DCcb2d5E008b31AfE1cF;
 
     address public BASE_RECEIVE_LIB = 0xc70AB6f32772f59fBfc23889Caf4Ba3376C84bAf;
     address public KAIA_RECEIVE_LIB = 0x937AbA873827BF883CeD83CA557697427eAA46Ee;
+    address public GLMR_RECEIVE_LIB = 0x2F4C6eeA955e95e6d65E08620D980C0e0e92211F;
 
     uint32 public BASE_EID = 30184;
     uint32 public KAIA_EID = 30150;
+    uint32 public GLMR_EID = 30126;
 
     address public BASE_DVN1 = 0x554833698Ae0FB22ECC90B01222903fD62CA4B47; // Canary
     address public BASE_DVN2 = 0xa7b5189bcA84Cd304D8553977c7C614329750d99; // Horizen
@@ -23,8 +27,13 @@ contract Helper {
     address public KAIA_DVN2 = 0xaCDe1f22EEAb249d3ca6Ba8805C8fEe9f52a16e7; // Horizen
     address public KAIA_DVN3 = 0xc80233AD8251E668BecbC3B0415707fC7075501e; // LayerZeroLabs
 
+    address public GLMR_DVN1 = 0x33E5fcC13D7439cC62d54c41AA966197145b3Cd7; // Canary
+    address public GLMR_DVN2 = 0x34730f2570E6cff8B1C91FaaBF37D0DD917c4367; // Horizen
+    address public GLMR_DVN3 = 0x8B9b67b22ab2ed6Ee324C2fd43734dBd2dDDD045; // LayerZeroLabs
+
     address public BASE_EXECUTOR = 0x2CCA08ae69E0C44b18a57Ab2A87644234dAebaE4;
     address public KAIA_EXECUTOR = 0xe149187a987F129FD3d397ED04a60b0b89D1669f;
+    address public GLMR_EXECUTOR = 0xEC0906949f88f72bF9206E84764163e24a56a499;
 
     address public KAIA_USDT = 0xd077A400968890Eacc75cdc901F0356c943e4fDb;
     address public KAIA_USDT_STARGATE = 0x9025095263d1E548dc890A7589A4C78038aC40ab; // stargate
@@ -96,10 +105,10 @@ contract Helper {
 
     // *******************
     // ORACLE - KAIA MAINNET
-    // address public usdt_usd = 0xa7C4c292Ed720b1318F415B106a443Dc1f052994;
-    // address public native_usdt = 0x9254CD72f207cc231A2307Eac5e4BFa316eb0c2e;
-    // address public eth_usdt = 0xbF61f1F8D45EcB33006a335E7c76f306689dcAab;
-    // address public btc_usdt = 0x624c060ea3fe93321e40530F3f7E587545D594aA;
+    address public usdt_usd = 0xa7C4c292Ed720b1318F415B106a443Dc1f052994;
+    address public native_usdt = 0x9254CD72f207cc231A2307Eac5e4BFa316eb0c2e;
+    address public eth_usdt = 0xbF61f1F8D45EcB33006a335E7c76f306689dcAab;
+    address public btc_usdt = 0x624c060ea3fe93321e40530F3f7E587545D594aA;
 
     // ORACLE - KAIA TESTNET
     // address public usdt_usd = 0x2D9A3d17400332c44ff0E2dC1b728529a33F5591;
@@ -108,10 +117,17 @@ contract Helper {
     // address public btc_usdt = 0x43aDD670A0E1948C90386d2b972FCAEC6CE1BE90;
 
     // ORACLE - BASE TESTNET
-    address public usdt_usd = 0xf19d560eB8d2ADf07BD6D13ed03e1D11215721F9;
-    address public native_usdt = 0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70;
-    address public eth_usdt = 0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70;
-    address public btc_usdt = 0x64c911996D3c6aC71f9b455B1E8E7266BcbD848F;
+    // address public usdt_usd = 0xf19d560eB8d2ADf07BD6D13ed03e1D11215721F9;
+    // address public native_usdt = 0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70;
+    // address public eth_usdt = 0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70;
+    // address public btc_usdt = 0x64c911996D3c6aC71f9b455B1E8E7266BcbD848F;
+
+    // ORACLE - MOONBEAM MAINNET
+    // address public usdc_usd = 0xD3C586Eec1C6C3eC41D276a23944dea080eDCf7f;
+    // address public usdt_usd = 0x4eadC6ee74b7Ceb09A4ad90a33eA2915fbefcf76;
+    // address public native_usdt = 0xB64e610082d3c5C34130b8229E13DaB96180a6DF;
+    // address public eth_usdt = 0x5b0cf2b36a65a6BB085D501B971e4c102B9Cd473;
+    // address public btc_usdt = 0xCAc4d304032a46C8D0947396B7cBb07986826A36;
 
     // *******************
 
@@ -126,7 +142,6 @@ contract Helper {
     address public KAIA_protocol = 0xd8d5edCE9F0e3544D2A712818232fdA7502BA1A6;
     address public KAIA_lendingPoolDeployer = 0x677f0172ff3E8EEf477Ce811Ed57A85B8d8a3bDa;
     address public KAIA_lendingPoolRouterDeployer = 0x60377628d1733fe0FB64D8B84466b461974DA60A;
-    // address public KAIA_lendingPoolFactoryImplementation = 0xb0FCA55167f94D0f515877C411E0deb904321761; // before upgrade
     address public KAIA_lendingPoolFactoryImplementation = 0xc28446267B3c9a733D6C7419535B883908e55813;
     address public KAIA_lendingPoolFactoryProxy = 0xa971CD2714fbCc9A942b09BC391a724Df9338206;
     address public KAIA_HELPER_UTILS = 0x3De8C22F6b84C575429c1B9cbf5bdDd49cf129fC;
