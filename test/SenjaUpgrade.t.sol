@@ -44,7 +44,7 @@ contract SenjaUpgradeTest is Test, Helper {
         console.log("BTC", LendingPoolFactory(KAIA_lendingPoolFactoryProxy).tokenDataStream(KAIA_WBTC));
         console.log("****************************");
         newImplementation = new LendingPoolFactory();
-        LendingPoolFactory(KAIA_lendingPoolFactoryProxy).upgradeTo(address(newImplementation));
+        LendingPoolFactory(KAIA_lendingPoolFactoryProxy).upgradeToAndCall(address(newImplementation), "");
         console.log("****************************");
         console.log("pool count", LendingPoolFactory(KAIA_lendingPoolFactoryProxy).poolCount());
         {

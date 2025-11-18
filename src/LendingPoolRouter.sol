@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
-import {IFactory} from "./Interfaces/IFactory.sol";
-import {IIsHealthy} from "./Interfaces/IIsHealthy.sol";
+import {IFactory} from "./interfaces/IFactory.sol";
+import {IIsHealthy} from "./interfaces/IIsHealthy.sol";
 import {IPositionDeployer} from "./interfaces/IPositionDeployer.sol";
 
 /**
