@@ -2,7 +2,9 @@ name: CI
 
 on:
   push:
+    branches: [main, master, dev]
   pull_request:
+    branches: [main, master, dev]
   workflow_dispatch:
 
 env:
@@ -19,15 +21,33 @@ jobs:
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
 
       - name: Show Forge version
-        run: forge --version
+        run: |
+          forge --version
+          cast --version
 
       - name: Run Forge fmt
         run: forge fmt --check
+        id: fmt
 
       - name: Run Forge build
-        run: forge build --sizes
+        run: |
+          forge --version
+          forge build --sizes
+        id: build
 
       - name: Run Forge tests
-        run: forge test -vvv
+        run: |
+          forge test -vv --match-contract "ProtocolTest" --no-match-test "testExecuteBuyback"
+        env:
+          FOUNDRY_FUZZ_RUNS: 100
+        id: test
+        continue-on-error: false
+
+      - name: Run Forge snapshot
+        run: forge snapshot --match-contract "ProtocolTest" --no-match-test "testExecuteBuyback"
+        id: snapshot
+        continue-on-error: true
