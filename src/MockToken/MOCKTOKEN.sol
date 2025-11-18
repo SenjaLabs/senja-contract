@@ -5,11 +5,11 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 contract MOCKTOKEN is ERC20 {
     uint8 private immutable _DECIMALS;
-    
+
     constructor(string memory _name, string memory _symbol, uint8 __decimals) ERC20(_name, _symbol) {
         _DECIMALS = __decimals;
     }
-    
+
     function decimals() public view virtual override returns (uint8) {
         return _DECIMALS;
     }

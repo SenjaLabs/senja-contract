@@ -15,7 +15,9 @@ contract MockDex is Ownable, ReentrancyGuard {
 
     address public factory;
 
-    event ExactInputSingle(address indexed tokenIn, address indexed tokenOut, uint256 amountIn, uint256 amountOut, uint256 amountOutMinimum);
+    event ExactInputSingle(
+        address indexed tokenIn, address indexed tokenOut, uint256 amountIn, uint256 amountOut, uint256 amountOutMinimum
+    );
 
     constructor(address _factory) Ownable(msg.sender) {
         factory = _factory;
@@ -36,7 +38,12 @@ contract MockDex is Ownable, ReentrancyGuard {
         uint160 sqrtPriceLimitX96;
     }
 
-    function exactInputSingle(ExactInputSingleParams memory params) external payable nonReentrant returns (uint256 amountOut) {
+    function exactInputSingle(ExactInputSingleParams memory params)
+        external
+        payable
+        nonReentrant
+        returns (uint256 amountOut)
+    {
         IERC20(params.tokenIn).transferFrom(msg.sender, address(this), params.amountIn);
 
         address _tokenInPrice = IFactory(factory).tokenDataStream(params.tokenIn);
@@ -63,7 +70,8 @@ contract MockDex is Ownable, ReentrancyGuard {
         (, uint256 quotePrice,,,) = IOracle(_tokenInPrice).latestRoundData();
         (, uint256 basePrice,,,) = IOracle(_tokenOutPrice).latestRoundData();
 
-        uint256 amountOut = (_amountIn * ((uint256(quotePrice) * (10 ** tokenOutDecimal)) / uint256(basePrice))) / 10 ** tokenInDecimal;
+        uint256 amountOut =
+            (_amountIn * ((uint256(quotePrice) * (10 ** tokenOutDecimal)) / uint256(basePrice))) / 10 ** tokenInDecimal;
         return amountOut;
     }
 }

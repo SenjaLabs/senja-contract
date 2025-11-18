@@ -51,9 +51,8 @@ contract SetPeers is Script, Helper {
 
         // USDT Stargate Adapter peers
         MyOApp(KAIA_OFT_USDT_STARGATE_ADAPTER).setPeer(BASE_EID, bytes32(uint256(uint160(BASE_OFT_USDTK_ADAPTER))));
-        MyOApp(KAIA_OFT_USDT_STARGATE_ADAPTER).setPeer(
-            KAIA_EID, bytes32(uint256(uint160(KAIA_OFT_USDT_STARGATE_ADAPTER)))
-        );
+        MyOApp(KAIA_OFT_USDT_STARGATE_ADAPTER)
+            .setPeer(KAIA_EID, bytes32(uint256(uint160(KAIA_OFT_USDT_STARGATE_ADAPTER))));
 
         // WKAIA Adapter peers
         MyOApp(KAIA_OFT_WKAIA_ADAPTER).setPeer(BASE_EID, bytes32(uint256(uint160(BASE_OFT_WKAIAK_ADAPTER))));

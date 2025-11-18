@@ -11,7 +11,10 @@ contract STOKEN is ERC20, Ownable {
 
     error NotOperator();
 
-    constructor(string memory _name, string memory _symbol, uint8 __decimals) ERC20(_name, _symbol) Ownable(msg.sender) {
+    constructor(string memory _name, string memory _symbol, uint8 __decimals)
+        ERC20(_name, _symbol)
+        Ownable(msg.sender)
+    {
         _DECIMALS = __decimals;
     }
 

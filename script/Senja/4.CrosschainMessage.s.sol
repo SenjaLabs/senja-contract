@@ -97,15 +97,13 @@ contract CrosschainMessage is Script, Helper {
         if (block.chainid == 8453) {
             ILayerZeroEndpointV2(endpoint).setSendLibrary(BASE_oappSupplyLiquidityUSDT, eid0, sendLib);
             ILayerZeroEndpointV2(endpoint).setSendLibrary(BASE_oappSupplyLiquidityUSDT, eid1, sendLib);
-            ILayerZeroEndpointV2(endpoint).setReceiveLibrary(
-                BASE_oappSupplyLiquidityUSDT, srcEid, receiveLib, gracePeriod
-            );
+            ILayerZeroEndpointV2(endpoint)
+                .setReceiveLibrary(BASE_oappSupplyLiquidityUSDT, srcEid, receiveLib, gracePeriod);
         } else if (block.chainid == 8217) {
             ILayerZeroEndpointV2(endpoint).setSendLibrary(KAIA_oappSupplyLiquidityUSDT, eid0, sendLib);
             ILayerZeroEndpointV2(endpoint).setSendLibrary(KAIA_oappSupplyLiquidityUSDT, eid1, sendLib);
-            ILayerZeroEndpointV2(endpoint).setReceiveLibrary(
-                KAIA_oappSupplyLiquidityUSDT, srcEid, receiveLib, gracePeriod
-            );
+            ILayerZeroEndpointV2(endpoint)
+                .setReceiveLibrary(KAIA_oappSupplyLiquidityUSDT, srcEid, receiveLib, gracePeriod);
         }
     }
 

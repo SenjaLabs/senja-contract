@@ -152,7 +152,10 @@ contract IsHealthy {
         address lendingPoolRouter,
         address, /* factory */
         uint256 liquidationIncentive
-    ) external returns (uint256 liquidatedAmount) {
+    )
+        external
+        returns (uint256 liquidatedAmount)
+    {
         // Use regular call instead of delegatecall for security
         (bool success, bytes memory data) = liquidator.call(
             abi.encodeWithSignature(

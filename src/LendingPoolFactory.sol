@@ -165,9 +165,8 @@ contract LendingPoolFactory is
      */
     function createLendingPool(address collateralToken, address borrowToken, uint256 ltv) public returns (address) {
         // Deploy a new router for this pool
-        address router = ILPRouterDeployer(lendingPoolRouterDeployer).deployLendingPoolRouter(
-            address(this), collateralToken, borrowToken, ltv
-        );
+        address router = ILPRouterDeployer(lendingPoolRouterDeployer)
+            .deployLendingPoolRouter(address(this), collateralToken, borrowToken, ltv);
         // Deploy the LendingPool
         address lendingPool = ILPDeployer(lendingPoolDeployer).deployLendingPool(address(router));
 

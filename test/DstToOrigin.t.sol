@@ -47,7 +47,6 @@ contract DstToOriginTest is Test, Helper {
 
     function setUp() public {
         vm.createSelectFork(vm.rpcUrl("base_mainnet"));
-        console.log("sel", vm.createSelectFork(vm.rpcUrl("base_mainnet")));
         deal(BASE_USDTK, owner, 1000000000000000000000000000000000000000);
         vm.startPrank(owner);
         _getUtils();
@@ -98,9 +97,8 @@ contract DstToOriginTest is Test, Helper {
     function _setLibraries() internal {
         ILayerZeroEndpointV2(endpoint).setSendLibrary(address(oappSupplyLiquidityUSDT), dstEid0, sendLib);
         ILayerZeroEndpointV2(endpoint).setSendLibrary(address(oappSupplyLiquidityUSDT), dstEid1, sendLib);
-        ILayerZeroEndpointV2(endpoint).setReceiveLibrary(
-            address(oappSupplyLiquidityUSDT), srcEid, receiveLib, gracePeriod
-        );
+        ILayerZeroEndpointV2(endpoint)
+            .setReceiveLibrary(address(oappSupplyLiquidityUSDT), srcEid, receiveLib, gracePeriod);
     }
 
     function _setSendConfig() internal {

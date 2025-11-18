@@ -83,9 +83,7 @@ interface ILendingPool {
      * @return liquidatedAmount Amount of debt repaid through liquidation
      * @notice Anyone can call this function to liquidate unhealthy positions
      */
-    function liquidateByDEX(address borrower, uint256 liquidationIncentive)
-        external
-        returns (uint256 liquidatedAmount);
+    function liquidateByDEX(address borrower, uint256 liquidationIncentive) external returns (uint256 liquidatedAmount);
 
     /**
      * @dev Liquidates an unhealthy position by allowing MEV/external liquidator to buy collateral

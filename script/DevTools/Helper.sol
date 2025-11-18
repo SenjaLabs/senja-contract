@@ -105,16 +105,16 @@ contract Helper {
 
     // *******************
     // ORACLE - KAIA MAINNET
-    address public usdt_usd = 0xa7C4c292Ed720b1318F415B106a443Dc1f052994;
-    address public native_usdt = 0x9254CD72f207cc231A2307Eac5e4BFa316eb0c2e;
-    address public eth_usdt = 0xbF61f1F8D45EcB33006a335E7c76f306689dcAab;
-    address public btc_usdt = 0x624c060ea3fe93321e40530F3f7E587545D594aA;
+    // address public usdt_usd = 0xa7C4c292Ed720b1318F415B106a443Dc1f052994;
+    // address public native_usdt = 0x9254CD72f207cc231A2307Eac5e4BFa316eb0c2e;
+    // address public eth_usdt = 0xbF61f1F8D45EcB33006a335E7c76f306689dcAab;
+    // address public btc_usdt = 0x624c060ea3fe93321e40530F3f7E587545D594aA;
 
     // ORACLE - KAIA TESTNET
-    // address public usdt_usd = 0x2D9A3d17400332c44ff0E2dC1b728529a33F5591;
-    // address public native_usdt = 0xC2caA26226585F666Ec79f8eCDB0AEc17893aF1d;
-    // address public eth_usdt = 0x22BE5ff1eF09ebf06995Da9050d44d23070C2142;
-    // address public btc_usdt = 0x43aDD670A0E1948C90386d2b972FCAEC6CE1BE90;
+    address public usdt_usd = 0x2D9A3d17400332c44ff0E2dC1b728529a33F5591;
+    address public native_usdt = 0xC2caA26226585F666Ec79f8eCDB0AEc17893aF1d;
+    address public eth_usdt = 0x22BE5ff1eF09ebf06995Da9050d44d23070C2142;
+    address public btc_usdt = 0x43aDD670A0E1948C90386d2b972FCAEC6CE1BE90;
 
     // ORACLE - BASE TESTNET
     // address public usdt_usd = 0xf19d560eB8d2ADf07BD6D13ed03e1D11215721F9;

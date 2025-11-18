@@ -68,9 +68,8 @@ contract SendMessage is Script, Helper {
         });
         MessagingFee memory feeBridge = OFTUSDTadapter(BASE_OFT_MOCK_USDT_ADAPTER).quoteSend(sendParam, false);
 
-        MessagingFee memory feeMessage = OAppSupplyLiquidityUSDT(BASE_oappSupplyLiquidityUSDT).quoteSendString(
-            KAIA_EID, KAIA_lendingPool, owner, KAIA_MOCK_USDT, amount, "", false
-        );
+        MessagingFee memory feeMessage = OAppSupplyLiquidityUSDT(BASE_oappSupplyLiquidityUSDT)
+            .quoteSendString(KAIA_EID, KAIA_lendingPool, owner, KAIA_MOCK_USDT, amount, "", false);
 
         IERC20(BASE_MOCK_USDT).approve(oappAdapter, amount);
         OAppAdapter(oappAdapter).sendBridge{value: feeBridge.nativeFee + feeMessage.nativeFee}(

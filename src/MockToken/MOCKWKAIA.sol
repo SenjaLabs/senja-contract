@@ -20,7 +20,7 @@ contract MOCKWKAIA {
 
     mapping(address => uint256) public balanceOf;
     mapping(address => mapping(address => uint256)) public allowance;
-    
+
     uint256 private _totalSupply;
 
     receive() external payable {
@@ -48,7 +48,7 @@ contract MOCKWKAIA {
     function totalSupply() public view returns (uint256) {
         return _totalSupply;
     }
-    
+
     /**
      * @notice Mint tokens for testing purposes
      * @param to Address to mint tokens to
@@ -61,7 +61,7 @@ contract MOCKWKAIA {
         emit Mint(to, wad);
         emit Transfer(address(0), to, wad);
     }
-    
+
     /**
      * @notice Burn tokens from an address for testing purposes
      * @param from Address to burn tokens from

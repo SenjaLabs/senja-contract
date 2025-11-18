@@ -99,7 +99,10 @@ contract MyOApp is OApp, OAppOptionsType3 {
         bytes calldata _message,
         address, /*_executor*/
         bytes calldata /*_extraData*/
-    ) internal override {
+    )
+        internal
+        override
+    {
         // 1. Decode the incoming bytes into a string
         //    You can use abi.decode, abi.decodePacked, or directly splice bytes
         //    if you know the format of your data structures

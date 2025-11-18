@@ -54,9 +54,7 @@ interface IFactory {
      * @notice This function deploys a new lending pool with specified parameters
      * @custom:security Only authorized addresses should be able to create pools
      */
-    function createLendingPool(address _collateralToken, address _borrowToken, uint256 _ltv)
-        external
-        returns (address);
+    function createLendingPool(address _collateralToken, address _borrowToken, uint256 _ltv) external returns (address);
 
     /**
      * @dev Returns the protocol contract address

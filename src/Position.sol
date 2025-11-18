@@ -57,8 +57,6 @@ contract Position is ReentrancyGuard {
     // Track if we're in a withdrawal operation to avoid auto-wrapping
     bool private _withdrawing;
 
-    uint8 public constant VERSION = 2; // TODO: fee from swap
-
     /// @notice Mapping from token ID to token address
     mapping(uint256 => address) public tokenLists;
     /// @notice Mapping from token address to token ID

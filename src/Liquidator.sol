@@ -425,8 +425,9 @@ contract Liquidator is ReentrancyGuard, Ownable {
     ) internal view returns (uint256 collateralAmount) {
         // Get prices
         (, uint256 borrowPrice,,,) = IOracle(_tokenDataStream(borrowToken)).latestRoundData();
-        (, uint256 collateralPrice,,,) =
-            IOracle(_tokenDataStream(collateralToken == address(1) ? _WRAPPED_NATIVE() : collateralToken)).latestRoundData();
+        (, uint256 collateralPrice,,,) = IOracle(
+                _tokenDataStream(collateralToken == address(1) ? _WRAPPED_NATIVE() : collateralToken)
+            ).latestRoundData();
 
         // Calculate base collateral amount
         uint256 borrowDecimals = _tokenDecimals(borrowToken);
@@ -467,7 +468,11 @@ contract Liquidator is ReentrancyGuard, Ownable {
     /**
      * @notice Calculates the maximum amount that can be repaid in liquidation
      */
-    function _calculateMaxRepayAmount(address borrower, address lendingPoolRouter, address /* borrowerPosition */ )
+    function _calculateMaxRepayAmount(
+        address borrower,
+        address lendingPoolRouter,
+        address /* borrowerPosition */
+    )
         internal
         view
         returns (uint256 maxRepayAmount)

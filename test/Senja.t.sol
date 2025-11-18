@@ -112,9 +112,9 @@ contract SenjaTest is Test, Helper {
     uint256 repayDebt;
 
     function setUp() public {
-        vm.createSelectFork(vm.rpcUrl("kaia_mainnet"));
+        // vm.createSelectFork(vm.rpcUrl("kaia_mainnet"));
         // vm.createSelectFork(vm.rpcUrl("base_mainnet"));
-        // vm.createSelectFork(vm.rpcUrl("kaia_testnet"));
+        vm.createSelectFork(vm.rpcUrl("kaia_testnet"));
         // vm.createSelectFork(vm.rpcUrl("moonbeam_mainnet"));
         vm.startPrank(owner);
         _getUtils();
@@ -919,4 +919,6 @@ contract SenjaTest is Test, Helper {
         assertLt(ILPRouter(_router(lendingPool)).userBorrowShares(alice), 15e6);
         assertLt(ILPRouter(_router(lendingPool)).totalBorrowAssets(), 15e6);
     }
+
+    // TODO: Liquidation scenario test
 }

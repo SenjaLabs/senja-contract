@@ -77,9 +77,8 @@ contract SenjaUpgradeTest is Test, Helper {
         console.log("****************************");
         lendingPoolRouterDeployer = new LendingPoolRouterDeployer();
         lendingPoolRouterDeployer.setFactory(KAIA_lendingPoolFactoryProxy);
-        LendingPoolFactory(KAIA_lendingPoolFactoryProxy).setLendingPoolRouterDeployer(
-            address(lendingPoolRouterDeployer)
-        );
+        LendingPoolFactory(KAIA_lendingPoolFactoryProxy)
+            .setLendingPoolRouterDeployer(address(lendingPoolRouterDeployer));
         console.log("****************************");
 
         (address c3, address b3, address lp3) = LendingPoolFactory(KAIA_lendingPoolFactoryProxy).pools(3);

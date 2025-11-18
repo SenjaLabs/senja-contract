@@ -21,10 +21,13 @@ contract OFTadapter is OFTAdapter, ReentrancyGuard {
     event Credit(address to, uint256 amount);
     event Debit(address from, uint256 amount);
 
-    constructor(address _token, address _elevatedMinterBurner, address _lzEndpoint, address _owner, uint8 _sharedDecimals)
-        OFTAdapter(_token, _lzEndpoint, _owner)
-        Ownable(_owner)
-    {
+    constructor(
+        address _token,
+        address _elevatedMinterBurner,
+        address _lzEndpoint,
+        address _owner,
+        uint8 _sharedDecimals
+    ) OFTAdapter(_token, _lzEndpoint, _owner) Ownable(_owner) {
         tokenOFT = _token;
         elevatedMinterBurner = _elevatedMinterBurner;
         _SHAREDDECIMALS = _sharedDecimals;

@@ -260,11 +260,7 @@ contract HelperUtils {
         return totalLiquidity;
     }
 
-    function getCollateralBalance(address _lendingPool, address _user)
-        public
-        view
-        returns (uint256 collateralBalance)
-    {
+    function getCollateralBalance(address _lendingPool, address _user) public view returns (uint256 collateralBalance) {
         address collateralToken = ILPRouter(_router(_lendingPool)).collateralToken();
         address addressPosition = ILPRouter(_router(_lendingPool)).addressPositions(_user);
         if (collateralToken == address(1)) {

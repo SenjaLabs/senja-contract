@@ -73,9 +73,8 @@ contract SetLibraries is Script, Helper {
 
         // Set receive library for inbound messages
         ILayerZeroEndpointV2(endpoint).setReceiveLibrary(KAIA_OFT_USDT_ADAPTER, srcEid, receiveLib, gracePeriod);
-        ILayerZeroEndpointV2(endpoint).setReceiveLibrary(
-            KAIA_OFT_USDT_STARGATE_ADAPTER, srcEid, receiveLib, gracePeriod
-        );
+        ILayerZeroEndpointV2(endpoint)
+            .setReceiveLibrary(KAIA_OFT_USDT_STARGATE_ADAPTER, srcEid, receiveLib, gracePeriod);
         ILayerZeroEndpointV2(endpoint).setReceiveLibrary(KAIA_OFT_WKAIA_ADAPTER, srcEid, receiveLib, gracePeriod);
         ILayerZeroEndpointV2(endpoint).setReceiveLibrary(KAIA_OFT_WBTC_ADAPTER, srcEid, receiveLib, gracePeriod);
         ILayerZeroEndpointV2(endpoint).setReceiveLibrary(KAIA_OFT_WETH_ADAPTER, srcEid, receiveLib, gracePeriod);

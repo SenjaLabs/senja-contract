@@ -136,15 +136,16 @@ contract LendingPoolRouter {
         if (userBorrowShares[_user] > 0) {
             address isHealthy = IFactory(factory).isHealthy();
             // ishealthy supply collateral
-            IIsHealthy(isHealthy)._isHealthy(
-                borrowToken,
-                factory,
-                addressPositions[_user],
-                ltv,
-                totalBorrowAssets,
-                totalBorrowShares,
-                userBorrowShares[_user]
-            );
+            IIsHealthy(isHealthy)
+                ._isHealthy(
+                    borrowToken,
+                    factory,
+                    addressPositions[_user],
+                    ltv,
+                    totalBorrowAssets,
+                    totalBorrowShares,
+                    userBorrowShares[_user]
+                );
         }
         return userCollateral[_user];
     }
@@ -260,15 +261,16 @@ contract LendingPoolRouter {
             revert InsufficientLiquidity();
         }
         address isHealthy = IFactory(factory).isHealthy();
-        IIsHealthy(isHealthy)._isHealthy(
-            borrowToken,
-            factory,
-            addressPositions[_user], // check position from other chain
-            ltv,
-            totalBorrowAssets,
-            totalBorrowShares,
-            userBorrowShares[_user]
-        );
+        IIsHealthy(isHealthy)
+            ._isHealthy(
+                borrowToken,
+                factory,
+                addressPositions[_user], // check position from other chain
+                ltv,
+                totalBorrowAssets,
+                totalBorrowShares,
+                userBorrowShares[_user]
+            );
 
         return (protocolFee, userAmount, shares);
     }
