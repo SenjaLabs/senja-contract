@@ -45,7 +45,7 @@ contract UpgradeContract is Script, Helper {
 
     function _upgrade() internal {
         newImplementation = new LendingPoolFactory();
-        LendingPoolFactory(lendingPoolFactoryProxy).upgradeToAndCall(address(newImplementation), "");
+        LendingPoolFactory(lendingPoolFactoryProxy).upgradeToAndCall(address(newImplementation), new bytes(0));
 
         console.log("address public %s_lendingPoolFactoryImplementation = %s;", chainName, address(newImplementation));
     }

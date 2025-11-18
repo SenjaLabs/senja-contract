@@ -244,4 +244,10 @@ contract LendingPoolFactory is
      * @dev Only callable by addresses with UPGRADER_ROLE
      */
     function _authorizeUpgrade(address newImplementation) internal override onlyRole(UPGRADER_ROLE) {}
+
+    /**
+     * @notice Fallback function to handle calls with empty data during upgrades
+     * @dev This is needed for compatibility with older OpenZeppelin versions
+     */
+    fallback() external {}
 }
