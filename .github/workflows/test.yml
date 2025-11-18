@@ -18,6 +18,12 @@ jobs:
       - uses: actions/checkout@v5
         with:
           submodules: recursive
+          fetch-depth: 0
+
+      - name: Update submodules
+        run: |
+          git submodule update --init --recursive --force
+          git submodule status
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
@@ -28,6 +34,20 @@ jobs:
         run: |
           forge --version
           cast --version
+          
+      - name: Verify dependencies
+        run: |
+          echo "Checking lib directory..."
+          ls -la lib/ || echo "lib directory not found"
+          echo "Checking LayerZero..."
+          ls -la lib/layerzero-v2/ || echo "layerzero-v2 not found"
+          ls -la lib/devtools/ || echo "devtools not found"
+          echo "Checking OpenZeppelin..."
+          ls -la lib/openzeppelin-contracts/ || echo "openzeppelin-contracts not found"
+
+      - name: Install Forge dependencies
+        run: forge install
+        continue-on-error: true
 
       - name: Run Forge fmt
         run: forge fmt --check
