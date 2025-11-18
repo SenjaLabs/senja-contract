@@ -187,7 +187,6 @@ contract Position is ReentrancyGuard {
         if (msg.sender != owner && msg.sender != lpAddress) revert NotForSwap();
         if (slippageTolerance > 10000) revert InvalidParameter(); // Max 100% slippage
 
-        // Perform DEX with slippage protection
         amountOut = _performDex(_tokenIn, _tokenOut, amountIn, slippageTolerance);
 
         emit SwapTokenByPosition(msg.sender, _tokenIn, _tokenOut, amountIn, amountOut);

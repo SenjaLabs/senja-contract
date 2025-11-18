@@ -7,7 +7,7 @@ import {ILendingPool} from "../src/interfaces/ILendingPool.sol";
 import {ILPRouter} from "../src/interfaces/ILPRouter.sol";
 import {IsHealthy} from "../src/IsHealthy.sol";
 import {LendingPoolDeployer} from "../src/LendingPoolDeployer.sol";
-import {Protocol} from "../src/Protocol.sol";
+import {ProtocolV2} from "../src/ProtocolV2.sol";
 import {Oracle} from "../src/Oracle.sol";
 import {Liquidator} from "../src/Liquidator.sol";
 import {IOracle} from "../src/interfaces/IOracle.sol";
@@ -48,7 +48,7 @@ contract SenjaTest is Test, Helper {
     Liquidator public liquidator;
     LendingPoolRouterDeployer public lendingPoolRouterDeployer;
     LendingPoolDeployer public lendingPoolDeployer;
-    Protocol public protocol;
+    ProtocolV2 public protocol;
     PositionDeployer public positionDeployer;
     LendingPoolFactory public lendingPoolFactory;
     LendingPoolFactory public newImplementation;
@@ -334,7 +334,7 @@ contract SenjaTest is Test, Helper {
         isHealthy = new IsHealthy(address(liquidator));
         lendingPoolDeployer = new LendingPoolDeployer();
         lendingPoolRouterDeployer = new LendingPoolRouterDeployer();
-        protocol = new Protocol();
+        protocol = new ProtocolV2();
         positionDeployer = new PositionDeployer();
 
         lendingPoolFactory = new LendingPoolFactory();
@@ -600,7 +600,7 @@ contract SenjaTest is Test, Helper {
         vm.startPrank(alice);
         console.log("WNative balance before", IERC20(WNative).balanceOf(_addressPosition(lendingPool2, alice)));
 
-        IPosition(_addressPosition(lendingPool2, alice)).swapTokenByPosition(USDT, WNative, 100e6, 100); // 1% slippage tolerance
+        ILendingPool(lendingPool2).swapTokenByPosition(USDT, WNative, 100e6, 100); // 1% slippage tolerance
         vm.stopPrank();
 
         console.log("WNative balance after", IERC20(WNative).balanceOf(_addressPosition(lendingPool2, alice)));

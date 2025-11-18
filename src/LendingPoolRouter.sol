@@ -24,8 +24,11 @@ contract LendingPoolRouter {
     error NotFactory();
     /// @notice Error thrown when position already exists
     error PositionAlreadyCreated();
+    /// @notice Error thrown when total supply shares is zero
+    error TotalSupplySharesZero(uint256 shares, uint256 totalSupplyShares);
     /// @notice Error thrown when user has insufficient collateral
-    error InsufficientCollateral();
+    error InsufficientCollateral(uint256 amount, uint256 expectedAmount);
+    error TotalBorrowSharesZero(uint256 shares, uint256 totalBorrowShares);
 
     /// @notice Total supply assets in the pool
     uint256 public totalSupplyAssets;
@@ -110,6 +113,7 @@ contract LendingPoolRouter {
     function withdrawLiquidity(uint256 _shares, address _user) public onlyLendingPool returns (uint256 amount) {
         if (_shares == 0) revert ZeroAmount();
         if (_shares > userSupplyShares[_user]) revert InsufficientShares();
+        if (totalSupplyShares == 0) revert TotalSupplySharesZero(_shares, totalSupplyShares);
 
         amount = ((_shares * totalSupplyAssets) / totalSupplyShares);
 
@@ -129,7 +133,7 @@ contract LendingPoolRouter {
     }
 
     function withdrawCollateral(uint256 _amount, address _user) public onlyLendingPool returns (uint256) {
-        if (userCollateral[_user] < _amount) revert InsufficientCollateral();
+        if (userCollateral[_user] < _amount) revert InsufficientCollateral(userCollateral[_user], _amount);
 
         userCollateral[_user] -= _amount;
 
@@ -282,6 +286,7 @@ contract LendingPoolRouter {
     {
         if (_shares == 0) revert ZeroAmount();
         if (_shares > userBorrowShares[_user]) revert InsufficientShares();
+        if (totalBorrowShares == 0) revert TotalBorrowSharesZero(_shares, totalBorrowShares);
 
         uint256 borrowAmount = ((_shares * totalBorrowAssets) / totalBorrowShares);
         userBorrowShares[_user] -= _shares;

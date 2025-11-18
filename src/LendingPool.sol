@@ -22,20 +22,17 @@ contract LendingPool is ReentrancyGuard {
     /// @notice Contract version for tracking upgrades
     uint8 public constant VERSION = 1;
 
-    error InsufficientCollateral();
-    error InsufficientLiquidity();
-    error InsufficientShares();
-    error LTVExceedMaxAmount();
-    error PositionAlreadyCreated();
-    error TokenNotAvailable();
+    error InsufficientCollateral(uint256 amount, uint256 expectedAmount);
     error ZeroAmount();
-    error InsufficientBorrowShares();
-    error amountSharesInvalid();
-    error NotOperator();
+    error amountSharesInvalid(uint256 shares, uint256 userBorrowShares);
     error NotAuthorized(address executor);
-    error TransferFailed();
-    error InvalidParameter();
-    error InsufficientContractBalance();
+    error TransferFailed(uint256 amount);
+    error SwapTokenByPositionInvalidParameter(address tokenIn, address tokenOut);
+    error OracleOnTokenNotSet(address token);
+    error SupplyLiquidityWrongInputAmount(uint256 amount, uint256 expectedAmount);
+    error CollateralWrongInputAmount(uint256 amount, uint256 expectedAmount);
+    error RepayWithSelectedTokenWrongInputAmount(uint256 amount, uint256 expectedAmount);
+    error PositionAlreadyCreated(address positionAddress);
 
     event SupplyLiquidity(address user, uint256 amount, uint256 shares);
     event WithdrawLiquidity(address user, uint256 amount, uint256 shares);
@@ -47,6 +44,7 @@ contract LendingPool is ReentrancyGuard {
     );
     event InterestRateModelSet(address indexed oldModel, address indexed newModel);
     event WithdrawCollateral(address user, uint256 amount);
+    event SwapTokenByPosition(address user, address tokenIn, address tokenOut, uint256 amountIn, uint256 amountOut);
 
     address public router;
 
@@ -67,21 +65,24 @@ contract LendingPool is ReentrancyGuard {
         _;
     }
 
+    modifier checkOracleOnToken(address _token) {
+        _checkOracleOnToken(_token);
+        _;
+    }
+
     /**
      * @notice Supply liquidity to the lending pool by depositing borrow tokens.
      * @dev Users receive shares proportional to their deposit. Shares represent ownership in the pool. Accrues interest before deposit.
      * @param _user The address of the user to supply liquidity.
      * @param _amount The amount of borrow tokens to supply as liquidity.
-     * @custom:throws ZeroAmount if amount is 0.
      * @custom:emits SupplyLiquidity when liquidity is supplied.
      */
     function supplyLiquidity(address _user, uint256 _amount) public payable nonReentrant accessControl(_user) {
         uint256 shares = _supplyLiquidity(_amount, _user);
         _accrueInterest();
         if (_borrowToken() == address(1)) {
-            // Handle native token by wrapping to ERC20
-            if (msg.value != _amount) revert InsufficientCollateral();
-            IWrappedNative(_WRAPPED_NATIVE()).deposit{value: msg.value}();
+            if (msg.value != _amount) revert SupplyLiquidityWrongInputAmount(msg.value, _amount);
+            IWrappedNative(_WRAPPED_NATIVE()).deposit{value: _amount}();
         } else {
             IERC20(_borrowToken()).safeTransferFrom(_user, address(this), _amount);
         }
@@ -92,9 +93,7 @@ contract LendingPool is ReentrancyGuard {
      * @notice Withdraw supplied liquidity by redeeming shares for underlying tokens.
      * @dev Calculates the corresponding asset amount based on the proportion of total shares. Accrues interest before withdrawal.
      * @param _shares The number of supply shares to redeem for underlying tokens.
-     * @custom:throws ZeroAmount if _shares is 0.
-     * @custom:throws InsufficientShares if user does not have enough shares.
-     * @custom:throws InsufficientLiquidity if protocol lacks liquidity after withdrawal.
+     * @custom:throws TransferFailed if the transfer fails.
      * @custom:emits WithdrawLiquidity when liquidity is withdrawn.
      */
     function withdrawLiquidity(uint256 _shares) public payable nonReentrant {
@@ -104,7 +103,7 @@ contract LendingPool is ReentrancyGuard {
             _withdrawing = true;
             IWrappedNative(_WRAPPED_NATIVE()).withdraw(amount);
             (bool sent,) = msg.sender.call{value: amount}("");
-            if (!sent) revert TransferFailed();
+            if (!sent) revert TransferFailed(amount);
             _withdrawing = false;
         } else {
             IERC20(_borrowToken()).safeTransfer(msg.sender, amount);
@@ -139,7 +138,7 @@ contract LendingPool is ReentrancyGuard {
         _accrueInterest();
         if (_collateralToken() == address(1)) {
             // Handle native token by wrapping to ERC20
-            if (msg.value != _amount) revert InsufficientCollateral();
+            if (msg.value != _amount) revert CollateralWrongInputAmount(msg.value, _amount);
             IWrappedNative(_WRAPPED_NATIVE()).deposit{value: msg.value}();
             IERC20(_WRAPPED_NATIVE()).approve(_addressPositions(_user), _amount);
             IERC20(_WRAPPED_NATIVE()).safeTransfer(_addressPositions(_user), _amount);
@@ -173,7 +172,7 @@ contract LendingPool is ReentrancyGuard {
         }
 
         if (_amount > userCollateralBalance) {
-            revert InsufficientCollateral();
+            revert InsufficientCollateral(_amount, userCollateralBalance);
         }
 
         _accrueInterest();
@@ -248,8 +247,9 @@ contract LendingPool is ReentrancyGuard {
                 _withdrawing = true;
                 IWrappedNative(_WRAPPED_NATIVE()).withdraw(_amount);
                 (bool sent,) = _protocol().call{value: protocolFee}("");
+                if (sent) revert TransferFailed(protocolFee);
                 (bool sent2,) = msg.sender.call{value: userAmount}("");
-                if (!sent && !sent2) revert TransferFailed();
+                if (sent2) revert TransferFailed(userAmount);
                 _withdrawing = false;
             } else {
                 IERC20(_borrowToken()).safeTransfer(_protocol(), protocolFee);
@@ -259,32 +259,52 @@ contract LendingPool is ReentrancyGuard {
         emit BorrowDebtCrosschain(msg.sender, _amount, shares, _chainId, _addExecutorLzReceiveOption);
     }
 
+    function swapTokenByPosition(address _tokenIn, address _tokenOut, uint256 amountIn, uint256 slippageTolerance)
+        public
+        positionRequired(msg.sender)
+        checkOracleOnToken(_tokenIn)
+        checkOracleOnToken(_tokenOut)
+        returns (uint256 amountOut)
+    {
+        if (_tokenIn == _tokenOut) {
+            revert SwapTokenByPositionInvalidParameter(_tokenIn, _tokenOut);
+        }
+
+        // Perform DEX with slippage protection
+        amountOut = IPosition(_addressPositions(msg.sender))
+            .swapTokenByPosition(_tokenIn, _tokenOut, amountIn, slippageTolerance);
+
+        emit SwapTokenByPosition(msg.sender, _tokenIn, _tokenOut, amountIn, amountOut);
+    }
+
     /**
      * @notice Repay borrowed assets using a selected token from the user's position.
      * @dev Swaps selected token to borrow token if needed via position contract. Accrues interest before repayment.
-     * @param shares The number of borrow shares to repay.
+     * @param _shares The number of borrow shares to repay.
      * @param _token The address of the token to use for repayment.
      * @param _fromPosition Whether to use tokens from the position contract (true) or from the user's wallet (false).
-     * @custom:throws ZeroAmount if shares is 0.
+     * @param _user The address of the user to repay the debt.
+     * @param _slippageTolerance The slippage tolerance in basis points (e.g., 500 = 5%).
+     * @custom:throws ZeroAmount if _shares is 0.
      * @custom:throws amountSharesInvalid if shares exceed user's borrow shares.
      * @custom:emits RepayByPosition when repayment is successful.
      */
     function repayWithSelectedToken(
-        uint256 shares,
+        uint256 _shares,
         address _token,
         bool _fromPosition,
         address _user,
         uint256 _slippageTolerance
     ) public payable positionRequired(_user) nonReentrant accessControl(_user) {
-        if (shares == 0) revert ZeroAmount();
-        if (shares > _userBorrowShares(_user)) revert amountSharesInvalid();
+        if (_shares == 0) revert ZeroAmount();
+        if (_shares > _userBorrowShares(_user)) revert amountSharesInvalid(_shares, _userBorrowShares(_user));
 
         _accrueInterest();
-        (uint256 borrowAmount,,,) = _repayWithSelectedToken(shares, _user);
+        (uint256 borrowAmount,,,) = _repayWithSelectedToken(_shares, _user);
 
         if (_token == _borrowToken() && !_fromPosition) {
             if (_borrowToken() == address(1) && msg.value > 0) {
-                if (msg.value != borrowAmount) revert InsufficientCollateral();
+                if (msg.value != borrowAmount) revert RepayWithSelectedTokenWrongInputAmount(msg.value, borrowAmount);
                 IWrappedNative(_WRAPPED_NATIVE()).deposit{value: msg.value}();
             } else {
                 IERC20(_borrowToken()).safeTransferFrom(_user, address(this), borrowAmount);
@@ -293,7 +313,7 @@ contract LendingPool is ReentrancyGuard {
             IPosition(_addressPositions(_user)).repayWithSelectedToken(borrowAmount, _token, _slippageTolerance);
         }
 
-        emit RepayByPosition(_user, borrowAmount, shares);
+        emit RepayByPosition(_user, borrowAmount, _shares);
     }
 
     function _accessControl(address _user) internal view {
@@ -311,11 +331,12 @@ contract LendingPool is ReentrancyGuard {
     /**
      * @notice Creates a new Position contract for the caller if one does not already exist.
      * @dev Each user can have only one Position contract. The Position contract manages collateral and borrowed assets for the user.
+     * @param _user The address of the user to create a position.
      * @custom:throws PositionAlreadyCreated if the caller already has a Position contract.
      * @custom:emits CreatePosition when a new Position is created.
      */
     function _createPosition(address _user) internal {
-        if (_addressPositions(_user) != address(0)) revert PositionAlreadyCreated();
+        if (_addressPositions(_user) != address(0)) revert PositionAlreadyCreated(_addressPositions(_user));
         ILPRouter(router).createPosition(_user);
         emit CreatePosition(_user, _addressPositions(_user));
     }
@@ -381,6 +402,10 @@ contract LendingPool is ReentrancyGuard {
 
     function _liquidator() internal view returns (address) {
         return IIsHealthy(_factory()).liquidator();
+    }
+
+    function _checkOracleOnToken(address _token) internal view {
+        if (IFactory(_factory()).tokenDataStream(_token) == address(0)) revert OracleOnTokenNotSet(_token);
     }
     /**
      * @notice Liquidates an unhealthy position using DEX swapping

@@ -105,4 +105,8 @@ interface ILendingPool {
         external
         view
         returns (bool isLiquidatable, uint256 borrowValue, uint256 collateralValue);
+
+    function swapTokenByPosition(address _tokenIn, address _tokenOut, uint256 amountIn, uint256 slippageTolerance)
+        external
+        returns (uint256 amountOut);
 }

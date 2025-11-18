@@ -28,7 +28,8 @@ contract IsHealthy {
      *      - The borrowed value exceeds the maximum allowed based on LTV ratio
      */
     error InsufficientCollateral();
-
+    /// @notice Error thrown when oracle is not set on the token
+    error OracleOnTokenNotSet(address token);
     /**
      * @notice Address of the Liquidator contract
      */
@@ -40,6 +41,15 @@ contract IsHealthy {
      */
     constructor(address _liquidator) {
         liquidator = _liquidator;
+    }
+
+    modifier checkOracleOnToken(address factory, address _token) {
+        _checkOracleOnToken(factory, _token);
+        _;
+    }
+
+    function _checkOracleOnToken(address factory, address _token) internal view {
+        if (_tokenDataStream(factory, _token) == address(0)) revert OracleOnTokenNotSet(_token);
     }
 
     /**
@@ -72,7 +82,7 @@ contract IsHealthy {
         uint256 totalBorrowAssets,
         uint256 totalBorrowShares,
         uint256 userBorrowShares
-    ) public view {
+    ) public view checkOracleOnToken(factory, borrowToken) {
         (, uint256 borrowPrice,,,) = IOracle(_tokenDataStream(factory, borrowToken)).latestRoundData();
         uint256 collateralValue = 0;
         for (uint256 i = 1; i <= _counter(addressPositions); i++) {

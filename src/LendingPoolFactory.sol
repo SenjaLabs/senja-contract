@@ -75,6 +75,8 @@ contract LendingPoolFactory is
 
     event DexRouterSet(address indexed dexRouter);
 
+    error OracleOnTokenNotSet(address token);
+
     /**
      * @notice Structure representing a lending pool
      * @param collateralToken The address of the collateral token
@@ -103,6 +105,9 @@ contract LendingPoolFactory is
 
     address public DEX_ROUTER;
 
+    /// @notice The address of the lending pool deployer contract
+    address public lendingPoolRouterDeployer;
+
     /// @notice Mapping from token address to its data stream address
     mapping(address => address) public tokenDataStream;
 
@@ -116,8 +121,10 @@ contract LendingPoolFactory is
     /// @notice Total number of pools created
     uint256 public poolCount;
 
-    /// @notice The address of the lending pool deployer contract
-    address public lendingPoolRouterDeployer;
+    modifier checkOracleOnToken(address _token) {
+        _checkOracleOnToken(_token);
+        _;
+    }
 
     constructor() {
         _disableInitializers();
@@ -163,7 +170,12 @@ contract LendingPoolFactory is
      * @return The address of the newly created lending pool
      * @dev This function deploys a new lending pool using the lending pool deployer
      */
-    function createLendingPool(address collateralToken, address borrowToken, uint256 ltv) public returns (address) {
+    function createLendingPool(address collateralToken, address borrowToken, uint256 ltv)
+        public
+        checkOracleOnToken(collateralToken)
+        checkOracleOnToken(borrowToken)
+        returns (address)
+    {
         // Deploy a new router for this pool
         address router = ILPRouterDeployer(lendingPoolRouterDeployer)
             .deployLendingPoolRouter(address(this), collateralToken, borrowToken, ltv);
@@ -236,6 +248,10 @@ contract LendingPoolFactory is
     function setDexRouter(address _dexRouter) public onlyRole(OWNER_ROLE) {
         DEX_ROUTER = _dexRouter;
         emit DexRouterSet(_dexRouter);
+    }
+
+    function _checkOracleOnToken(address _token) internal view {
+        if (tokenDataStream[_token] == address(0)) revert OracleOnTokenNotSet(_token);
     }
 
     /**
