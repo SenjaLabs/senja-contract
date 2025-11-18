@@ -40,7 +40,7 @@ jobs:
           echo "Checking lib directory..."
           ls -la lib/ || echo "lib directory not found"
           echo "Checking LayerZero..."
-          ls -la lib/layerzero-v2/ || echo "layerzero-v2 not found"
+          ls -la lib/LayerZero-v2/ || echo "LayerZero-v2 not found"
           ls -la lib/devtools/ || echo "devtools not found"
           echo "Checking OpenZeppelin..."
           ls -la lib/openzeppelin-contracts/ || echo "openzeppelin-contracts not found"
