@@ -4,12 +4,12 @@ pragma solidity ^0.8.30;
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
-contract WBTCk is ERC20, Ownable {
+contract sWETH is ERC20, Ownable {
     mapping(address => bool) public operator;
 
     error NotOperator();
 
-    constructor() ERC20("Wrapped BTC representative", "WBTCk") Ownable(msg.sender) {}
+    constructor() ERC20("Wrapped ETH representative", "sWETH") Ownable(msg.sender) {}
 
     modifier onlyOperator() {
         _onlyOperator();
@@ -21,7 +21,7 @@ contract WBTCk is ERC20, Ownable {
     }
 
     function decimals() public pure override returns (uint8) {
-        return 8;
+        return 18;
     }
 
     function setOperator(address _operator, bool _isOperator) public onlyOwner {

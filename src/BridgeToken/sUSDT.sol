@@ -4,12 +4,12 @@ pragma solidity ^0.8.30;
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
-contract USDTk is ERC20, Ownable {
+contract sUSDT is ERC20, Ownable {
     mapping(address => bool) public operator;
 
     error NotOperator();
 
-    constructor() ERC20("USD Tether representative", "USDTk") Ownable(msg.sender) {}
+    constructor() ERC20("USD Tether representative", "sUSDT") Ownable(msg.sender) {}
 
     modifier onlyOperator() {
         _onlyOperator();

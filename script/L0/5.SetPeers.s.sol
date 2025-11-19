@@ -20,20 +20,20 @@ contract SetPeers is Script, Helper {
         vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
 
         // USDT Adapter peers
-        MyOApp(BASE_OFT_USDTK_ADAPTER).setPeer(BASE_EID, bytes32(uint256(uint160(BASE_OFT_USDTK_ADAPTER))));
-        MyOApp(BASE_OFT_USDTK_ADAPTER).setPeer(KAIA_EID, bytes32(uint256(uint160(KAIA_OFT_USDT_ADAPTER))));
+        MyOApp(BASE_OFT_SUSDT_ADAPTER).setPeer(BASE_EID, bytes32(uint256(uint160(BASE_OFT_SUSDT_ADAPTER))));
+        MyOApp(BASE_OFT_SUSDT_ADAPTER).setPeer(KAIA_EID, bytes32(uint256(uint160(KAIA_OFT_USDT_ADAPTER))));
 
         // WKAIA Adapter peers
-        MyOApp(BASE_OFT_WKAIAK_ADAPTER).setPeer(BASE_EID, bytes32(uint256(uint160(BASE_OFT_WKAIAK_ADAPTER))));
-        MyOApp(BASE_OFT_WKAIAK_ADAPTER).setPeer(KAIA_EID, bytes32(uint256(uint160(KAIA_OFT_WKAIA_ADAPTER))));
+        MyOApp(BASE_OFT_SWKAIA_ADAPTER).setPeer(BASE_EID, bytes32(uint256(uint160(BASE_OFT_SWKAIA_ADAPTER))));
+        MyOApp(BASE_OFT_SWKAIA_ADAPTER).setPeer(KAIA_EID, bytes32(uint256(uint160(KAIA_OFT_WKAIA_ADAPTER))));
 
         // WBTC Adapter peers
-        MyOApp(BASE_OFT_WBTCK_ADAPTER).setPeer(BASE_EID, bytes32(uint256(uint160(BASE_OFT_WBTCK_ADAPTER))));
-        MyOApp(BASE_OFT_WBTCK_ADAPTER).setPeer(KAIA_EID, bytes32(uint256(uint160(KAIA_OFT_WBTC_ADAPTER))));
+        MyOApp(BASE_OFT_SWBTC_ADAPTER).setPeer(BASE_EID, bytes32(uint256(uint160(BASE_OFT_SWBTC_ADAPTER))));
+        MyOApp(BASE_OFT_SWBTC_ADAPTER).setPeer(KAIA_EID, bytes32(uint256(uint160(KAIA_OFT_WBTC_ADAPTER))));
 
         // WETH Adapter peers
-        MyOApp(BASE_OFT_WETHK_ADAPTER).setPeer(BASE_EID, bytes32(uint256(uint160(BASE_OFT_WETHK_ADAPTER))));
-        MyOApp(BASE_OFT_WETHK_ADAPTER).setPeer(KAIA_EID, bytes32(uint256(uint160(KAIA_OFT_WETH_ADAPTER))));
+        MyOApp(BASE_OFT_SWETH_ADAPTER).setPeer(BASE_EID, bytes32(uint256(uint160(BASE_OFT_SWETH_ADAPTER))));
+        MyOApp(BASE_OFT_SWETH_ADAPTER).setPeer(KAIA_EID, bytes32(uint256(uint160(KAIA_OFT_WETH_ADAPTER))));
 
         MyOApp(BASE_OFT_MOCK_USDT_ADAPTER).setPeer(BASE_EID, bytes32(uint256(uint160(BASE_OFT_MOCK_USDT_ADAPTER))));
         MyOApp(BASE_OFT_MOCK_USDT_ADAPTER).setPeer(KAIA_EID, bytes32(uint256(uint160(KAIA_OFT_MOCK_USDT_ADAPTER))));
@@ -46,20 +46,20 @@ contract SetPeers is Script, Helper {
         vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
 
         // USDT Adapter peers
-        MyOApp(KAIA_OFT_USDT_ADAPTER).setPeer(BASE_EID, bytes32(uint256(uint160(BASE_OFT_USDTK_ADAPTER))));
+        MyOApp(KAIA_OFT_USDT_ADAPTER).setPeer(BASE_EID, bytes32(uint256(uint160(BASE_OFT_SUSDT_ADAPTER))));
         MyOApp(KAIA_OFT_USDT_ADAPTER).setPeer(KAIA_EID, bytes32(uint256(uint160(KAIA_OFT_USDT_ADAPTER))));
 
         // USDT Stargate Adapter peers
-        MyOApp(KAIA_OFT_USDT_STARGATE_ADAPTER).setPeer(BASE_EID, bytes32(uint256(uint160(BASE_OFT_USDTK_ADAPTER))));
+        MyOApp(KAIA_OFT_USDT_STARGATE_ADAPTER).setPeer(BASE_EID, bytes32(uint256(uint160(BASE_OFT_SUSDT_ADAPTER))));
         MyOApp(KAIA_OFT_USDT_STARGATE_ADAPTER)
             .setPeer(KAIA_EID, bytes32(uint256(uint160(KAIA_OFT_USDT_STARGATE_ADAPTER))));
 
         // WKAIA Adapter peers
-        MyOApp(KAIA_OFT_WKAIA_ADAPTER).setPeer(BASE_EID, bytes32(uint256(uint160(BASE_OFT_WKAIAK_ADAPTER))));
+        MyOApp(KAIA_OFT_WKAIA_ADAPTER).setPeer(BASE_EID, bytes32(uint256(uint160(BASE_OFT_SWKAIA_ADAPTER))));
         MyOApp(KAIA_OFT_WKAIA_ADAPTER).setPeer(KAIA_EID, bytes32(uint256(uint160(KAIA_OFT_WKAIA_ADAPTER))));
 
         // WBTC Adapter peers
-        MyOApp(KAIA_OFT_WBTC_ADAPTER).setPeer(BASE_EID, bytes32(uint256(uint160(BASE_OFT_WBTCK_ADAPTER))));
+        MyOApp(KAIA_OFT_WBTC_ADAPTER).setPeer(BASE_EID, bytes32(uint256(uint160(BASE_OFT_SWBTC_ADAPTER))));
         MyOApp(KAIA_OFT_WBTC_ADAPTER).setPeer(KAIA_EID, bytes32(uint256(uint160(KAIA_OFT_WBTC_ADAPTER))));
 
         // WETH Adapter peers

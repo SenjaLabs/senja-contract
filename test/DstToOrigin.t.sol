@@ -47,7 +47,7 @@ contract DstToOriginTest is Test, Helper {
 
     function setUp() public {
         vm.createSelectFork(vm.rpcUrl("base_mainnet"));
-        deal(BASE_USDTK, owner, 1000000000000000000000000000000000000000);
+        deal(BASE_SUSDT, owner, 1000000000000000000000000000000000000000);
         vm.startPrank(owner);
         _getUtils();
         _deployOApp();
@@ -162,7 +162,7 @@ contract DstToOriginTest is Test, Helper {
     // forge test -vvvv --match-test test_SupplyLiquidityCrosschain
     function test_SupplyLiquidityCrosschain() public {
         vm.startPrank(owner);
-        oappSupplyLiquidityUSDT.setOFTaddress(BASE_OFT_USDTK_ADAPTER);
+        oappSupplyLiquidityUSDT.setOFTaddress(BASE_OFT_SUSDT_ADAPTER);
 
         bytes memory extraOptions = OptionsBuilder.newOptions().addExecutorLzReceiveOption(65000, 0);
         SendParam memory sendParam = SendParam({
@@ -174,17 +174,17 @@ contract DstToOriginTest is Test, Helper {
             composeMsg: "",
             oftCmd: ""
         });
-        MessagingFee memory feeBridge = OFTUSDTadapter(BASE_OFT_USDTK_ADAPTER).quoteSend(sendParam, false);
+        MessagingFee memory feeBridge = OFTUSDTadapter(BASE_OFT_SUSDT_ADAPTER).quoteSend(sendParam, false);
 
         MessagingFee memory feeMessage =
             oappSupplyLiquidityUSDT.quoteSendString(KAIA_EID, KAIA_lendingPool, owner, KAIA_MOCK_USDT, 1e6, "", false);
 
-        IERC20(BASE_USDTK).approve(BASE_oappAdapter, 1e6);
+        IERC20(BASE_SUSDT).approve(BASE_oappAdapter, 1e6);
         OAppAdapter(BASE_oappAdapter).sendBridge{value: feeBridge.nativeFee + feeMessage.nativeFee}(
             address(oappSupplyLiquidityUSDT),
-            BASE_OFT_USDTK_ADAPTER,
+            BASE_OFT_SUSDT_ADAPTER,
             KAIA_lendingPool,
-            BASE_USDTK,
+            BASE_SUSDT,
             KAIA_MOCK_USDT,
             address(oappSupplyLiquidityUSDT),
             KAIA_EID,

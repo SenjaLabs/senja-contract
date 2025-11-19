@@ -76,10 +76,10 @@ contract SetReceiveConfig is Script, Helper {
         params[1] = SetConfigParam(eid1, RECEIVE_CONFIG_TYPE, encodedUln);
 
         vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
-        ILayerZeroEndpointV2(endpoint).setConfig(BASE_OFT_USDTK_ADAPTER, receiveLib, params);
-        ILayerZeroEndpointV2(endpoint).setConfig(BASE_OFT_WKAIAK_ADAPTER, receiveLib, params);
-        ILayerZeroEndpointV2(endpoint).setConfig(BASE_OFT_WBTCK_ADAPTER, receiveLib, params);
-        ILayerZeroEndpointV2(endpoint).setConfig(BASE_OFT_WETHK_ADAPTER, receiveLib, params);
+        ILayerZeroEndpointV2(endpoint).setConfig(BASE_OFT_SUSDT_ADAPTER, receiveLib, params);
+        ILayerZeroEndpointV2(endpoint).setConfig(BASE_OFT_SWKAIA_ADAPTER, receiveLib, params);
+        ILayerZeroEndpointV2(endpoint).setConfig(BASE_OFT_SWBTC_ADAPTER, receiveLib, params);
+        ILayerZeroEndpointV2(endpoint).setConfig(BASE_OFT_SWETH_ADAPTER, receiveLib, params);
         vm.stopBroadcast();
     }
 

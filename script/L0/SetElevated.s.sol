@@ -5,7 +5,7 @@ import {Script, console} from "forge-std/Script.sol";
 import {Helper} from "../DevTools/Helper.sol";
 import {ElevatedMinterBurner} from "../../src/layerzero/ElevatedMinterBurner.sol";
 import {OFTUSDTadapter} from "../../src/layerzero/OFTUSDTAdapter.sol";
-import {USDTk} from "../../src/BridgeToken/USDTk.sol";
+import {sUSDT} from "../../src/BridgeToken/sUSDT.sol";
 
 contract SetElevated is Script, Helper {
     address public owner = vm.envAddress("PUBLIC_KEY");
@@ -22,15 +22,15 @@ contract SetElevated is Script, Helper {
     }
 
     function _setElevated() internal {
-        elevatedminterburner = new ElevatedMinterBurner(address(BASE_USDTK), owner);
-        elevatedminterburner.setOperator(address(BASE_OFT_USDTK_ADAPTER), true);
-        OFTUSDTadapter(BASE_OFT_USDTK_ADAPTER).setElevatedMinterBurner(address(elevatedminterburner));
+        elevatedminterburner = new ElevatedMinterBurner(address(BASE_SUSDT), owner);
+        elevatedminterburner.setOperator(address(BASE_OFT_SUSDT_ADAPTER), true);
+        OFTUSDTadapter(BASE_OFT_SUSDT_ADAPTER).setElevatedMinterBurner(address(elevatedminterburner));
         console.log("address public BASE_USDTK_ELEVATED_MINTER_BURNER =", address(elevatedminterburner), ";");
     }
 
     function _setOperator() internal {
-        USDTk(BASE_USDTK).setOperator(BASE_USDTK_ELEVATED_MINTER_BURNER, true);
-        USDTk(BASE_USDTK).setOperator(BASE_OFT_USDTK_ADAPTER, true);
+        sUSDT(BASE_SUSDT).setOperator(BASE_SUSDT_ELEVATED_MINTER_BURNER, true);
+        sUSDT(BASE_SUSDT).setOperator(BASE_OFT_SUSDT_ADAPTER, true);
     }
 }
 

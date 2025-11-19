@@ -86,10 +86,10 @@ contract SetSendConfig is Script, Helper {
         params[2] = SetConfigParam(eid1, EXECUTOR_CONFIG_TYPE, encodedExec);
         params[3] = SetConfigParam(eid1, ULN_CONFIG_TYPE, encodedUln);
         vm.startBroadcast(privateKey);
-        ILayerZeroEndpointV2(endpoint).setConfig(BASE_OFT_USDTK_ADAPTER, sendLib, params);
-        ILayerZeroEndpointV2(endpoint).setConfig(BASE_OFT_WKAIAK_ADAPTER, sendLib, params);
-        ILayerZeroEndpointV2(endpoint).setConfig(BASE_OFT_WBTCK_ADAPTER, sendLib, params);
-        ILayerZeroEndpointV2(endpoint).setConfig(BASE_OFT_WETHK_ADAPTER, sendLib, params);
+        ILayerZeroEndpointV2(endpoint).setConfig(BASE_OFT_SUSDT_ADAPTER, sendLib, params);
+        ILayerZeroEndpointV2(endpoint).setConfig(BASE_OFT_SWKAIA_ADAPTER, sendLib, params);
+        ILayerZeroEndpointV2(endpoint).setConfig(BASE_OFT_SWBTC_ADAPTER, sendLib, params);
+        ILayerZeroEndpointV2(endpoint).setConfig(BASE_OFT_SWETH_ADAPTER, sendLib, params);
         vm.stopBroadcast();
     }
 

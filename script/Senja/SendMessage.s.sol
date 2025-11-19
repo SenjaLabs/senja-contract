@@ -90,8 +90,8 @@ contract SendMessage is Script, Helper {
 
     function _checkTokenOFT() internal view {
         if (block.chainid == 8453) {
-            console.log("tokenOFT", OFTUSDTadapter(BASE_OFT_USDTK_ADAPTER).tokenOFT());
-            console.log("elevated", OFTUSDTadapter(BASE_OFT_USDTK_ADAPTER).elevatedMinterBurner());
+            console.log("tokenOFT", OFTUSDTadapter(BASE_OFT_SUSDT_ADAPTER).tokenOFT());
+            console.log("elevated", OFTUSDTadapter(BASE_OFT_SUSDT_ADAPTER).elevatedMinterBurner());
             console.log("tokenOFT", OFTUSDTadapter(BASE_OFT_MOCK_USDT_ADAPTER).tokenOFT());
             console.log("elevated", OFTUSDTadapter(BASE_OFT_MOCK_USDT_ADAPTER).elevatedMinterBurner());
         } else if (block.chainid == 8217) {
@@ -106,7 +106,7 @@ contract SendMessage is Script, Helper {
 
     function _getUtils() internal {
         if (block.chainid == 8453) {
-            token = BASE_USDTK;
+            token = BASE_SUSDT;
             oappAdapter = BASE_oappAdapter;
         } else if (block.chainid == 8217) {
             token = KAIA_MOCK_USDT;

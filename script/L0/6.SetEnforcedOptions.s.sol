@@ -34,10 +34,10 @@ contract SetEnforcedOptions is Script, Helper {
         enforcedOptions[1] = EnforcedOptionParam({eid: dstEid2, msgType: SEND, options: options2});
 
         vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
-        MyOApp(BASE_OFT_USDTK_ADAPTER).setEnforcedOptions(enforcedOptions);
-        MyOApp(BASE_OFT_WKAIAK_ADAPTER).setEnforcedOptions(enforcedOptions);
-        MyOApp(BASE_OFT_WBTCK_ADAPTER).setEnforcedOptions(enforcedOptions);
-        MyOApp(BASE_OFT_WETHK_ADAPTER).setEnforcedOptions(enforcedOptions);
+        MyOApp(BASE_OFT_SUSDT_ADAPTER).setEnforcedOptions(enforcedOptions);
+        MyOApp(BASE_OFT_SWKAIA_ADAPTER).setEnforcedOptions(enforcedOptions);
+        MyOApp(BASE_OFT_SWBTC_ADAPTER).setEnforcedOptions(enforcedOptions);
+        MyOApp(BASE_OFT_SWETH_ADAPTER).setEnforcedOptions(enforcedOptions);
         MyOApp(BASE_OFT_MOCK_USDT_ADAPTER).setEnforcedOptions(enforcedOptions);
         vm.stopBroadcast();
 

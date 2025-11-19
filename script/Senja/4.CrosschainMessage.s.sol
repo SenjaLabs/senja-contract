@@ -190,7 +190,7 @@ contract CrosschainMessage is Script, Helper {
 
     function _setOFTAddress() internal {
         if (block.chainid == 8453) {
-            OAppSupplyLiquidityUSDT(BASE_oappSupplyLiquidityUSDT).setOFTaddress(BASE_OFT_USDTK_ADAPTER);
+            OAppSupplyLiquidityUSDT(BASE_oappSupplyLiquidityUSDT).setOFTaddress(BASE_OFT_SUSDT_ADAPTER);
         } else if (block.chainid == 8217) {
             OAppSupplyLiquidityUSDT(KAIA_oappSupplyLiquidityUSDT).setOFTaddress(KAIA_OFT_MOCK_USDT_ADAPTER);
         }

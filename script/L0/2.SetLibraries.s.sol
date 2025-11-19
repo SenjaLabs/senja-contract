@@ -46,16 +46,16 @@ contract SetLibraries is Script, Helper {
         vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
         _getUtils();
 
-        ILayerZeroEndpointV2(endpoint).setSendLibrary(BASE_OFT_USDTK_ADAPTER, dstEid1, sendLib);
-        ILayerZeroEndpointV2(endpoint).setSendLibrary(BASE_OFT_WKAIAK_ADAPTER, dstEid1, sendLib);
-        ILayerZeroEndpointV2(endpoint).setSendLibrary(BASE_OFT_WBTCK_ADAPTER, dstEid1, sendLib);
-        ILayerZeroEndpointV2(endpoint).setSendLibrary(BASE_OFT_WETHK_ADAPTER, dstEid1, sendLib);
+        ILayerZeroEndpointV2(endpoint).setSendLibrary(BASE_OFT_SUSDT_ADAPTER, dstEid1, sendLib);
+        ILayerZeroEndpointV2(endpoint).setSendLibrary(BASE_OFT_SWKAIA_ADAPTER, dstEid1, sendLib);
+        ILayerZeroEndpointV2(endpoint).setSendLibrary(BASE_OFT_SWBTC_ADAPTER, dstEid1, sendLib);
+        ILayerZeroEndpointV2(endpoint).setSendLibrary(BASE_OFT_SWETH_ADAPTER, dstEid1, sendLib);
 
         // Set receive library for inbound messages
-        ILayerZeroEndpointV2(endpoint).setReceiveLibrary(BASE_OFT_USDTK_ADAPTER, srcEid, receiveLib, gracePeriod);
-        ILayerZeroEndpointV2(endpoint).setReceiveLibrary(BASE_OFT_WKAIAK_ADAPTER, srcEid, receiveLib, gracePeriod);
-        ILayerZeroEndpointV2(endpoint).setReceiveLibrary(BASE_OFT_WBTCK_ADAPTER, srcEid, receiveLib, gracePeriod);
-        ILayerZeroEndpointV2(endpoint).setReceiveLibrary(BASE_OFT_WETHK_ADAPTER, srcEid, receiveLib, gracePeriod);
+        ILayerZeroEndpointV2(endpoint).setReceiveLibrary(BASE_OFT_SUSDT_ADAPTER, srcEid, receiveLib, gracePeriod);
+        ILayerZeroEndpointV2(endpoint).setReceiveLibrary(BASE_OFT_SWKAIA_ADAPTER, srcEid, receiveLib, gracePeriod);
+        ILayerZeroEndpointV2(endpoint).setReceiveLibrary(BASE_OFT_SWBTC_ADAPTER, srcEid, receiveLib, gracePeriod);
+        ILayerZeroEndpointV2(endpoint).setReceiveLibrary(BASE_OFT_SWETH_ADAPTER, srcEid, receiveLib, gracePeriod);
 
         vm.stopBroadcast();
     }
