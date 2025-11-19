@@ -145,4 +145,9 @@ contract Helper {
     address public KAIA_lendingPoolFactoryImplementation = 0xc28446267B3c9a733D6C7419535B883908e55813;
     address public KAIA_lendingPoolFactoryProxy = 0xa971CD2714fbCc9A942b09BC391a724Df9338206;
     address public KAIA_HELPER_UTILS = 0x3De8C22F6b84C575429c1B9cbf5bdDd49cf129fC;
+
+    address public KAIA_TESTNET_usdt_usd_adapter = 0xdF05e9AbF64dA281B3cBd8aC3581022eC4841FB2;
+    address public KAIA_TESTNET_native_usdt_adapter = 0xdF05e9AbF64dA281B3cBd8aC3581022eC4841FB2;
+    address public KAIA_TESTNET_eth_usdt_adapter = 0x15858A57854BBf0DF60A737811d50e1Ee785f9bc;
+    address public KAIA_TESTNET_btc_usdt_adapter = 0x4Ba8D8083e7F3652CCB084C32652e68566E9Ef23;
 }

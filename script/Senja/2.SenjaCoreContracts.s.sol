@@ -13,6 +13,7 @@ import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.s
 import {IFactory} from "../../src/interfaces/IFactory.sol";
 import {LendingPoolRouterDeployer} from "../../src/LendingPoolRouterDeployer.sol";
 import {MockDex} from "../../src/MockDex/MockDex.sol";
+import {MOCKTOKEN} from "../../src/MockToken/MOCKTOKEN.sol";
 
 contract SenjaCoreContracts is Script, Helper {
     Liquidator public liquidator;
@@ -24,6 +25,7 @@ contract SenjaCoreContracts is Script, Helper {
     LendingPoolFactory public lendingPoolFactory;
     ERC1967Proxy public proxy;
     MockDex public mockDex;
+    MOCKTOKEN public mockToken;
 
     address USDT;
     address USDT_STARGATE;
@@ -61,47 +63,49 @@ contract SenjaCoreContracts is Script, Helper {
             NATIVE_USDT_ADAPTER = KAIA_kaia_usdt_adapter;
             ETH_USDT_ADAPTER = KAIA_eth_usdt_adapter;
             BTC_USDT_ADAPTER = KAIA_btc_usdt_adapter;
+
             OFT_USDT = KAIA_OFT_MOCK_USDT_ADAPTER;
+            OFT_USDT_STARGATE = KAIA_OFT_USDT_STARGATE_ADAPTER;
             OFT_NATIVE = KAIA_OFT_MOCK_WKAIA_ADAPTER;
             OFT_WNATIVE = KAIA_OFT_MOCK_WKAIA_ADAPTER;
-            OFT_WETH;
-            OFT_WBTC;
+            OFT_WETH = KAIA_OFT_WETH_ADAPTER;
+            OFT_WBTC = KAIA_OFT_WBTC_ADAPTER;
             factory = KAIA_lendingPoolFactoryProxy;
+        } else if (block.chainid == 1001) {
+            chainName = "KAIA_TESTNET";
+            USDT = _deployMockToken("USDT", "USDT", 6);
+            USDT_STARGATE = address(0);
+            KAIA = address(1);
+            WKAIA = _deployMockToken("WKAIA", "WKAIA", 18);
+            WETH = _deployMockToken("WETH", "WETH", 18);
+            WBTC = _deployMockToken("WBTC", "WBTC", 8);
+            USDT_USD_ADAPTER = KAIA_TESTNET_usdt_usd_adapter;
+            NATIVE_USDT_ADAPTER = KAIA_TESTNET_native_usdt_adapter;
+            ETH_USDT_ADAPTER = KAIA_TESTNET_eth_usdt_adapter;
+            BTC_USDT_ADAPTER = KAIA_TESTNET_btc_usdt_adapter;
+
+            OFT_USDT = address(0);
+            OFT_USDT_STARGATE = address(0);
+            OFT_NATIVE = address(0);
+            OFT_WNATIVE = address(0);
+            OFT_WETH = address(0);
+            OFT_WBTC = address(0);
+        } else {
+            revert("chain dont recognize yet");
         }
     }
 
     function run() public {
-        vm.createSelectFork(vm.rpcUrl("kaia_mainnet"));
+        // vm.createSelectFork(vm.rpcUrl("kaia_mainnet"));
+        vm.createSelectFork(vm.rpcUrl("kaia_testnet"));
         _getUtils();
         vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
-        liquidator = new Liquidator();
-        isHealthy = new IsHealthy(address(liquidator));
-        lendingPoolDeployer = new LendingPoolDeployer();
-        lendingPoolRouterDeployer = new LendingPoolRouterDeployer();
-        protocol = new Protocol();
-        positionDeployer = new PositionDeployer();
-
-        lendingPoolFactory = new LendingPoolFactory();
-        bytes memory data = abi.encodeWithSelector(
-            lendingPoolFactory.initialize.selector,
-            address(isHealthy),
-            address(lendingPoolRouterDeployer),
-            address(lendingPoolDeployer),
-            address(protocol),
-            address(positionDeployer)
-        );
-
-        proxy = new ERC1967Proxy(address(lendingPoolFactory), data);
-        factory = address(proxy);
-
-        lendingPoolDeployer.setFactory(factory);
-
-        lendingPoolRouterDeployer.setFactory(factory);
-
+        _deploySenjaCore();
+        _setToFactory();
         _addTokenDataStream();
         _deployMockDex();
         _setDexRouter();
-        _setOftAddress();
+        // _setOftAddress();
         vm.stopBroadcast();
 
         console.log("address public %s_liquidator = %s;", chainName, address(liquidator));
@@ -118,7 +122,7 @@ contract SenjaCoreContracts is Script, Helper {
             IFactory(factory).addTokenDataStream(USDT, USDT_USD_ADAPTER);
             console.log("Token data stream of USDT set to %s", USDT_USD_ADAPTER);
         }
-        if (USDT_USD_ADAPTER != address(0)) {
+        if (USDT_STARGATE != address(0) && USDT_USD_ADAPTER != address(0)) {
             IFactory(factory).addTokenDataStream(USDT_STARGATE, USDT_USD_ADAPTER);
             console.log("Token data stream of USDT_STARGATE set to %s", USDT_USD_ADAPTER);
         }
@@ -140,6 +144,39 @@ contract SenjaCoreContracts is Script, Helper {
         }
     }
 
+    function _deployMockToken(string memory _name, string memory _symbol, uint8 _decimal) internal returns (address) {
+        mockToken = new MOCKTOKEN(_name, _symbol, _decimal);
+        console.log("address public %s_%s = %s;", chainName, _name, address(mockToken));
+        return address(mockToken);
+    }
+
+    function _setToFactory() internal {
+        factory = address(proxy);
+        lendingPoolDeployer.setFactory(factory);
+        lendingPoolRouterDeployer.setFactory(factory);
+    }
+
+    function _deploySenjaCore() internal {
+        liquidator = new Liquidator();
+        isHealthy = new IsHealthy(address(liquidator));
+        lendingPoolDeployer = new LendingPoolDeployer();
+        lendingPoolRouterDeployer = new LendingPoolRouterDeployer();
+        protocol = new Protocol();
+        positionDeployer = new PositionDeployer();
+
+        lendingPoolFactory = new LendingPoolFactory();
+        bytes memory data = abi.encodeWithSelector(
+            lendingPoolFactory.initialize.selector,
+            address(isHealthy),
+            address(lendingPoolRouterDeployer),
+            address(lendingPoolDeployer),
+            address(protocol),
+            address(positionDeployer)
+        );
+
+        proxy = new ERC1967Proxy(address(lendingPoolFactory), data);
+    }
+
     function _deployMockDex() internal {
         mockDex = new MockDex(factory);
         console.log("address public %s_mockDex = %s;", chainName, address(mockDex));
@@ -155,7 +192,7 @@ contract SenjaCoreContracts is Script, Helper {
             IFactory(factory).setOftAddress(USDT, OFT_USDT);
             console.log("OFT address of USDT set to %s", OFT_USDT);
         }
-        if (OFT_USDT_STARGATE != address(0)) {
+        if (USDT_STARGATE != address(0) && OFT_USDT_STARGATE != address(0)) {
             IFactory(factory).setOftAddress(USDT_STARGATE, OFT_USDT_STARGATE);
             console.log("OFT address of USDT_STARGATE set to %s", OFT_USDT_STARGATE);
         }
@@ -179,5 +216,6 @@ contract SenjaCoreContracts is Script, Helper {
 }
 
 // RUN
+// forge script SenjaCoreContracts --broadcast -vvv --verify
 // forge script SenjaCoreContracts --broadcast -vvv
 // forge script SenjaCoreContracts -vvv

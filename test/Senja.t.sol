@@ -189,7 +189,7 @@ contract SenjaTest is Test, Helper {
         // TESTNET
         else if (block.chainid == 1001) {
             USDT = _deployMockToken("USDT");
-            WNative = _deployMockToken("WNative");
+            WNative = _deployMockToken("WKAIA");
             DEX_ROUTER = KAIA_DEX_ROUTER;
         }
     }
@@ -198,7 +198,7 @@ contract SenjaTest is Test, Helper {
         if (keccak256(abi.encodePacked(_name)) == keccak256(abi.encodePacked("USDT"))) {
             mockUSDT = new MOCKUSDT();
             return address(mockUSDT);
-        } else if (keccak256(abi.encodePacked(_name)) == keccak256(abi.encodePacked("WNative"))) {
+        } else if (keccak256(abi.encodePacked(_name)) == keccak256(abi.encodePacked("WKAIA"))) {
             mockWKAIA = new MOCKWKAIA();
             return address(mockWKAIA);
         } else if (keccak256(abi.encodePacked(_name)) == keccak256(abi.encodePacked("WETH"))) {
@@ -317,10 +317,8 @@ contract SenjaTest is Test, Helper {
     }
 
     function _deployOracleAdapter() internal {
-        // if (block.chainid == 1001 || block.chainid == 8217) {
         oracle = new Oracle(native_usdt);
         native_usdt_adapter = address(oracle);
-        // }
         oracle = new Oracle(usdt_usd);
         usdt_usd_adapter = address(oracle);
         oracle = new Oracle(eth_usdt);
@@ -354,7 +352,6 @@ contract SenjaTest is Test, Helper {
         IFactory(address(proxy)).addTokenDataStream(USDT, usdt_usd_adapter);
         IFactory(address(proxy)).addTokenDataStream(WNative, native_usdt_adapter);
         IFactory(address(proxy)).addTokenDataStream(Native, native_usdt_adapter);
-
         IFactory(address(proxy)).setWrappedNative(WNative);
 
         // Deploy MockDex for testnet, Base, and Moonbeam
