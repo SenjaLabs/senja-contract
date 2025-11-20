@@ -150,4 +150,18 @@ contract Helper {
     address public KAIA_TESTNET_native_usdt_adapter = 0xdF05e9AbF64dA281B3cBd8aC3581022eC4841FB2;
     address public KAIA_TESTNET_eth_usdt_adapter = 0x15858A57854BBf0DF60A737811d50e1Ee785f9bc;
     address public KAIA_TESTNET_btc_usdt_adapter = 0x4Ba8D8083e7F3652CCB084C32652e68566E9Ef23;
+
+    address public KAIA_TESTNET_USDT = 0x5aAdFB43eF8dAF45DD80F4676345b7676f1D70e3;
+    address public KAIA_TESTNET_WKAIA = 0xf13D09eD3cbdD1C930d4de74808de1f33B6b3D4f;
+    address public KAIA_TESTNET_WETH = 0x5c4a3C2CD1ffE6aAfDF62b64bb3E620C696c832E;
+    address public KAIA_TESTNET_WBTC = 0x6AE5E129054a5dBFCeBb9Dfcb1CE1AA229fB1Ddb;
+
+    address public KAIA_TESTNET_mockDex = 0xC746B3AaB0C6Da075C9b7b43CEebd437Ef759D5b;
+    address public KAIA_TESTNET_liquidator = 0x007F735Fd070DeD4B0B58D430c392Ff0190eC20F;
+    address public KAIA_TESTNET_isHealthy = 0x5C368bd6cE77b2ca47B4ba791fCC1f1645591c84;
+    address public KAIA_TESTNET_lendingPoolDeployer = 0x175867CAF278eB0610F216F3E0a6E671f2382E22;
+    address public KAIA_TESTNET_protocol = 0xb3B458299864487520d3B0cEDf9F5cfF2629a27B;
+    address public KAIA_TESTNET_positionDeployer = 0x39926DA4905f5Edb956F5dB5F2e2FF044E0882B2;
+    address public KAIA_TESTNET_lendingPoolFactoryImplementation = 0xAE1b8d3B428d6A8F62df2f623081EAC8734168fe;
+    address public KAIA_TESTNET_lendingPoolFactoryProxy = 0xa8e2E14AA272d360235B9444f8214bA5fa2A2888;
 }
