@@ -80,7 +80,7 @@ contract OAppSupplyCollateralUSDT is OApp, OAppOptionsType3 {
         userAmount[_user] -= _amount;
         address collateralToken = _collateralToken(_lendingPool);
         IERC20(collateralToken).approve(_lendingPool, _amount);
-        ILendingPool(_lendingPool).supplyCollateral(_amount, _user);
+        ILendingPool(_lendingPool).supplyCollateral(_user, _amount);
         emit ExecuteCollateral(_lendingPool, collateralToken, _user, _amount);
     }
 

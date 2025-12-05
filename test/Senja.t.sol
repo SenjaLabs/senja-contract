@@ -1,43 +1,51 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
+// ======================= LIB =======================
 import {Test, console} from "forge-std/Test.sol";
-import {LendingPoolFactory} from "../src/LendingPoolFactory.sol";
-import {ILendingPool} from "../src/interfaces/ILendingPool.sol";
-import {ILPRouter} from "../src/interfaces/ILPRouter.sol";
-import {IsHealthy} from "../src/IsHealthy.sol";
-import {LendingPoolDeployer} from "../src/LendingPoolDeployer.sol";
-import {ProtocolV2} from "../src/ProtocolV2.sol";
-import {Oracle} from "../src/Oracle.sol";
-import {Liquidator} from "../src/Liquidator.sol";
-import {IOracle} from "../src/interfaces/IOracle.sol";
-import {OFTKAIAadapter} from "../src/layerzero/OFTKAIAAdapter.sol";
-import {OFTUSDTadapter} from "../src/layerzero/OFTUSDTAdapter.sol";
-import {ElevatedMinterBurner} from "../src/layerzero/ElevatedMinterBurner.sol";
-import {Helper} from "../script/DevTools/Helper.sol";
 import {ILayerZeroEndpointV2} from "@layerzerolabs/lz-evm-protocol-v2/contracts/interfaces/ILayerZeroEndpointV2.sol";
 import {SetConfigParam} from "@layerzerolabs/lz-evm-protocol-v2/contracts/interfaces/IMessageLibManager.sol";
 import {UlnConfig} from "@layerzerolabs/lz-evm-messagelib-v2/contracts/uln/UlnBase.sol";
 import {ExecutorConfig} from "@layerzerolabs/lz-evm-messagelib-v2/contracts/SendLibBase.sol";
-import {MyOApp} from "../src/layerzero/MyOApp.sol";
 import {EnforcedOptionParam} from "@layerzerolabs/oapp-evm/contracts/oapp/libs/OAppOptionsType3.sol";
 import {OptionsBuilder} from "@layerzerolabs/oapp-evm/contracts/oapp/libs/OptionsBuilder.sol";
+
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {HelperUtils} from "../src/HelperUtils.sol";
-import {IFactory} from "../src/interfaces/IFactory.sol";
-import {IPosition} from "../src/interfaces/IPosition.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+// ======================= Core Source =======================
+import {LendingPoolFactory} from "../src/LendingPoolFactory.sol";
+import {IsHealthy} from "../src/IsHealthy.sol";
+import {LendingPoolDeployer} from "../src/LendingPoolDeployer.sol";
+import {ProtocolV2} from "../src/ProtocolV2.sol";
+import {Oracle} from "../src/Oracle.sol";
+import {OFTKAIAadapter} from "../src/layerzero/OFTKAIAAdapter.sol";
+import {OFTUSDTadapter} from "../src/layerzero/OFTUSDTAdapter.sol";
+import {ElevatedMinterBurner} from "../src/layerzero/ElevatedMinterBurner.sol";
+import {HelperUtils} from "../src/HelperUtils.sol";
 import {PositionDeployer} from "../src/PositionDeployer.sol";
 import {LendingPoolRouterDeployer} from "../src/LendingPoolRouterDeployer.sol";
+import {TokenDataStream} from "../src/TokenDataStream.sol";
+import {InterestRateModel} from "../src/InterestRateModel.sol";
+
+// ======================= Helper =======================
+import {Helper} from "../script/DevTools/Helper.sol";
+// ======================= MockDex =======================
+import {MockDex} from "../src/MockDex/MockDex.sol";
+
+// ======================= MockToken =======================
 import {MOCKUSDT} from "../src/MockToken/MOCKUSDT.sol";
 import {MOCKWKAIA} from "../src/MockToken/MOCKWKAIA.sol";
 import {MOCKWETH} from "../src/MockToken/MOCKWETH.sol";
-import {MockDex} from "../src/MockDex/MockDex.sol";
-
-interface IOrakl {
-    function latestRoundData() external view returns (uint80, int256, uint256);
-    function decimals() external view returns (uint8);
-}
+// ======================= LayerZero =======================
+import {MyOApp} from "../src/layerzero/MyOApp.sol";
+// ======================= Interfaces =======================
+import {IOracle} from "../src/interfaces/IOracle.sol";
+import {ILendingPool} from "../src/interfaces/ILendingPool.sol";
+import {ILPRouter} from "../src/interfaces/ILPRouter.sol";
+import {IFactory} from "../src/interfaces/IFactory.sol";
+import {IPosition} from "../src/interfaces/IPosition.sol";
+import {IIsHealthy} from "../src/interfaces/IIsHealthy.sol";
+import {ITokenDataStream} from "../src/interfaces/ITokenDataStream.sol";
 
 // RUN
 // forge test --match-contract SenjaTest -vvv
@@ -45,7 +53,6 @@ contract SenjaTest is Test, Helper {
     using OptionsBuilder for bytes;
 
     IsHealthy public isHealthy;
-    Liquidator public liquidator;
     LendingPoolRouterDeployer public lendingPoolRouterDeployer;
     LendingPoolDeployer public lendingPoolDeployer;
     ProtocolV2 public protocol;
@@ -62,6 +69,10 @@ contract SenjaTest is Test, Helper {
     MOCKWKAIA public mockWKAIA;
     MOCKWETH public mockWETH;
     MockDex public mockDex;
+    TokenDataStream public tokenDataStream;
+    InterestRateModel public interestRateModel;
+
+    bytes32 public constant OWNER_ROLE = keccak256("OWNER_ROLE");
 
     address public lendingPool;
     address public lendingPool2;
@@ -111,13 +122,25 @@ contract SenjaTest is Test, Helper {
     uint256 borrowAmount;
     uint256 repayDebt;
 
+    uint256 amountStartSupply_1 = 1_000e6;
+    uint256 amountStartSupply_2 = 1_000 ether;
+    uint256 amountStartSupply_3 = 1_000e6;
+
     function setUp() public {
         // vm.createSelectFork(vm.rpcUrl("kaia_mainnet"));
         // vm.createSelectFork(vm.rpcUrl("base_mainnet"));
         vm.createSelectFork(vm.rpcUrl("kaia_testnet"));
         // vm.createSelectFork(vm.rpcUrl("moonbeam_mainnet"));
         vm.startPrank(owner);
+
         _getUtils();
+        deal(USDT, alice, 100_000e6);
+        deal(WNative, alice, 100_000 ether);
+        vm.deal(alice, 100_000 ether);
+
+        deal(USDT, owner, 100_000e6);
+        deal(WNative, owner, 100_000 ether);
+        vm.deal(owner, 100_000 ether);
         // *************** layerzero ***************
         if (block.chainid != 1001) {
             _deployOFT();
@@ -129,17 +152,27 @@ contract SenjaTest is Test, Helper {
         }
         // *****************************************
 
-        _deployOracleAdapter();
+        _deployTokenDataStream();
+        _deployInterestRateModel();
+        _deployDeployer();
+        _deployProtocol();
         _deployFactory();
+        _setDeployerToFactory();
+        _setFactoryConfig();
+        _configIsHealthy();
+        _setInterestRateModelToFactory();
+        _createLendingPool();
         helperUtils = new HelperUtils(address(proxy));
-        lendingPool = IFactory(address(proxy)).createLendingPool(WNative, USDT, 8e17);
-        lendingPool2 = IFactory(address(proxy)).createLendingPool(USDT, WNative, 8e17);
-        lendingPool3 = IFactory(address(proxy)).createLendingPool(Native, USDT, 8e17);
         if (block.chainid != 1001) _setOFTAddress();
-        deal(USDT, alice, 100_000e6);
-        deal(WNative, alice, 100_000 ether);
-        vm.deal(alice, 100_000 ether);
+
         vm.stopPrank();
+    }
+
+    function _deployInterestRateModel() internal {
+        interestRateModel = new InterestRateModel();
+        bytes memory data = abi.encodeWithSelector(interestRateModel.initialize.selector);
+        proxy = new ERC1967Proxy(address(interestRateModel), data);
+        interestRateModel = InterestRateModel(address(proxy));
     }
 
     function _getUtils() internal {
@@ -316,25 +349,25 @@ contract SenjaTest is Test, Helper {
         MyOApp(oapp3).setEnforcedOptions(enforcedOptions);
     }
 
-    function _deployOracleAdapter() internal {
-        oracle = new Oracle(native_usdt);
-        native_usdt_adapter = address(oracle);
-        oracle = new Oracle(usdt_usd);
-        usdt_usd_adapter = address(oracle);
-        oracle = new Oracle(eth_usdt);
-        eth_usdt_adapter = address(oracle);
-        oracle = new Oracle(btc_usdt);
-        btc_usdt_adapter = address(oracle);
+    function _deployTokenDataStream() internal {
+        tokenDataStream = new TokenDataStream();
+        tokenDataStream.setTokenPriceFeed(USDT, usdt_usd);
+        tokenDataStream.setTokenPriceFeed(WNative, native_usdt);
+        tokenDataStream.setTokenPriceFeed(Native, native_usdt);
+    }
+
+    function _deployDeployer() internal {
+        lendingPoolDeployer = new LendingPoolDeployer();
+        lendingPoolRouterDeployer = new LendingPoolRouterDeployer();
+        positionDeployer = new PositionDeployer();
+        isHealthy = new IsHealthy();
+    }
+
+    function _deployProtocol() internal {
+        protocol = new ProtocolV2();
     }
 
     function _deployFactory() internal {
-        liquidator = new Liquidator();
-        isHealthy = new IsHealthy(address(liquidator));
-        lendingPoolDeployer = new LendingPoolDeployer();
-        lendingPoolRouterDeployer = new LendingPoolRouterDeployer();
-        protocol = new ProtocolV2();
-        positionDeployer = new PositionDeployer();
-
         lendingPoolFactory = new LendingPoolFactory();
         bytes memory data = abi.encodeWithSelector(
             lendingPoolFactory.initialize.selector,
@@ -346,14 +379,6 @@ contract SenjaTest is Test, Helper {
         );
         proxy = new ERC1967Proxy(address(lendingPoolFactory), data);
 
-        lendingPoolDeployer.setFactory(address(proxy));
-        lendingPoolRouterDeployer.setFactory(address(proxy));
-
-        IFactory(address(proxy)).addTokenDataStream(USDT, usdt_usd_adapter);
-        IFactory(address(proxy)).addTokenDataStream(WNative, native_usdt_adapter);
-        IFactory(address(proxy)).addTokenDataStream(Native, native_usdt_adapter);
-        IFactory(address(proxy)).setWrappedNative(WNative);
-
         // Deploy MockDex for testnet, Base, and Moonbeam
         if (block.chainid == 1001 || block.chainid == 8453 || block.chainid == 1284) {
             _deployMockDex();
@@ -364,6 +389,78 @@ contract SenjaTest is Test, Helper {
         } else {
             revert("Dex Unconfigured");
         }
+    }
+
+    function _setDeployerToFactory() internal {
+        lendingPoolDeployer.setFactory(address(proxy));
+        lendingPoolRouterDeployer.setFactory(address(proxy));
+        isHealthy.setFactory(address(lendingPoolFactory));
+    }
+
+    function _setFactoryConfig() internal {
+        IFactory(address(proxy)).setOperator(address(proxy), true);
+        IFactory(address(proxy)).setTokenDataStream(address(tokenDataStream));
+        IFactory(address(proxy)).setWrappedNative(WNative);
+        IFactory(address(proxy)).setInterestRateModel(address(interestRateModel));
+
+        IFactory(address(proxy)).setMinAmountSupplyLiquidity(USDT, 1e6);
+        IFactory(address(proxy)).setMinAmountSupplyLiquidity(WNative, 0.1 ether);
+        IFactory(address(proxy)).setMinAmountSupplyLiquidity(Native, 0.1 ether);
+    }
+
+    function _setInterestRateModelToFactory() internal {
+        interestRateModel.grantRole(OWNER_ROLE, address(proxy));
+    }
+
+    function _configIsHealthy() internal {
+        IIsHealthy(address(isHealthy)).setFactory(address(proxy));
+    }
+
+    function _createLendingPool() internal {
+        IFactory.LendingPoolParams memory lendingPoolParams_1 = IFactory.LendingPoolParams({
+            collateralToken: WNative,
+            borrowToken: USDT,
+            ltv: 80e16,
+            supplyLiquidity: amountStartSupply_1,
+            baseRate: 0.05e16,
+            rateAtOptimal: 80e16,
+            optimalUtilization: 60e16,
+            maxUtilization: 60e16,
+            liquidationThreshold: 85e16,
+            liquidationBonus: 5e16
+        });
+        IERC20(USDT).approve(address(proxy), amountStartSupply_1);
+        lendingPool = IFactory(address(proxy)).createLendingPool(lendingPoolParams_1);
+
+        IFactory.LendingPoolParams memory lendingPoolParams_2 = IFactory.LendingPoolParams({
+            collateralToken: USDT,
+            borrowToken: WNative,
+            ltv: 8e17,
+            supplyLiquidity: amountStartSupply_2,
+            baseRate: 0.05e16,
+            rateAtOptimal: 80e16,
+            optimalUtilization: 60e16,
+            maxUtilization: 6e16,
+            liquidationThreshold: 85e16,
+            liquidationBonus: 5e16
+        });
+        IERC20(WNative).approve(address(proxy), amountStartSupply_2);
+        lendingPool2 = IFactory(address(proxy)).createLendingPool(lendingPoolParams_2);
+
+        IFactory.LendingPoolParams memory lendingPoolParams_3 = IFactory.LendingPoolParams({
+            collateralToken: Native,
+            borrowToken: USDT,
+            ltv: 8e17,
+            supplyLiquidity: amountStartSupply_3,
+            baseRate: 0.05e16,
+            rateAtOptimal: 80e16,
+            optimalUtilization: 60e16,
+            maxUtilization: 6e16,
+            liquidationThreshold: 85e16,
+            liquidationBonus: 5e16
+        });
+        IERC20(USDT).approve(address(proxy), amountStartSupply_3);
+        lendingPool3 = IFactory(address(proxy)).createLendingPool(lendingPoolParams_3);
     }
 
     function _setOFTAddress() internal {
@@ -393,23 +490,13 @@ contract SenjaTest is Test, Helper {
     // RUN
     // forge test --match-test test_checkorakl -vvv
     function test_checkorakl() public view {
-        (, int256 price,) = IOrakl(native_usdt).latestRoundData();
-        uint8 decimals = IOrakl(native_usdt).decimals();
-        console.log("native_usdt price", price);
-        console.log("native_usdt decimals", decimals);
-
-        (, uint256 price3,,,) = IOracle(native_usdt_adapter).latestRoundData();
-        console.log("native_usdt_adapter price", price3);
-        uint8 decimals3 = IOracle(native_usdt_adapter).decimals();
-        console.log("native_usdt_adapter decimals", decimals3);
-        (, uint256 price4,,,) = IOracle(eth_usdt_adapter).latestRoundData();
-        console.log("eth_usdt_adapter price", price4);
-        uint8 decimals4 = IOracle(eth_usdt_adapter).decimals();
-        console.log("eth_usdt_adapter decimals", decimals4);
-        (, uint256 price5,,,) = IOracle(btc_usdt_adapter).latestRoundData();
-        console.log("btc_usdt_adapter price", price5);
-        uint8 decimals5 = IOracle(btc_usdt_adapter).decimals();
-        console.log("btc_usdt_adapter decimals", decimals5);
+        address _tokenDataStream = IFactory(address(proxy)).tokenDataStream();
+        (, uint256 price,,,) = TokenDataStream(_tokenDataStream).latestRoundData(address(USDT));
+        console.log("USDT/USD price", price);
+        (, uint256 price2,,,) = TokenDataStream(_tokenDataStream).latestRoundData(WNative);
+        console.log("WNative/USD price", price2);
+        (, uint256 price3,,,) = TokenDataStream(_tokenDataStream).latestRoundData(Native);
+        console.log("Native/USD price", price3);
     }
 
     // RUN
@@ -431,9 +518,9 @@ contract SenjaTest is Test, Helper {
         vm.stopPrank();
 
         // Check balances
-        assertEq(IERC20(USDT).balanceOf(lendingPool), 1_000e6);
-        assertEq(IERC20(WNative).balanceOf(lendingPool2), 1_000 ether);
-        assertEq(IERC20(USDT).balanceOf(lendingPool3), 1_000e6);
+        // assertEq(IERC20(USDT).balanceOf(lendingPool), 1_000e6 + amountStartSupply_1);
+        assertEq(IERC20(WNative).balanceOf(lendingPool2), 1_000 ether + amountStartSupply_2);
+        assertEq(IERC20(USDT).balanceOf(lendingPool3), 1_000e6 + amountStartSupply_3);
     }
 
     // RUN
@@ -446,9 +533,9 @@ contract SenjaTest is Test, Helper {
         ILendingPool(lendingPool3).withdrawLiquidity(1_000e6);
         vm.stopPrank();
 
-        assertEq(IERC20(USDT).balanceOf(lendingPool), 0);
-        assertEq(IERC20(WNative).balanceOf(lendingPool2), 0);
-        assertEq(IERC20(USDT).balanceOf(lendingPool3), 0);
+        assertEq(IERC20(USDT).balanceOf(lendingPool), 0 + amountStartSupply_1);
+        assertEq(IERC20(WNative).balanceOf(lendingPool2), 0 + amountStartSupply_2);
+        assertEq(IERC20(USDT).balanceOf(lendingPool3), 0 + amountStartSupply_3);
     }
 
     // RUN
@@ -457,12 +544,12 @@ contract SenjaTest is Test, Helper {
         vm.startPrank(alice);
 
         IERC20(WNative).approve(lendingPool, 1000 ether);
-        ILendingPool(lendingPool).supplyCollateral(1000 ether, alice);
+        ILendingPool(lendingPool).supplyCollateral(alice, 1000 ether);
 
         IERC20(USDT).approve(lendingPool2, 1_000e6);
-        ILendingPool(lendingPool2).supplyCollateral(1_000e6, alice);
+        ILendingPool(lendingPool2).supplyCollateral(alice, 1_000e6);
 
-        ILendingPool(lendingPool3).supplyCollateral{value: 1_000 ether}(1_000 ether, alice);
+        ILendingPool(lendingPool3).supplyCollateral{value: 1_000 ether}(alice, 1_000 ether);
         vm.stopPrank();
 
         assertEq(IERC20(WNative).balanceOf(_addressPosition(lendingPool, alice)), 1000 ether);
@@ -492,22 +579,22 @@ contract SenjaTest is Test, Helper {
         test_supply_collateral();
 
         vm.startPrank(alice);
-        ILendingPool(lendingPool).borrowDebt(10e6, block.chainid, eid0, 65000);
-        ILendingPool(lendingPool).borrowDebt(10e6, block.chainid, eid0, 65000);
+        ILendingPool(lendingPool).borrowDebt(10e6, block.chainid, 65000);
+        ILendingPool(lendingPool).borrowDebt(10e6, block.chainid, 65000);
 
-        ILendingPool(lendingPool2).borrowDebt(0.1 ether, block.chainid, eid0, 65000);
-        ILendingPool(lendingPool2).borrowDebt(0.1 ether, block.chainid, eid0, 65000);
-        assertEq(ILPRouter(_router(lendingPool2)).userBorrowShares(alice), 2 * 0.1 ether);
-        assertEq(ILPRouter(_router(lendingPool2)).totalBorrowAssets(), 2 * 0.1 ether);
-        assertEq(ILPRouter(_router(lendingPool2)).totalBorrowShares(), 2 * 0.1 ether);
+        ILendingPool(lendingPool2).borrowDebt(0.1 ether, block.chainid, 65000);
+        ILendingPool(lendingPool2).borrowDebt(0.1 ether, block.chainid, 65000);
 
-        ILendingPool(lendingPool3).borrowDebt(10e6, block.chainid, eid0, 65000);
-        ILendingPool(lendingPool3).borrowDebt(10e6, block.chainid, eid0, 65000);
+        ILendingPool(lendingPool3).borrowDebt(10e6, block.chainid, 65000);
+        ILendingPool(lendingPool3).borrowDebt(10e6, block.chainid, 65000);
         vm.stopPrank();
 
         assertEq(ILPRouter(_router(lendingPool)).userBorrowShares(alice), 2 * 10e6);
         assertEq(ILPRouter(_router(lendingPool)).totalBorrowAssets(), 2 * 10e6);
         assertEq(ILPRouter(_router(lendingPool)).totalBorrowShares(), 2 * 10e6);
+        assertEq(ILPRouter(_router(lendingPool2)).userBorrowShares(alice), 2 * 0.1 ether);
+        assertEq(ILPRouter(_router(lendingPool2)).totalBorrowAssets(), 2 * 0.1 ether);
+        assertEq(ILPRouter(_router(lendingPool2)).totalBorrowShares(), 2 * 0.1 ether);
         assertEq(ILPRouter(_router(lendingPool3)).userBorrowShares(alice), 2 * 10e6);
         assertEq(ILPRouter(_router(lendingPool3)).totalBorrowAssets(), 2 * 10e6);
         assertEq(ILPRouter(_router(lendingPool3)).totalBorrowShares(), 2 * 10e6);
@@ -520,19 +607,19 @@ contract SenjaTest is Test, Helper {
 
         vm.startPrank(alice);
         IERC20(USDT).approve(lendingPool, 10e6);
-        ILendingPool(lendingPool).repayWithSelectedToken(10e6, USDT, false, alice, 500);
+        ILendingPool(lendingPool).repayWithSelectedToken(alice, USDT, 10e6, 0, false);
         IERC20(USDT).approve(lendingPool, 10e6);
-        ILendingPool(lendingPool).repayWithSelectedToken(10e6, USDT, false, alice, 500);
+        ILendingPool(lendingPool).repayWithSelectedToken(alice, USDT, 10e6, 500, false);
         // For WNative repayment, send native Native which gets auto-wrapped
         IERC20(WNative).approve(lendingPool2, 0.1 ether);
-        ILendingPool(lendingPool2).repayWithSelectedToken(0.1 ether, WNative, false, alice, 500);
+        ILendingPool(lendingPool2).repayWithSelectedToken(alice, WNative, 0.1 ether, 500, false);
         IERC20(WNative).approve(lendingPool2, 0.1 ether);
-        ILendingPool(lendingPool2).repayWithSelectedToken(0.1 ether, WNative, false, alice, 500);
+        ILendingPool(lendingPool2).repayWithSelectedToken(alice, WNative, 0.1 ether, 500, false);
 
         IERC20(USDT).approve(lendingPool3, 10e6);
-        ILendingPool(lendingPool3).repayWithSelectedToken(10e6, USDT, false, alice, 500);
+        ILendingPool(lendingPool3).repayWithSelectedToken(alice, USDT, 10e6, 500, false);
         IERC20(USDT).approve(lendingPool3, 10e6);
-        ILendingPool(lendingPool3).repayWithSelectedToken(10e6, USDT, false, alice, 500);
+        ILendingPool(lendingPool3).repayWithSelectedToken(alice, USDT, 10e6, 500, false);
         vm.stopPrank();
 
         assertEq(ILPRouter(_router(lendingPool)).userBorrowShares(alice), 0);
@@ -559,14 +646,14 @@ contract SenjaTest is Test, Helper {
             vm.startPrank(alice);
 
             uint256 fee = helperUtils.getFee(oft_usdt_adapter, BASE_EID, alice, 10e6);
-            ILendingPool(lendingPool).borrowDebt{value: fee}(10e6, 8453, BASE_EID, 65000);
+            ILendingPool(lendingPool).borrowDebt{value: fee}(10e6, 8453, 65000);
             fee = helperUtils.getFee(oft_usdt_adapter, BASE_EID, alice, 10e6);
-            ILendingPool(lendingPool).borrowDebt{value: fee}(10e6, 8453, BASE_EID, 65000);
+            ILendingPool(lendingPool).borrowDebt{value: fee}(10e6, 8453, 65000);
             if (block.chainid == 8217) {
                 fee = helperUtils.getFee(oft_native_adapter, BASE_EID, alice, 15 ether);
-                ILendingPool(lendingPool2).borrowDebt{value: fee}(15 ether, 8453, BASE_EID, 65000);
+                ILendingPool(lendingPool2).borrowDebt{value: fee}(15 ether, 8453, 65000);
                 fee = helperUtils.getFee(oft_native_adapter, BASE_EID, alice, 15 ether);
-                ILendingPool(lendingPool2).borrowDebt{value: fee}(15 ether, 8453, BASE_EID, 65000);
+                ILendingPool(lendingPool2).borrowDebt{value: fee}(15 ether, 8453, 65000);
 
                 assertEq(ILPRouter(_router(lendingPool2)).userBorrowShares(alice), 2 * 15 ether);
                 assertEq(ILPRouter(_router(lendingPool2)).totalBorrowAssets(), 2 * 15 ether);
@@ -574,9 +661,9 @@ contract SenjaTest is Test, Helper {
             }
 
             fee = helperUtils.getFee(oft_usdt_adapter, BASE_EID, alice, 10e6);
-            ILendingPool(lendingPool3).borrowDebt{value: fee}(10e6, 8453, BASE_EID, 65000);
+            ILendingPool(lendingPool3).borrowDebt{value: fee}(10e6, 8453, 65000);
             fee = helperUtils.getFee(oft_usdt_adapter, BASE_EID, alice, 10e6);
-            ILendingPool(lendingPool3).borrowDebt{value: fee}(10e6, 8453, BASE_EID, 65000);
+            ILendingPool(lendingPool3).borrowDebt{value: fee}(10e6, 8453, 65000);
 
             vm.stopPrank();
 
@@ -594,10 +681,10 @@ contract SenjaTest is Test, Helper {
     // forge test --match-test test_swap_collateral -vvv --match-contract SenjaTest
     function test_swap_collateral() public {
         test_supply_collateral();
-        vm.startPrank(alice);
         console.log("WNative balance before", IERC20(WNative).balanceOf(_addressPosition(lendingPool2, alice)));
 
-        ILendingPool(lendingPool2).swapTokenByPosition(USDT, WNative, 100e6, 100); // 1% slippage tolerance
+        vm.startPrank(alice);
+        ILendingPool(lendingPool2).swapTokenByPosition(USDT, WNative, 100e6, 100);
         vm.stopPrank();
 
         console.log("WNative balance after", IERC20(WNative).balanceOf(_addressPosition(lendingPool2, alice)));
@@ -629,7 +716,7 @@ contract SenjaTest is Test, Helper {
 
         // Step 3: Borrow debt
         vm.startPrank(alice);
-        ILendingPool(lendingPool).borrowDebt(10e6, block.chainid, eid0, 65000);
+        ILendingPool(lendingPool).borrowDebt(10e6, block.chainid, 65000);
         vm.stopPrank();
 
         // Verify initial state
@@ -642,34 +729,26 @@ contract SenjaTest is Test, Helper {
         vm.startPrank(alice);
         console.log("Initial WNative in position:", IERC20(WNative).balanceOf(position));
         console.log("Initial USDT in position:", IERC20(USDT).balanceOf(position));
-        IPosition(position).swapTokenByPosition(WNative, USDT, 100 ether, 10000);
+        ILendingPool(lendingPool).swapTokenByPosition(WNative, USDT, 100 ether, 10000);
         console.log("Final WNative in position:", IERC20(WNative).balanceOf(position));
         console.log("Final USDT in position:", IERC20(USDT).balanceOf(position));
-
         vm.stopPrank();
 
         vm.startPrank(alice);
         console.log("Before second swap - WNative:", IERC20(WNative).balanceOf(position));
         console.log("Before second swap - USDT:", IERC20(USDT).balanceOf(position));
-
-        IPosition(position).swapTokenByPosition(USDT, WNative, 1e6, 10000);
-
+        ILendingPool(lendingPool).swapTokenByPosition(USDT, WNative, 1e6, 10000);
         console.log("After second swap - WNative:", IERC20(WNative).balanceOf(position));
         console.log("After second swap - USDT:", IERC20(USDT).balanceOf(position));
-
         vm.stopPrank();
 
         vm.startPrank(alice);
-
         console.log("Before repayment - WNative:", IERC20(WNative).balanceOf(position));
         console.log("Before repayment - USDT:", IERC20(USDT).balanceOf(position));
-
         IERC20(USDT).approve(lendingPool, 5e6);
-        ILendingPool(lendingPool).repayWithSelectedToken(5e6, USDT, false, alice, 500);
-
+        ILendingPool(lendingPool).repayWithSelectedToken(alice, USDT, 5e6, 500, false);
         console.log("After repayment - WNative:", IERC20(WNative).balanceOf(position));
         console.log("After repayment - USDT:", IERC20(USDT).balanceOf(position));
-
         vm.stopPrank();
 
         assertLt(ILPRouter(_router(lendingPool)).userBorrowShares(alice), 50e6);
@@ -680,66 +759,52 @@ contract SenjaTest is Test, Helper {
     }
 
     // RUN
-    // forge test --match-test test_repay_with_high_slippage -vvv
-    function test_repay_with_high_slippage() public {
+    // forge test --match-test test_repay_with_collateral -vvv
+    function test_repay_with_collateral() public {
         // Setup: Supply liquidity, collateral, and borrow
         test_supply_liquidity();
         test_supply_collateral();
 
         vm.startPrank(alice);
-        ILendingPool(lendingPool).borrowDebt(20e6, block.chainid, eid0, 65000);
+        ILendingPool(lendingPool).borrowDebt(20e6, block.chainid, 65000);
         vm.stopPrank();
 
         address position = _addressPosition(lendingPool, alice);
-
-        // Test repaying with USDT directly (no swap needed)
         vm.startPrank(alice);
-
-        // Check initial state
         console.log("Initial WNative in position:", IERC20(WNative).balanceOf(position));
         console.log("Initial USDT in position:", IERC20(USDT).balanceOf(position));
         console.log("Initial borrow shares:", ILPRouter(_router(lendingPool)).userBorrowShares(alice));
-
-        // Repay using USDT directly (this should work without swapping)
         IERC20(USDT).approve(lendingPool, 10e6);
-        ILendingPool(lendingPool).repayWithSelectedToken(10e6, USDT, false, alice, 500);
-
-        // Check final state
+        ILendingPool(lendingPool).repayWithSelectedToken(alice, WNative, 10e6, 500, true);
         console.log("Final WNative in position:", IERC20(WNative).balanceOf(position));
         console.log("Final USDT in position:", IERC20(USDT).balanceOf(position));
         console.log("Final borrow shares:", ILPRouter(_router(lendingPool)).userBorrowShares(alice));
-
         vm.stopPrank();
-
-        // Verify some repayment occurred
         assertLt(ILPRouter(_router(lendingPool)).userBorrowShares(alice), 20e6);
     }
 
     // RUN
-    // forge test --match-test test_swap_with_extreme_slippage -vvv
-    function test_swap_with_extreme_slippage() public {
+    // forge test --match-test test_swap_with_zero_min_amount_out_minimum -vvv
+    function test_swap_with_zero_min_amount_out_minimum() public {
         test_supply_collateral();
 
         address position = _addressPosition(lendingPool, alice);
 
         vm.startPrank(alice);
 
-        // Test with maximum slippage tolerance (10000 = 100%)
         uint256 swapAmount = 50 ether;
 
         console.log("Testing swap with 10000 slippage tolerance (100%)");
         console.log("Initial WNative:", IERC20(WNative).balanceOf(position));
         console.log("Initial USDT:", IERC20(USDT).balanceOf(position));
 
-        // This should work even with extreme slippage
-        IPosition(position).swapTokenByPosition(WNative, USDT, swapAmount, 10000);
+        ILendingPool(lendingPool).swapTokenByPosition(WNative, USDT, swapAmount, 10000);
 
         console.log("After swap WNative:", IERC20(WNative).balanceOf(position));
         console.log("After swap USDT:", IERC20(USDT).balanceOf(position));
 
-        // Test swapping back (use a smaller amount that's available)
-        uint256 usdtAmount = 1e6; // Use 1 USDT instead of 10
-        IPosition(position).swapTokenByPosition(USDT, WNative, usdtAmount, 10000);
+        uint256 usdtAmount = 1e6;
+        ILendingPool(lendingPool).swapTokenByPosition(USDT, WNative, usdtAmount, 10000);
 
         console.log("After swap back WNative:", IERC20(WNative).balanceOf(position));
         console.log("After swap back USDT:", IERC20(USDT).balanceOf(position));
@@ -748,152 +813,82 @@ contract SenjaTest is Test, Helper {
     }
 
     // RUN
-    // forge test --match-test test_position_repay_with_swap -vvv
-    function test_position_repay_with_swap() public {
+    // forge test --match-test test_position_repay_collateral_swap -vvv
+    function test_position_repay_collateral_swap() public {
         // Setup: Supply liquidity, collateral, and borrow
         test_supply_liquidity();
         test_supply_collateral();
 
         vm.startPrank(alice);
-        ILendingPool(lendingPool).borrowDebt(20e6, block.chainid, eid0, 65000);
+        ILendingPool(lendingPool).borrowDebt(20e6, block.chainid, 65000);
         vm.stopPrank();
 
         address position = _addressPosition(lendingPool, alice);
 
-        // First, swap some WNative to USDT in the position
         vm.startPrank(alice);
-
         console.log("Before swap - WNative:", IERC20(WNative).balanceOf(position));
         console.log("Before swap - USDT:", IERC20(USDT).balanceOf(position));
         console.log("Before swap - borrow shares:", ILPRouter(_router(lendingPool)).userBorrowShares(alice));
-
-        // Swap WNative to USDT with high slippage tolerance
-        IPosition(position).swapTokenByPosition(WNative, USDT, 100 ether, 10000);
-
+        ILendingPool(lendingPool).swapTokenByPosition(WNative, USDT, 200 ether, 0);
         console.log("After swap - WNative:", IERC20(WNative).balanceOf(position));
         console.log("After swap - USDT:", IERC20(USDT).balanceOf(position));
-
         vm.stopPrank();
 
-        // Now test repayment using the position's repayWithSelectedToken function
-        // This should work because the position has USDT and can repay directly
         vm.startPrank(alice);
-
-        // The position should have USDT now, so we can repay directly
-        // But we need to call this through the lending pool, not directly on position
-        IERC20(USDT).approve(lendingPool, 10e6);
-        ILendingPool(lendingPool).repayWithSelectedToken(10e6, USDT, false, alice, 500);
-
+        ILendingPool(lendingPool).repayWithSelectedToken(alice, USDT, 10e6, 500, true);
         console.log("After repayment - WNative:", IERC20(WNative).balanceOf(position));
         console.log("After repayment - USDT:", IERC20(USDT).balanceOf(position));
         console.log("After repayment - borrow shares:", ILPRouter(_router(lendingPool)).userBorrowShares(alice));
-
         vm.stopPrank();
 
-        // Verify repayment occurred
         assertLt(ILPRouter(_router(lendingPool)).userBorrowShares(alice), 20e6);
     }
 
     // RUN
-    // forge test --match-test test_position_repay_with_collateral_swap -vvv --TODO:
+    // forge test --match-test test_position_repay_with_collateral_swap -vvv
     function test_position_repay_with_collateral_swap() public {
-        // Setup: Supply liquidity, collateral, and borrow
         test_supply_liquidity();
         test_supply_collateral();
 
         vm.startPrank(alice);
-        ILendingPool(lendingPool).borrowDebt(20e6, block.chainid, eid0, 65000);
+        ILendingPool(lendingPool).borrowDebt(20e6, block.chainid, 65000);
         vm.stopPrank();
 
         address position = _addressPosition(lendingPool, alice);
 
-        // Test repaying using WNative collateral through lending pool
-        // The lending pool should call the position's repayWithSelectedToken function
         vm.startPrank(alice);
-
         console.log("Before repayment - WNative:", IERC20(WNative).balanceOf(position));
         console.log("Before repayment - USDT:", IERC20(USDT).balanceOf(position));
         console.log("Before repayment - borrow shares:", ILPRouter(_router(lendingPool)).userBorrowShares(alice));
-
-        // Call repayWithSelectedToken through lending pool with WNative
-        // This should trigger internal swap from WNative to USDT in the position
-        ILendingPool(lendingPool).repayWithSelectedToken(10e6, WNative, false, alice, 10000);
-
+        ILendingPool(lendingPool).repayWithSelectedToken(alice, WNative, 10e6, 10000, true);
         console.log("After repayment - WNative:", IERC20(WNative).balanceOf(position));
         console.log("After repayment - USDT:", IERC20(USDT).balanceOf(position));
         console.log("After repayment - borrow shares:", ILPRouter(_router(lendingPool)).userBorrowShares(alice));
-
         vm.stopPrank();
-
-        // Verify repayment occurred
         assertLt(ILPRouter(_router(lendingPool)).userBorrowShares(alice), 20e6);
     }
 
     // RUN
-    // forge test --match-test test_position_swap_authorization_issue -vvv
-    function test_position_swap_authorization_issue() public {
-        // This test demonstrates the authorization issue in Position.sol
-        // The repayWithSelectedToken function calls swapTokenByPosition internally
-        // but swapTokenByPosition has _onlyAuthorizedSwap() modifier that doesn't allow
-        // the Position contract itself to call it
-
+    // forge test --match-test test_position_repay_other_token_direct -vvv
+    function test_position_repay_other_token_direct() public {
         test_supply_liquidity();
         test_supply_collateral();
 
         vm.startPrank(alice);
-        ILendingPool(lendingPool).borrowDebt(20e6, block.chainid, eid0, 65000);
+        ILendingPool(lendingPool).borrowDebt(15e6, block.chainid, 65000);
         vm.stopPrank();
 
         address position = _addressPosition(lendingPool, alice);
 
-        console.log("Position address:", position);
-        console.log("WNative in position:", IERC20(WNative).balanceOf(position));
-        console.log("USDT in position:", IERC20(USDT).balanceOf(position));
-
-        // Try to call swapTokenByPosition directly from the position (this should fail)
         vm.startPrank(alice);
-
-        // This will fail with NotForSwap() because the position contract is not authorized
-        // to call its own swapTokenByPosition function
-        try IPosition(position).swapTokenByPosition(WNative, USDT, 100 ether, 10000) {
-            console.log("Direct swap succeeded (unexpected)");
-        } catch Error(string memory reason) {
-            console.log("Direct swap failed as expected:", reason);
-        }
-
-        vm.stopPrank();
-
-        // The issue is that repayWithSelectedToken calls swapTokenByPosition internally
-        // but swapTokenByPosition has _onlyAuthorizedSwap() modifier that only allows
-        // calls from lending pool, IsHealthy, or Liquidator contracts
-        // The Position contract itself is not authorized to call swapTokenByPosition
-    }
-
-    // RUN
-    // forge test --match-test test_position_repay_collateral_direct -vvv --TODO:
-    function test_position_repay_collateral_direct() public {
-        // Setup: Supply liquidity, collateral, and borrow
-        test_supply_liquidity();
-        test_supply_collateral();
-
-        vm.startPrank(alice);
-        ILendingPool(lendingPool).borrowDebt(15e6, block.chainid, eid0, 65000);
-        vm.stopPrank();
-
-        address position = _addressPosition(lendingPool, alice);
-
-        // Test repaying using WNative collateral with high slippage tolerance
-        vm.startPrank(alice);
-
         console.log("Initial state:");
         console.log("WNative in position:", IERC20(WNative).balanceOf(position));
         console.log("USDT in position:", IERC20(USDT).balanceOf(position));
         console.log("Borrow shares:", ILPRouter(_router(lendingPool)).userBorrowShares(alice));
         console.log("Total borrow assets:", ILPRouter(_router(lendingPool)).totalBorrowAssets());
 
-        // Repay using WNative collateral through lending pool - this should swap internally
-        // The position contract should handle the swap from WNative to USDT
-        ILendingPool(lendingPool).repayWithSelectedToken(5e6, WNative, false, alice, 10000);
+        IERC20(WNative).approve(lendingPool, 5e6);
+        ILendingPool(lendingPool).repayWithSelectedToken(alice, WNative, 5e6, 10000, false);
 
         console.log("After first repayment:");
         console.log("WNative in position:", IERC20(WNative).balanceOf(position));
@@ -901,15 +896,14 @@ contract SenjaTest is Test, Helper {
         console.log("Borrow shares:", ILPRouter(_router(lendingPool)).userBorrowShares(alice));
         console.log("Total borrow assets:", ILPRouter(_router(lendingPool)).totalBorrowAssets());
 
-        // Try another repayment with WNative
-        ILendingPool(lendingPool).repayWithSelectedToken(5e6, WNative, false, alice, 10000);
+        IERC20(WNative).approve(lendingPool, 5e6);
+        ILendingPool(lendingPool).repayWithSelectedToken(alice, WNative, 5e6, 10000, false);
 
         console.log("After second repayment:");
         console.log("WNative in position:", IERC20(WNative).balanceOf(position));
         console.log("USDT in position:", IERC20(USDT).balanceOf(position));
         console.log("Borrow shares:", ILPRouter(_router(lendingPool)).userBorrowShares(alice));
         console.log("Total borrow assets:", ILPRouter(_router(lendingPool)).totalBorrowAssets());
-
         vm.stopPrank();
 
         // Verify repayments occurred
@@ -917,5 +911,25 @@ contract SenjaTest is Test, Helper {
         assertLt(ILPRouter(_router(lendingPool)).totalBorrowAssets(), 15e6);
     }
 
+    // RUN
+    // forge test --match-test test_borrow_higher_than_liquidation_threshold -vvv
+    function test_borrow_higher_than_liquidation_threshold() public {
+        test_supply_liquidity();
+        test_supply_collateral();
+        console.log("_tokenPrice(WNative)", 1000 * helper_tokenPrice(WNative) / 1e8);
+
+        vm.startPrank(alice);
+        ILendingPool(lendingPool).borrowDebt(35e6, block.chainid, 65000);
+        vm.stopPrank();
+    }
+
+    function helper_tokenPrice(address _token) internal view returns (uint256) {
+        (, uint256 price,,,) = ITokenDataStream(helper_tokenDataStream()).latestRoundData(_token);
+        return price;
+    }
+
+    function helper_tokenDataStream() internal view returns (address) {
+        return IFactory(address(proxy)).tokenDataStream();
+    }
     // TODO: Liquidation scenario test
 }

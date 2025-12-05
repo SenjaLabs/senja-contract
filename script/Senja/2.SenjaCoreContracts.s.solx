@@ -3,7 +3,6 @@ pragma solidity ^0.8.30;
 
 import {Script, console} from "forge-std/Script.sol";
 import {Helper} from "../DevTools/Helper.sol";
-import {Liquidator} from "../../src/Liquidator.sol";
 import {IsHealthy} from "../../src/IsHealthy.sol";
 import {LendingPoolDeployer} from "../../src/LendingPoolDeployer.sol";
 import {Protocol} from "../../src/Protocol.sol";
@@ -16,7 +15,6 @@ import {MockDex} from "../../src/MockDex/MockDex.sol";
 import {MOCKTOKEN} from "../../src/MockToken/MOCKTOKEN.sol";
 
 contract SenjaCoreContracts is Script, Helper {
-    Liquidator public liquidator;
     IsHealthy public isHealthy;
     LendingPoolDeployer public lendingPoolDeployer;
     LendingPoolRouterDeployer public lendingPoolRouterDeployer;
@@ -102,13 +100,12 @@ contract SenjaCoreContracts is Script, Helper {
         vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
         _deploySenjaCore();
         _setToFactory();
-        _addTokenDataStream();
+        _setTokenDataStream();
         _deployMockDex();
         _setDexRouter();
         // _setOftAddress();
         vm.stopBroadcast();
 
-        console.log("address public %s_liquidator = %s;", chainName, address(liquidator));
         console.log("address public %s_isHealthy = %s;", chainName, address(isHealthy));
         console.log("address public %s_lendingPoolDeployer = %s;", chainName, address(lendingPoolDeployer));
         console.log("address public %s_protocol = %s;", chainName, address(protocol));
@@ -117,29 +114,29 @@ contract SenjaCoreContracts is Script, Helper {
         console.log("address public %s_lendingPoolFactoryProxy = %s;", chainName, address(proxy));
     }
 
-    function _addTokenDataStream() internal {
+    function _setTokenDataStream() internal {
         if (USDT_USD_ADAPTER != address(0)) {
-            IFactory(factory).addTokenDataStream(USDT, USDT_USD_ADAPTER);
+            IFactory(factory).setTokenDataStream(USDT, USDT_USD_ADAPTER);
             console.log("Token data stream of USDT set to %s", USDT_USD_ADAPTER);
         }
         if (USDT_STARGATE != address(0) && USDT_USD_ADAPTER != address(0)) {
-            IFactory(factory).addTokenDataStream(USDT_STARGATE, USDT_USD_ADAPTER);
+            IFactory(factory).setTokenDataStream(USDT_STARGATE, USDT_USD_ADAPTER);
             console.log("Token data stream of USDT_STARGATE set to %s", USDT_USD_ADAPTER);
         }
         if (NATIVE_USDT_ADAPTER != address(0)) {
-            IFactory(factory).addTokenDataStream(WKAIA, NATIVE_USDT_ADAPTER);
+            IFactory(factory).setTokenDataStream(WKAIA, NATIVE_USDT_ADAPTER);
             console.log("Token data stream of WKAIA set to %s", NATIVE_USDT_ADAPTER);
         }
         if (NATIVE_USDT_ADAPTER != address(0)) {
-            IFactory(factory).addTokenDataStream(KAIA, NATIVE_USDT_ADAPTER);
+            IFactory(factory).setTokenDataStream(KAIA, NATIVE_USDT_ADAPTER);
             console.log("Token data stream of KAIA set to %s", NATIVE_USDT_ADAPTER);
         }
         if (ETH_USDT_ADAPTER != address(0)) {
-            IFactory(factory).addTokenDataStream(WETH, ETH_USDT_ADAPTER);
+            IFactory(factory).setTokenDataStream(WETH, ETH_USDT_ADAPTER);
             console.log("Token data stream of WETH set to %s", ETH_USDT_ADAPTER);
         }
         if (BTC_USDT_ADAPTER != address(0)) {
-            IFactory(factory).addTokenDataStream(WBTC, BTC_USDT_ADAPTER);
+            IFactory(factory).setTokenDataStream(WBTC, BTC_USDT_ADAPTER);
             console.log("Token data stream of WBTC set to %s", BTC_USDT_ADAPTER);
         }
     }
@@ -157,8 +154,7 @@ contract SenjaCoreContracts is Script, Helper {
     }
 
     function _deploySenjaCore() internal {
-        liquidator = new Liquidator();
-        isHealthy = new IsHealthy(address(liquidator));
+        isHealthy = new IsHealthy(address(factory));
         lendingPoolDeployer = new LendingPoolDeployer();
         lendingPoolRouterDeployer = new LendingPoolRouterDeployer();
         protocol = new Protocol();

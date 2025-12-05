@@ -18,7 +18,7 @@ interface ILendingPool {
      * @notice This function allows users to deposit collateral
      * @custom:security Users must approve tokens before calling this function
      */
-    function supplyCollateral(uint256 _amount, address _user) external payable;
+    function supplyCollateral(address _user, uint256 _amount) external payable;
 
     /**
      * @dev Supplies liquidity to the lending pool
@@ -33,12 +33,11 @@ interface ILendingPool {
      * @dev Borrows debt from the lending pool
      * @param _amount Amount to borrow
      * @param _chainId Chain ID for cross-chain operations
-     * @param _dstEid Destination endpoint ID for LayerZero
      * @param _addExecutorLzReceiveOption Executor options for LayerZero
      * @notice This function allows users to borrow against their collateral
      * @custom:security Users must have sufficient collateral to borrow
      */
-    function borrowDebt(uint256 _amount, uint256 _chainId, uint32 _dstEid, uint128 _addExecutorLzReceiveOption)
+    function borrowDebt(uint256 _amount, uint256 _chainId, uint128 _addExecutorLzReceiveOption)
         external
         payable;
 
@@ -48,16 +47,16 @@ interface ILendingPool {
      * @param _token Address of the token used for repayment
      * @param _fromPosition Whether to repay from position balance
      * @param _user Address of the user repaying the debt
-     * @param _slippageTolerance Slippage tolerance in basis points (e.g., 500 = 5%)
+     * @param _amountOutMinimum Slippage tolerance in basis points (e.g., 500 = 5%)
      * @notice This function allows users to repay their borrowed debt
      * @custom:security Users must approve tokens before calling this function
      */
     function repayWithSelectedToken(
-        uint256 _shares,
-        address _token,
-        bool _fromPosition,
         address _user,
-        uint256 _slippageTolerance
+        address _token,
+        uint256 _shares,
+        uint256 _amountOutMinimum,
+        bool _fromPosition
     ) external payable;
 
     /**
@@ -77,34 +76,11 @@ interface ILendingPool {
     function withdrawCollateral(uint256 _amount) external;
 
     /**
-     * @dev Liquidates an unhealthy position using DEX swapping
+     * @dev Liquidates an unhealthy position
      * @param borrower The address of the borrower to liquidate
-     * @param liquidationIncentive The liquidation incentive in basis points (e.g., 500 = 5%)
-     * @return liquidatedAmount Amount of debt repaid through liquidation
      * @notice Anyone can call this function to liquidate unhealthy positions
      */
-    function liquidateByDEX(address borrower, uint256 liquidationIncentive) external returns (uint256 liquidatedAmount);
-
-    /**
-     * @dev Liquidates an unhealthy position by allowing MEV/external liquidator to buy collateral
-     * @param borrower The address of the borrower to liquidate
-     * @param repayAmount Amount of debt the liquidator wants to repay
-     * @param liquidationIncentive The liquidation incentive in basis points
-     * @notice Liquidator pays debt and receives collateral with incentive
-     */
-    function liquidateByMEV(address borrower, uint256 repayAmount, uint256 liquidationIncentive) external payable;
-
-    /**
-     * @dev Checks if a borrower's position is liquidatable
-     * @param borrower The address of the borrower to check
-     * @return isLiquidatable Whether the position can be liquidated
-     * @return borrowValue The current borrow value in USD
-     * @return collateralValue The current collateral value in USD
-     */
-    function checkLiquidation(address borrower)
-        external
-        view
-        returns (bool isLiquidatable, uint256 borrowValue, uint256 collateralValue);
+    function liquidation(address borrower) external;
 
     function swapTokenByPosition(address _tokenIn, address _tokenOut, uint256 amountIn, uint256 slippageTolerance)
         external

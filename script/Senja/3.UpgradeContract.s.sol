@@ -7,7 +7,6 @@ import {Helper} from "../DevTools/Helper.sol";
 import {LendingPoolRouterDeployer} from "../../src/LendingPoolRouterDeployer.sol";
 import {LendingPoolDeployer} from "../../src/LendingPoolDeployer.sol";
 import {IsHealthy} from "../../src/IsHealthy.sol";
-import {Liquidator} from "../../src/Liquidator.sol";
 import {PositionDeployer} from "../../src/PositionDeployer.sol";
 import {Protocol} from "../../src/Protocol.sol";
 
@@ -16,7 +15,6 @@ contract UpgradeContract is Script, Helper {
     LendingPoolRouterDeployer public lendingPoolRouterDeployer;
     LendingPoolDeployer public lendingPoolDeployer;
     IsHealthy public isHealthy;
-    Liquidator public liquidator;
     PositionDeployer public positionDeployer;
     Protocol public protocol;
 
@@ -67,11 +65,8 @@ contract UpgradeContract is Script, Helper {
     }
 
     function _setupLiquidatorAndIsHealthy() internal {
-        liquidator = new Liquidator();
-        liquidator.setFactory(lendingPoolFactoryProxy);
-        isHealthy = new IsHealthy(address(liquidator));
+        isHealthy = new IsHealthy();
         LendingPoolFactory(lendingPoolFactoryProxy).setIsHealthy(address(isHealthy));
-        console.log("address public %s_liquidator = %s;", chainName, address(liquidator));
         console.log("address public %s_isHealthy = %s;", chainName, address(isHealthy));
     }
 
@@ -95,7 +90,7 @@ contract UpgradeContract is Script, Helper {
     }
 
     function _createLendingPool() internal {
-        LendingPoolFactory(lendingPoolFactoryProxy).createLendingPool(MOCK_WNative, MOCK_USDT, 886e15);
+        // LendingPoolFactory(lendingPoolFactoryProxy).createLendingPool(MOCK_WNative, MOCK_USDT, 886e15);
     }
 
     function _getUtils() internal {

@@ -1,14 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {IFactory} from "../interfaces/IFactory.sol";
-import {IOracle} from "../interfaces/IOracle.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {IMintableBurnable} from "../interfaces/IMintableBurnable.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {IMintableBurnable} from "../interfaces/IMintableBurnable.sol";
+import {IFactory} from "../interfaces/IFactory.sol";
+import {IOracle} from "../interfaces/IOracle.sol";
+import {ITokenDataStream} from "../interfaces/ITokenDataStream.sol";
 
 contract MockDex is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -46,10 +47,7 @@ contract MockDex is Ownable, ReentrancyGuard {
     {
         IERC20(params.tokenIn).transferFrom(msg.sender, address(this), params.amountIn);
 
-        address _tokenInPrice = IFactory(factory).tokenDataStream(params.tokenIn);
-        address _tokenOutPrice = IFactory(factory).tokenDataStream(params.tokenOut);
-
-        amountOut = tokenCalculator(params.tokenIn, params.tokenOut, params.amountIn, _tokenInPrice, _tokenOutPrice);
+        amountOut = tokenCalculator(params.tokenIn, params.tokenOut, params.amountIn);
 
         IMintableBurnable(params.tokenIn).burn(address(this), params.amountIn);
         IMintableBurnable(params.tokenOut).mint(msg.sender, amountOut);
@@ -57,21 +55,28 @@ contract MockDex is Ownable, ReentrancyGuard {
         emit ExactInputSingle(params.tokenIn, params.tokenOut, params.amountIn, amountOut, params.amountOutMinimum);
     }
 
-    function tokenCalculator(
-        address _tokenIn,
-        address _tokenOut,
-        uint256 _amountIn,
-        address _tokenInPrice,
-        address _tokenOutPrice
-    ) public view returns (uint256) {
+    function tokenCalculator(address _tokenIn, address _tokenOut, uint256 _amountIn) public view returns (uint256) {
         uint256 tokenInDecimal = IERC20Metadata(_tokenIn).decimals();
         uint256 tokenOutDecimal = IERC20Metadata(_tokenOut).decimals();
 
-        (, uint256 quotePrice,,,) = IOracle(_tokenInPrice).latestRoundData();
-        (, uint256 basePrice,,,) = IOracle(_tokenOutPrice).latestRoundData();
+        uint256 quotePrice = _tokenPrice(_tokenIn);
+        uint256 basePrice = _tokenPrice(_tokenOut);
 
         uint256 amountOut =
             (_amountIn * ((uint256(quotePrice) * (10 ** tokenOutDecimal)) / uint256(basePrice))) / 10 ** tokenInDecimal;
         return amountOut;
+    }
+
+    function _tokenDataStream() internal view returns (address) {
+        return IFactory(factory).tokenDataStream();
+    }
+
+    function _oracleAddress(address _token) internal view returns (address) {
+        return ITokenDataStream(_tokenDataStream()).tokenPriceFeed(_token);
+    }
+
+    function _tokenPrice(address _token) internal view returns (uint256) {
+        (, uint256 price,,,) = ITokenDataStream(_tokenDataStream()).latestRoundData(_token);
+        return price;
     }
 }

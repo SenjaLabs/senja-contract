@@ -12,6 +12,7 @@ import {OFTadapter} from "./layerzero/OFTadapter.sol";
 import {OptionsBuilder} from "@layerzerolabs/oapp-evm/contracts/oapp/libs/OptionsBuilder.sol";
 import {SendParam} from "@layerzerolabs/oft-evm/contracts/interfaces/IOFT.sol";
 import {MessagingFee} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
+import {ITokenDataStream} from "./interfaces/ITokenDataStream.sol";
 
 contract HelperUtils {
     using OptionsBuilder for bytes;
@@ -49,8 +50,8 @@ contract HelperUtils {
         view
         returns (uint256)
     {
-        address _tokenInPrice = _tokenDataStream(_tokenIn);
-        address _tokenOutPrice = _tokenDataStream(_tokenOut);
+        address _tokenInPrice = _oracleAddress(_tokenIn);
+        address _tokenOutPrice = _oracleAddress(_tokenOut);
         uint256 tokenValue =
             IPosition(_position).tokenCalculator(_tokenIn, _tokenOut, _amountIn, _tokenInPrice, _tokenOutPrice);
 
@@ -58,8 +59,8 @@ contract HelperUtils {
     }
 
     function getTokenValue(address _token) public view returns (uint256) {
-        address tokenDataStream = _tokenDataStream(_token);
-        (, uint256 tokenPrice,,,) = IOracle(tokenDataStream).latestRoundData();
+        address oracleAddress = _oracleAddress(_token);
+        (, uint256 tokenPrice,,,) = IOracle(oracleAddress).latestRoundData();
         return uint256(tokenPrice);
     }
 
@@ -280,8 +281,8 @@ contract HelperUtils {
         address borrowToken = _borrowToken(_lendingPool);
         address addressPosition = _addressPositions(_lendingPool, _user);
 
-        address _tokenInPrice = _tokenDataStream(collateralToken);
-        address _tokenOutPrice = _tokenDataStream(borrowToken);
+        address _tokenInPrice = _oracleAddress(collateralToken);
+        address _tokenOutPrice = _oracleAddress(borrowToken);
 
         uint256 collateralBalance;
         if (collateralToken == _WRAPPED_NATIVE()) {
@@ -336,8 +337,12 @@ contract HelperUtils {
         return _router(_lendingPool).userBorrowShares(_user);
     }
 
-    function _tokenDataStream(address _token) internal view returns (address) {
-        return IFactory(factory).tokenDataStream(_token);
+    function _tokenDataStream() internal view returns (address) {
+        return IFactory(factory).tokenDataStream();
+    }
+
+    function _oracleAddress(address _token) internal view returns (address) {
+        return ITokenDataStream(_tokenDataStream()).tokenPriceFeed(_token);
     }
 
     function _addressToBytes32(address _address) internal pure returns (bytes32) {

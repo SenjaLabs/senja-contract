@@ -2,8 +2,10 @@
 pragma solidity ^0.8.30;
 
 import {IFactory} from "./interfaces/IFactory.sol";
-import {IIsHealthy} from "./interfaces/IIsHealthy.sol";
 import {IPositionDeployer} from "./interfaces/IPositionDeployer.sol";
+import {IPosition} from "./interfaces/IPosition.sol";
+import {IIsHealthy} from "./interfaces/IIsHealthy.sol";
+import {IInterestRateModel} from "./interfaces/IInterestRateModel.sol";
 
 /**
  * @title LendingPoolRouter
@@ -29,6 +31,9 @@ contract LendingPoolRouter {
     /// @notice Error thrown when user has insufficient collateral
     error InsufficientCollateral(uint256 amount, uint256 expectedAmount);
     error TotalBorrowSharesZero(uint256 shares, uint256 totalBorrowShares);
+    error NotLiquidable(address user);
+    error AssetNotLiquidatable(address collateralToken, uint256 collateralValue, uint256 borrowValue);
+    error MaxUtilizationReached(address borrowToken, uint256 newUtilization, uint256 maxUtilization);
 
     /// @notice Total supply assets in the pool
     uint256 public totalSupplyAssets;
@@ -43,8 +48,6 @@ contract LendingPoolRouter {
     mapping(address => uint256) public userSupplyShares;
     /// @notice Mapping of user to their borrow shares
     mapping(address => uint256) public userBorrowShares;
-    /// @notice Mapping of user to their collateral amount
-    mapping(address => uint256) public userCollateral;
     /// @notice Mapping of user to their position contract address
     mapping(address => address) public addressPositions;
 
@@ -128,35 +131,8 @@ contract LendingPoolRouter {
         return amount;
     }
 
-    function supplyCollateral(address _user, uint256 _amount) public onlyLendingPool {
-        userCollateral[_user] += _amount;
-    }
-
-    function withdrawCollateral(uint256 _amount, address _user) public onlyLendingPool returns (uint256) {
-        if (userCollateral[_user] < _amount) revert InsufficientCollateral(userCollateral[_user], _amount);
-
-        userCollateral[_user] -= _amount;
-
-        if (userBorrowShares[_user] > 0) {
-            address isHealthy = IFactory(factory).isHealthy();
-            // ishealthy supply collateral
-            IIsHealthy(isHealthy)
-                ._isHealthy(
-                    borrowToken,
-                    factory,
-                    addressPositions[_user],
-                    ltv,
-                    totalBorrowAssets,
-                    totalBorrowShares,
-                    userBorrowShares[_user]
-                );
-        }
-        return userCollateral[_user];
-    }
-
     /**
      * @dev Calculate dynamic borrow rate based on utilization rate
-     * Similar to AAVE's interest rate model
      * @return borrowRate The annual borrow rate in percentage (scaled by 100)
      */
     function calculateBorrowRate() public view returns (uint256 borrowRate) {
@@ -224,21 +200,13 @@ contract LendingPoolRouter {
     }
 
     function accrueInterest() public {
-        // Use dynamic interest rate based on utilization
-        uint256 borrowRate = calculateBorrowRate();
-
-        uint256 interestPerYear = (totalBorrowAssets * borrowRate) / 10000; // borrowRate is scaled by 100
         uint256 elapsedTime = block.timestamp - lastAccrued;
-        uint256 interest = (interestPerYear * elapsedTime) / 365 days;
-
-        // Reserve factor - portion of interest that goes to protocol
-        uint256 reserveFactor = 1000; // 10% (scaled by 10000)
-        uint256 reserveInterest = (interest * reserveFactor) / 10000;
-        uint256 supplierInterest = interest - reserveInterest;
-
-        totalSupplyAssets += supplierInterest;
-        totalBorrowAssets += interest;
+        if (elapsedTime == 0) return; // No time elapsed, skip
         lastAccrued = block.timestamp;
+        if (totalBorrowAssets == 0) return;
+        uint256 interest = IInterestRateModel(_interestRateModel()).calculateInterest(address(this), elapsedTime);
+        totalSupplyAssets += interest;
+        totalBorrowAssets += interest;
     }
 
     function borrowDebt(uint256 _amount, address _user)
@@ -258,23 +226,18 @@ contract LendingPoolRouter {
         totalBorrowShares += shares;
         totalBorrowAssets += _amount;
 
+        uint256 newUtilization = (totalBorrowAssets * 1e18) / totalSupplyAssets;
+
+        if (newUtilization >= _maxUtilization()) {
+            revert MaxUtilizationReached(borrowToken, newUtilization, _maxUtilization());
+        }
+
         protocolFee = (_amount * 1e15) / 1e18; // 0.1%
         userAmount = _amount - protocolFee;
 
         if (totalBorrowAssets > totalSupplyAssets) {
             revert InsufficientLiquidity();
         }
-        address isHealthy = IFactory(factory).isHealthy();
-        IIsHealthy(isHealthy)
-            ._isHealthy(
-                borrowToken,
-                factory,
-                addressPositions[_user], // check position from other chain
-                ltv,
-                totalBorrowAssets,
-                totalBorrowShares,
-                userBorrowShares[_user]
-            );
 
         return (protocolFee, userAmount, shares);
     }
@@ -296,11 +259,80 @@ contract LendingPoolRouter {
         return (borrowAmount, userBorrowShares[_user], totalBorrowShares, totalBorrowAssets);
     }
 
+    function liquidation(address _borrower)
+        public
+        onlyLendingPool
+        returns (
+            uint256 userBorrowAssets,
+            uint256 borrowerCollateral,
+            uint256 liquidationAllocation,
+            uint256 collateralToLiquidator,
+            address userPosition
+        )
+    {
+        // Check if borrower is authorized (has position)
+        if (userBorrowShares[_borrower] == 0 && _userCollateral(_borrower) == 0) {
+            revert NotLiquidable(_borrower);
+        }
+
+        // Check if position is liquidatable
+        (bool isLiquidatable, uint256 borrowValue, uint256 collateralValue, uint256 liquidationAllocationCalc) =
+            IIsHealthy(_isHealthy()).checkLiquidatable(_borrower, address(this));
+
+        if (!isLiquidatable) {
+            revert AssetNotLiquidatable(collateralToken, collateralValue, borrowValue);
+        }
+
+        // Accrue interest before liquidation
+        accrueInterest();
+
+        // Get borrower's state
+        borrowerCollateral = _userCollateral(_borrower);
+        userBorrowAssets = _borrowSharesToAmount(userBorrowShares[_borrower]);
+        liquidationAllocation = liquidationAllocationCalc;
+        userPosition = addressPositions[_borrower];
+
+        // Ensure liquidation allocation doesn't exceed borrower collateral
+        if (liquidationAllocation > borrowerCollateral) {
+            liquidationAllocation = 0;
+        }
+
+        collateralToLiquidator = borrowerCollateral - liquidationAllocation;
+
+        // Update state: clear borrower's position
+        totalBorrowAssets -= userBorrowAssets;
+        totalBorrowShares -= userBorrowShares[_borrower];
+        userBorrowShares[_borrower] = 0;
+        addressPositions[_borrower] = address(0);
+
+        return (userBorrowAssets, borrowerCollateral, liquidationAllocation, collateralToLiquidator, userPosition);
+    }
+
     function createPosition(address _user) public onlyLendingPool returns (address) {
         if (addressPositions[_user] != address(0)) revert PositionAlreadyCreated();
         address position = IPositionDeployer(_positionDeployer()).deployPosition(lendingPool, _user);
         addressPositions[_user] = position;
         return position;
+    }
+
+    function _userCollateral(address _user) internal view returns (uint256) {
+        return IPosition(addressPositions[_user]).totalCollateral();
+    }
+
+    function _isHealthy() internal view returns (address) {
+        return IFactory(factory).isHealthy();
+    }
+
+    function _borrowSharesToAmount(uint256 _shares) internal view returns (uint256) {
+        return (_shares * totalBorrowAssets) / totalBorrowShares;
+    }
+
+    function _interestRateModel() internal view returns (address) {
+        return IFactory(factory).interestRateModel();
+    }
+
+    function _maxUtilization() internal view returns (uint256) {
+        return IInterestRateModel(_interestRateModel()).lendingPoolMaxUtilization(address(this));
     }
 
     /**
@@ -310,88 +342,4 @@ contract LendingPoolRouter {
     function _positionDeployer() internal view returns (address) {
         return IFactory(factory).positionDeployer();
     }
-
-    /**
-     * @notice Liquidates a user's position and resets borrow/collateral state
-     * @param _user The address of the user being liquidated
-     * @param _repayAmount The amount of debt being repaid
-     * @dev This function resets user's borrow shares, collateral, and related variables
-     * @dev User liquidity shares remain untouched as they're not related to borrowing
-     */
-    function liquidatePosition(address _user, uint256 _repayAmount) external {
-        // Only allow calls from IsHealthy contract or authorized liquidators
-        address isHealthyContract = IFactory(factory).isHealthy();
-        require(msg.sender == isHealthyContract, "Not authorized");
-
-        // Calculate shares to remove based on repay amount
-        uint256 sharesToRemove = 0;
-        if (totalBorrowAssets > 0 && totalBorrowShares > 0) {
-            sharesToRemove = (_repayAmount * totalBorrowShares) / totalBorrowAssets;
-
-            // Ensure we don't remove more shares than the user has
-            if (sharesToRemove > userBorrowShares[_user]) {
-                sharesToRemove = userBorrowShares[_user];
-            }
-        } else {
-            // If no total borrow assets/shares, remove all user shares
-            sharesToRemove = userBorrowShares[_user];
-        }
-
-        // Update user's borrow state
-        userBorrowShares[_user] -= sharesToRemove;
-
-        // Update total borrow state
-        totalBorrowShares -= sharesToRemove;
-        totalBorrowAssets -= _repayAmount;
-
-        // Clear user's collateral (it's been seized in liquidation)
-        userCollateral[_user] = 0;
-
-        // Note: userSupplyShares[_user] is NOT touched - liquidity provision is separate from borrowing
-
-        // Emit liquidation event (optional - can be handled by IsHealthy contract)
-        emit PositionLiquidated(_user, sharesToRemove, _repayAmount);
-    }
-
-    /**
-     * @notice Emergency function to completely reset a user's position
-     * @param _user The address of the user whose position to reset
-     * @dev Only callable by factory owner in emergency situations
-     * @dev This resets ALL user state including liquidity (use with caution)
-     */
-    function emergencyResetPosition(address _user) external onlyFactory {
-        userBorrowShares[_user] = 0;
-        userCollateral[_user] = 0;
-        // In emergency, also reset supply shares if needed
-        // userSupplyShares[_user] = 0; // Uncomment if needed
-
-        emit EmergencyPositionReset(_user);
-    }
-
-    /**
-     * @notice Allows position contract to reduce user collateral during liquidation
-     * @param _user The user whose collateral is being reduced
-     * @param _amount The amount of collateral being removed
-     * @dev Called by Position contract during collateral withdrawal for liquidation
-     */
-    function reduceUserCollateral(address _user, uint256 _amount) external {
-        require(msg.sender == addressPositions[_user], "Not user's position");
-
-        if (_amount > userCollateral[_user]) {
-            userCollateral[_user] = 0;
-        } else {
-            userCollateral[_user] -= _amount;
-        }
-    }
-
-    // Events for liquidation tracking
-    /// @notice Emitted when a position is liquidated
-    /// @param user The address of the user being liquidated
-    /// @param sharesRemoved The amount of borrow shares removed
-    /// @param debtRepaid The amount of debt repaid
-    event PositionLiquidated(address indexed user, uint256 sharesRemoved, uint256 debtRepaid);
-
-    /// @notice Emitted when a position is reset in emergency
-    /// @param user The address of the user whose position was reset
-    event EmergencyPositionReset(address indexed user);
 }

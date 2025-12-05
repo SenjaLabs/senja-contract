@@ -164,4 +164,5 @@ contract Helper {
     address public KAIA_TESTNET_positionDeployer = 0x39926DA4905f5Edb956F5dB5F2e2FF044E0882B2;
     address public KAIA_TESTNET_lendingPoolFactoryImplementation = 0xAE1b8d3B428d6A8F62df2f623081EAC8734168fe;
     address public KAIA_TESTNET_lendingPoolFactoryProxy = 0xa8e2E14AA272d360235B9444f8214bA5fa2A2888;
+    address public KAIA_TESTNET_HELPER_UTILS = 0x67165C24A886AAAf1bFA81934e44a2063c6B608C;
 }

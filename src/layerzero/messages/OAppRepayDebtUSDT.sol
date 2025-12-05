@@ -149,7 +149,7 @@ contract OAppRepayDebtUSDT is OApp, OAppOptionsType3 {
         userAmount[_user] -= _amount;
         address borrowToken = _borrowToken(_lendingPool);
         IERC20(borrowToken).approve(_lendingPool, _amount);
-        ILendingPool(_lendingPool).repayWithSelectedToken(_amount, borrowToken, false, _user, 500);
+        ILendingPool(_lendingPool).repayWithSelectedToken(_user, borrowToken, _amount, 500, false);
         emit ExecuteRepayDebt(_lendingPool, borrowToken, _user, _amount);
     }
 

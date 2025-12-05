@@ -7,12 +7,15 @@ import {HelperUtils} from "../../src/HelperUtils.sol";
 
 contract DeployHelperUtils is Script, Helper {
     HelperUtils public helperUtils;
+
     address lendingPoolFactoryProxy;
     string chainName;
+
     uint256 privateKey = vm.envUint("PRIVATE_KEY");
 
     function run() public {
-        vm.createSelectFork(vm.rpcUrl("kaia_mainnet"));
+        // vm.createSelectFork(vm.rpcUrl("kaia_mainnet"));
+        vm.createSelectFork(vm.rpcUrl("kaia_testnet"));
         _getUtils();
         vm.startBroadcast(privateKey);
         helperUtils = new HelperUtils(address(lendingPoolFactoryProxy));
@@ -26,10 +29,14 @@ contract DeployHelperUtils is Script, Helper {
         if (block.chainid == 8217) {
             lendingPoolFactoryProxy = KAIA_lendingPoolFactoryProxy;
             chainName = "KAIA";
+        } else if (block.chainid == 1001) {
+            lendingPoolFactoryProxy = KAIA_TESTNET_lendingPoolFactoryProxy;
+            chainName = "KAIA_TESTNET";
         }
     }
 }
 
 // RUN
+// forge script DeployHelperUtils --broadcast -vvv --verify
 // forge script DeployHelperUtils --broadcast -vvv
 // forge script DeployHelperUtils -vvv

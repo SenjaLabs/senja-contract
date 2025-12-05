@@ -10,7 +10,6 @@ interface ILPRouter {
     function lastAccrued() external view returns (uint256);
     function userSupplyShares(address _user) external view returns (uint256);
     function userBorrowShares(address _user) external view returns (uint256);
-    function userCollateral(address _user) external view returns (uint256);
     function addressPositions(address _user) external view returns (address);
     function lendingPool() external view returns (address);
     function collateralToken() external view returns (address);
@@ -25,8 +24,6 @@ interface ILPRouter {
     function setLendingPool(address _lendingPool) external;
     function supplyLiquidity(uint256 _amount, address _user) external returns (uint256 shares);
     function withdrawLiquidity(uint256 _shares, address _user) external returns (uint256 amount);
-    function supplyCollateral(address _user, uint256 _amount) external;
-    function withdrawCollateral(uint256 _amount, address _user) external returns (uint256);
     function accrueInterest() external;
     function borrowDebt(uint256 _amount, address _user)
         external
@@ -37,7 +34,13 @@ interface ILPRouter {
     function createPosition(address _user) external returns (address);
 
     // ** LIQUIDATION FUNCTIONS
-    function liquidatePosition(address _user, uint256 _repayAmount) external;
-    function emergencyResetPosition(address _user) external;
-    function reduceUserCollateral(address _user, uint256 _amount) external;
+    function liquidation(address _borrower)
+        external
+        returns (
+            uint256 userBorrowAssets,
+            uint256 borrowerCollateral,
+            uint256 liquidationAllocation,
+            uint256 collateralToLiquidator,
+            address userPosition
+        );
 }

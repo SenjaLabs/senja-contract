@@ -1,226 +1,243 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.30;
+pragma solidity ^0.8.20;
 
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {ILendingPool} from "./interfaces/ILendingPool.sol";
+import {ILPRouter} from "./interfaces/ILPRouter.sol";
 import {IFactory} from "./interfaces/IFactory.sol";
 import {IOracle} from "./interfaces/IOracle.sol";
-import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {ITokenDataStream} from "./interfaces/ITokenDataStream.sol";
 import {IPosition} from "./interfaces/IPosition.sol";
 
 /**
  * @title IsHealthy
- * @author Senja Protocol
- * @notice A contract that validates the health status of lending positions
- * @dev This contract checks if a user's position is healthy by comparing
- *      the total collateral value against the borrowed amount and LTV ratio
+ * @author Senja Protocol Team
+ * @notice Contract that validates the health of borrowing positions based on collateral ratios
+ * @dev This contract implements health checks for lending positions by comparing the value
+ *      of a user's collateral against their borrowed amount and the loan-to-value (LTV) ratio.
+ *      It prevents users from borrowing more than their collateral can safely support.
  *
- * The health check ensures:
- * - The borrowed value doesn't exceed the total collateral value
- * - The borrowed value doesn't exceed the maximum allowed based on LTV ratio
- *
- * @custom:security This contract is used for position validation and should be
- *                  called before allowing additional borrows or liquidations
+ * Key Features:
+ * - Multi-token collateral support across different chains
+ * - Real-time price feed integration via TokenDataStream
+ * - Configurable loan-to-value ratios per token
+ * - Automatic liquidation threshold detection
+ * - Precision handling for different token decimals
  */
-contract IsHealthy {
-    /**
-     * @notice Error thrown when the position has insufficient collateral
-     * @dev This error is thrown when either:
-     *      - The borrowed value exceeds the total collateral value
-     *      - The borrowed value exceeds the maximum allowed based on LTV ratio
-     */
-    error InsufficientCollateral();
-    /// @notice Error thrown when oracle is not set on the token
-    error OracleOnTokenNotSet(address token);
-    /**
-     * @notice Address of the Liquidator contract
-     */
-    address public liquidator;
+contract IsHealthy is Ownable {
+    // =============================================================
+    //                           ERRORS
+    // =============================================================
 
-    /**
-     * @notice Constructor to set the liquidator contract address
-     * @param _liquidator Address of the Liquidator contract
-     */
-    constructor(address _liquidator) {
-        liquidator = _liquidator;
-    }
+    /// @notice Thrown when an invalid loan-to-value ratio is provided (e.g., zero)
+    /// @param ltv The invalid LTV ratio that was provided
+    error InvalidLtv(address lendingPool, uint256 ltv);
 
-    modifier checkOracleOnToken(address factory, address _token) {
-        _checkOracleOnToken(factory, _token);
+    error ZeroCollateralAmount(address lendingPool, uint256 userCollateralAmount, uint256 totalCollateral);
+
+    error LtvMustBeLessThanThreshold(address lendingPool, uint256 ltv, uint256 threshold);
+
+    error LiquidationAlert(uint256 borrowValue, uint256 collateralValue);
+
+    error LiquidationThresholdNotSet(address lendingPool);
+
+    error LiquidationBonusNotSet(address lendingPool);
+
+    error ZeroAddress();
+    error NotFactory();
+
+    event FactorySet(address factory);
+
+    event LiquidationThresholdSet(address lendingPool, uint256 threshold);
+
+    event LiquidationBonusSet(address lendingPool, uint256 bonus);
+
+    event MaxLiquidationPercentageSet(uint256 percentage);
+
+    // =============================================================
+    //                       STATE VARIABLES
+    // =============================================================
+
+    /// @notice Address of the Factory contract for accessing protocol configurations
+    address public factory;
+
+    /// @notice Liquidation threshold for each collateral token (with 18 decimals precision)
+    /// @dev lendingPool address => liquidation threshold (e.g., 0.85e18 = 85%)
+    /// When health factor drops below this, position can be liquidated
+    mapping(address => uint256) public liquidationThreshold;
+
+    /// @notice Liquidation bonus for each collateral token (with 18 decimals precision)
+    /// @dev router address => liquidation bonus (e.g., 0.05e18 = 5% bonus to liquidator)
+    /// Liquidators receive collateral worth (debt repaid * (1 + bonus))
+    mapping(address => uint256) public liquidationBonus;
+
+    // =============================================================
+    //                           CONSTRUCTOR
+    // =============================================================
+
+    /// @notice Initializes the IsHealthy contract with a factory address
+    /// @dev Sets up Ownable with deployer as owner and configures the factory
+    constructor() Ownable(msg.sender) {}
+
+    modifier onlyFactory() {
+        _onlyFactory();
         _;
     }
 
-    function _checkOracleOnToken(address factory, address _token) internal view {
-        if (_tokenDataStream(factory, _token) == address(0)) revert OracleOnTokenNotSet(_token);
+    // =============================================================
+    //                        HEALTH CHECK FUNCTIONS
+    // =============================================================
+
+    /// @notice Validates whether a user's borrowing position is healthy
+    /// @dev Calculates the total USD value of user's collateral across all supported tokens
+    ///      and compares it against their borrowed amount and the liquidation threshold.
+    ///      Reverts if the position is unhealthy (over-leveraged).
+    /// @param _user The user address whose position is being checked
+    /// @param _router The lending pool contract address
+    function isHealthy(address _user, address _router) public view {
+        uint256 borrowValue = _userBorrowValue(_router, _borrowToken(_router), _user);
+        if (borrowValue == 0) return; // No borrows = always healthy
+
+        uint256 maxCollateralValue = _userCollateralStats(_router, _collateralToken(_router), _user);
+        // If user has borrows but insufficient collateral, revert
+        if (borrowValue > maxCollateralValue) revert LiquidationAlert(borrowValue, maxCollateralValue);
     }
 
-    /**
-     * @notice Validates if a user's lending position is healthy
-     * @dev This function performs a comprehensive health check by:
-     *      1. Fetching the current price of the borrowed token from Chainlink
-     *      2. Calculating the total collateral value from all user positions
-     *      3. Computing the actual borrowed amount in the borrowed token
-     *      4. Converting the borrowed amount to USD value
-     *      5. Comparing against collateral value and LTV limits
-     *
-     * @param borrowToken The address of the token being borrowed
-     * @param factory The address of the lending pool factory contract
-     * @param addressPositions The address of the positions contract
-     * @param ltv The loan-to-value ratio (in basis points, e.g., 8000 = 80%)
-     * @param totalBorrowAssets The total amount of assets borrowed across all users
-     * @param totalBorrowShares The total number of borrow shares across all users
-     * @param userBorrowShares The number of borrow shares owned by the user
-     *
-     * @custom:revert InsufficientCollateral When the position is unhealthy
-     *
-     * @custom:security This function should be called before any borrow operations
-     *                  to ensure the position remains healthy after the operation
-     */
-    function _isHealthy(
-        address borrowToken,
-        address factory,
-        address addressPositions,
-        uint256 ltv,
-        uint256 totalBorrowAssets,
-        uint256 totalBorrowShares,
-        uint256 userBorrowShares
-    ) public view checkOracleOnToken(factory, borrowToken) {
-        (, uint256 borrowPrice,,,) = IOracle(_tokenDataStream(factory, borrowToken)).latestRoundData();
-        uint256 collateralValue = 0;
-        for (uint256 i = 1; i <= _counter(addressPositions); i++) {
-            address token = IPosition(addressPositions).tokenLists(i);
-            if (token != address(0)) {
-                collateralValue += _tokenValue(addressPositions, token);
-            }
-        }
-        uint256 borrowed = 0;
-        borrowed = (userBorrowShares * totalBorrowAssets) / totalBorrowShares;
-        uint256 borrowAdjustedPrice = uint256(borrowPrice) * 1e18 / 10 ** _oracleDecimal(factory, borrowToken);
-        uint256 borrowValue = (borrowed * borrowAdjustedPrice) / (10 ** _tokenDecimals(borrowToken));
-
-        // Calculate maximum allowed borrow based on LTV ratio
-        uint256 maxBorrow = (collateralValue * ltv) / 1e18;
-
-        // Check if position needs liquidation
-        bool isLiquidatable = (borrowValue > collateralValue) || (borrowValue > maxBorrow);
-
-        if (isLiquidatable) {
-            // Position is unhealthy and should be liquidated
-            revert InsufficientCollateral();
-        }
-    }
-
-    /**
-     * @notice Checks if a position is liquidatable
-     * @param borrowToken The address of the token being borrowed
-     * @param factory The address of the lending pool factory contract
-     * @param addressPositions The address of the positions contract
-     * @param ltv The loan-to-value ratio
-     * @param totalBorrowAssets The total amount of assets borrowed across all users
-     * @param totalBorrowShares The total number of borrow shares across all users
-     * @param userBorrowShares The number of borrow shares owned by the user
-     * @return isLiquidatable Whether the position can be liquidated
-     * @return borrowValue The current borrow value in USD
-     * @return collateralValue The current collateral value in USD
-     */
-    function checkLiquidation(
-        address borrowToken,
-        address factory,
-        address addressPositions,
-        uint256 ltv,
-        uint256 totalBorrowAssets,
-        uint256 totalBorrowShares,
-        uint256 userBorrowShares
-    ) public view returns (bool isLiquidatable, uint256 borrowValue, uint256 collateralValue) {
-        (, uint256 borrowPrice,,,) = IOracle(_tokenDataStream(factory, borrowToken)).latestRoundData();
-
-        collateralValue = 0;
-        for (uint256 i = 1; i <= _counter(addressPositions); i++) {
-            address token = IPosition(addressPositions).tokenLists(i);
-            if (token != address(0)) {
-                collateralValue += _tokenValue(addressPositions, token);
-            }
-        }
-
-        uint256 borrowed = (userBorrowShares * totalBorrowAssets) / totalBorrowShares;
-        uint256 borrowAdjustedPrice = uint256(borrowPrice) * 1e18 / 10 ** _oracleDecimal(factory, borrowToken);
-        borrowValue = (borrowed * borrowAdjustedPrice) / (10 ** _tokenDecimals(borrowToken));
-
-        uint256 maxBorrow = (collateralValue * ltv) / 1e18;
-
-        isLiquidatable = (borrowValue > collateralValue) || (borrowValue > maxBorrow);
-    }
-
-    /**
-     * @notice Liquidates a position using DEX (calls Liquidator contract)
-     * @param borrower The address of the borrower to liquidate
-     * @param lendingPoolRouter The address of the lending pool router
-     * @param // factory The address of the factory
-     * @param liquidationIncentive The liquidation incentive in basis points
-     * @return liquidatedAmount Amount of debt repaid
-     */
-    function liquidateByDEX(
-        address borrower,
-        address lendingPoolRouter,
-        address, /* factory */
-        uint256 liquidationIncentive
-    )
-        external
-        returns (uint256 liquidatedAmount)
+    function checkLiquidatable(address user, address lendingPool)
+        public
+        view
+        returns (bool, uint256, uint256, uint256)
     {
-        // Use regular call instead of delegatecall for security
-        (bool success, bytes memory data) = liquidator.call(
-            abi.encodeWithSignature(
-                "liquidateByDEX(address,address,uint256)", borrower, lendingPoolRouter, liquidationIncentive
-            )
-        );
-        require(success, "Liquidation failed");
-        liquidatedAmount = abi.decode(data, (uint256));
+        uint256 borrowValue = _userBorrowValue(lendingPool, _borrowToken(lendingPool), user);
+        if (borrowValue == 0) return (true, 0, 0, 0);
+        uint256 maxCollateralValue = _userCollateralStats(lendingPool, _collateralToken(lendingPool), user);
+        uint256 liquidationAllocation = _userCollateral(lendingPool, user) * liquidationBonus[lendingPool] / 1e18;
+        return (borrowValue > maxCollateralValue, borrowValue, maxCollateralValue, liquidationAllocation);
     }
 
-    /**
-     * @notice Liquidates a position using MEV (calls Liquidator contract)
-     * @param borrower The address of the borrower to liquidate
-     * @param lendingPoolRouter The address of the lending pool router
-     * @param // factory The address of the factory
-     * @param repayAmount Amount of debt the liquidator wants to repay
-     * @param liquidationIncentive The liquidation incentive in basis points
-     */
-    function liquidateByMEV(
-        address borrower,
-        address lendingPoolRouter,
-        address, /* factory */
-        uint256 repayAmount,
-        uint256 liquidationIncentive
-    ) external payable {
-        // Use regular call instead of delegatecall for security
-        (bool success,) = liquidator.call{value: msg.value}(
-            abi.encodeWithSignature(
-                "liquidateByMEV(address,address,uint256,uint256)",
-                borrower,
-                lendingPoolRouter,
-                repayAmount,
-                liquidationIncentive
-            )
-        );
-        require(success, "Liquidation failed");
+    // =============================================================
+    //                   CONFIGURATION FUNCTIONS
+    // =============================================================
+
+    /// @notice Updates the factory contract address
+    /// @dev Only the contract owner can call this function
+    /// @param _factory The new factory contract address
+    function setFactory(address _factory) public onlyOwner {
+        if (_factory == address(0)) revert ZeroAddress();
+        factory = _factory;
+        emit FactorySet(_factory);
     }
 
-    function _tokenDecimals(address _token) internal view returns (uint8) {
-        return _token == address(1) ? 18 : IERC20Metadata(_token).decimals();
+    function setLiquidationThreshold(address _router, uint256 _threshold) public onlyFactory {
+        uint256 ltv = _ltv(_router);
+        if (ltv > _threshold) revert LtvMustBeLessThanThreshold(_router, ltv, _threshold);
+        liquidationThreshold[_router] = _threshold;
+        emit LiquidationThresholdSet(_router, _threshold);
     }
 
-    function _oracleDecimal(address factory, address _token) internal view returns (uint8) {
-        return IOracle(_tokenDataStream(factory, _token)).decimals();
+    function setLiquidationBonus(address _router, uint256 bonus) public onlyFactory {
+        liquidationBonus[_router] = bonus;
+        emit LiquidationBonusSet(_router, bonus);
     }
 
-    function _tokenDataStream(address factory, address _token) internal view returns (address) {
-        return IFactory(factory).tokenDataStream(_token);
+    // =============================================================
+    //                    INTERNAL HELPER FUNCTIONS
+    // =============================================================
+
+    function _userCollateralStats(address _router, address _token, address _user) internal view returns (uint256) {
+        _checkLiquidation(_router);
+        uint256 userCollateral = _userCollateral(_router, _user);
+        uint256 collateralAdjustedPrice = (_tokenPrice(_token) * 1e18) / (10 ** _oracleDecimal(_token));
+        uint256 userCollateralValue = (userCollateral * collateralAdjustedPrice) / (10 ** _tokenDecimals(_token));
+        uint256 maxBorrowValue = (userCollateralValue * liquidationThreshold[_router]) / 1e18;
+        return maxBorrowValue;
     }
 
-    function _counter(address addressPositions) internal view returns (uint256) {
-        return IPosition(addressPositions).counter();
+    function _userBorrowValue(address _router, address _token, address _user) internal view returns (uint256) {
+        uint256 shares = _userBorrowShares(_router, _user);
+        if (shares == 0) return 0;
+        if (_totalBorrowShares(_router) == 0) return 0;
+        uint256 userBorrowAmount = (shares * _totalBorrowAssets(_router)) / _totalBorrowShares(_router);
+        uint256 borrowAdjustedPrice = (_tokenPrice(_token) * 1e18) / (10 ** _oracleDecimal(_token));
+        uint256 userBorrowValue = (userBorrowAmount * borrowAdjustedPrice) / (10 ** _tokenDecimals(_token));
+        return userBorrowValue;
     }
 
-    function _tokenValue(address addressPositions, address token) internal view returns (uint256) {
-        return IPosition(addressPositions).tokenValue(token);
+    function _collateralToken(address _router) internal view returns (address) {
+        return ILPRouter(_router).collateralToken();
+    }
+
+    function _borrowToken(address _router) internal view returns (address) {
+        return ILPRouter(_router).borrowToken();
+    }
+
+    function _userBorrowShares(address _router, address _user) internal view returns (uint256) {
+        return ILPRouter(_router).userBorrowShares(_user);
+    }
+
+    function _totalBorrowAssets(address _router) internal view returns (uint256) {
+        return ILPRouter(_router).totalBorrowAssets();
+    }
+
+    function _totalBorrowShares(address _router) internal view returns (uint256) {
+        return ILPRouter(_router).totalBorrowShares();
+    }
+
+    function _userPosition(address _router, address _user) internal view returns (address) {
+        return ILPRouter(_router).addressPositions(_user);
+    }
+
+    function _userCollateral(address _router, address _user) internal view returns (uint256) {
+        return IPosition(_userPosition(_router, _user)).totalCollateral();
+        // return IERC20(_collateralToken(_lendingPool)).balanceOf(_userPosition(_lendingPool, _user));
+    }
+
+    function _ltv(address _router) internal view returns (uint256) {
+        uint256 ltv = ILPRouter(_router).ltv();
+        if (ltv == 0) revert InvalidLtv(_router, ltv);
+        return ltv;
+    }
+
+    /// @notice Gets the current price of a collateral token from the price feed
+    /// @dev Retrieves the latest price data from the TokenDataStream oracle
+    /// @param _token The token address to get the price for
+    /// @return The current price of the token from the oracle
+    function _tokenPrice(address _token) internal view returns (uint256) {
+        (, uint256 price,,,) = ITokenDataStream(_tokenDataStream()).latestRoundData(_token);
+        return price;
+    }
+
+    function _tokenDataStream() internal view returns (address) {
+        return IFactory(factory).tokenDataStream();
+    }
+
+    /// @notice Gets the number of decimals used by the oracle for a token's price
+    /// @dev Used to properly normalize price values from different oracle sources
+    /// @param _token The token address to get oracle decimals for
+    /// @return The number of decimals used by the token's price oracle
+    function _oracleDecimal(address _token) internal view returns (uint256) {
+        return ITokenDataStream(_tokenDataStream()).decimals(_token);
+    }
+
+    /// @notice Gets the number of decimals used by an ERC20 token
+    /// @dev Used to properly normalize token amounts for value calculations
+    /// @param _token The token address to get decimals for
+    /// @return The number of decimals used by the ERC20 token
+    function _tokenDecimals(address _token) internal view returns (uint256) {
+        if (_token == address(1) || _token == IFactory(factory).WRAPPED_NATIVE()) {
+            return 18;
+        }
+        return IERC20Metadata(_token).decimals();
+    }
+
+    function _checkLiquidation(address _lendingPool) internal view {
+        if (liquidationThreshold[_lendingPool] == 0) revert LiquidationThresholdNotSet(_lendingPool);
+        if (liquidationBonus[_lendingPool] == 0) revert LiquidationBonusNotSet(_lendingPool);
+    }
+
+    function _onlyFactory() internal view {
+        if (msg.sender != factory) revert NotFactory();
     }
 }

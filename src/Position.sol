@@ -12,6 +12,7 @@ import {ILPRouter} from "./interfaces/ILPRouter.sol";
 import {IDexRouter} from "./interfaces/IDexRouter.sol";
 import {IWrappedNative} from "./interfaces/IWrappedNative.sol";
 import {IIsHealthy} from "./interfaces/IIsHealthy.sol";
+import {ITokenDataStream} from "./interfaces/ITokenDataStream.sol";
 
 /**
  * @title Position
@@ -49,6 +50,10 @@ contract Position is ReentrancyGuard {
     error InvalidParameter();
     /// @notice Error thrown when oracle on token is not set
     error OracleOnTokenNotSet();
+    /// @notice Error thrown when a function is called by unauthorized address
+    error OnlyForLendingPool();
+    /// @notice Error thrown when the output amount is less than the minimum amount
+    error InsufficientOutputAmount(uint256 amountOut, uint256 amountOutMinimum);
 
     address public owner;
     address public lpAddress;
@@ -100,6 +105,273 @@ contract Position is ReentrancyGuard {
     }
 
     /**
+     * @notice Modifier to check and register tokens in the position's token list
+     * @param _token The address of the token to check
+     * @dev Automatically adds new tokens to the position's token tracking system
+     */
+    modifier checkTokenList(address _token) {
+        _checkTokenList(_token);
+        _;
+    }
+    modifier onlyLendingPool() {
+        _onlyLendingPool();
+        _;
+    }
+
+    /**
+     * @notice Withdraws collateral from the position
+     * @param amount The amount of collateral to withdraw
+     * @param _user The address of the user to receive the collateral
+     * @dev Only authorized contracts can call this function
+     * @dev Transfers collateral tokens to the specified user
+     */
+    function withdrawCollateral(uint256 amount, address _user) public onlyLendingPool {
+        if (amount == 0) revert ZeroAmount();
+        _withdrawCollateralTransfer(amount, _user);
+        emit WithdrawCollateral(_user, amount);
+    }
+
+    /**
+     * @notice Swaps tokens within the position using DEX
+     * @param _tokenIn The address of the input token
+     * @param _tokenOut The address of the output token
+     * @param _amountIn The amount of input tokens to swap
+     * @param _amountOutMinimum The minimum amount of output tokens received
+     * @return amountOut The amount of output tokens received
+     * @dev Only the position owner can call this function
+     * @dev Uses DEX router for token swapping with slippage protection
+     */
+    function swapTokenByPosition(address _tokenIn, address _tokenOut, uint256 _amountIn, uint256 _amountOutMinimum)
+        public
+        checkTokenList(_tokenIn)
+        checkTokenList(_tokenOut)
+        onlyLendingPool
+        returns (uint256 amountOut)
+    {
+        if (IERC20(_tokenIn).balanceOf(address(this)) < _amountIn) revert InsufficientBalance();
+        amountOut = _attemptDex(_tokenIn, _tokenOut, _amountIn, _amountOutMinimum);
+        emit SwapTokenByPosition(msg.sender, _tokenIn, _tokenOut, _amountIn, amountOut);
+    }
+
+    function swapTokenToBorrow(address _token, uint256 _amount, uint256 _amountOutMinimum) public onlyLendingPool {
+        IERC20(_token).safeTransferFrom(msg.sender, address(this), _amount);
+        uint256 collateralNeeded = _calculateCollateralNeeded(_token, _borrowToken(), _amount);
+        uint256 balance = IERC20(_token).balanceOf(address(this));
+        if (balance < collateralNeeded) revert InsufficientBalance();
+        uint256 amountOut =
+            _attemptDex(_revealToken(_token), _revealToken(_borrowToken()), collateralNeeded, _amountOutMinimum);
+
+        IERC20(_token).approve(lpAddress, amountOut);
+        IERC20(_revealToken(_borrowToken())).safeTransfer(lpAddress, amountOut);
+    }
+
+    /**
+     * @notice Repays a loan using a selected token
+     * @param _token The address of the token to use for repayment
+     * @param _amount The amount to repay
+     * @param _amountOutMinimum The minimum amount of output tokens received
+     * @dev Only authorized contracts can call this function
+     * @dev If the selected token is not the borrow asset, it will be swapped first
+     * @dev Any excess tokens after repayment are swapped back to the original token
+     */
+    function repayWithSelectedToken(address _token, uint256 _amount, uint256 _amountOutMinimum)
+        public
+        payable
+        onlyLendingPool
+    {
+        if (_token != _borrowToken()) {
+            uint256 collateralNeeded = _calculateCollateralNeeded(_token, _borrowToken(), _amount);
+            uint256 balance = IERC20(_token).balanceOf(address(this));
+            if (balance < collateralNeeded) revert InsufficientBalance();
+            uint256 amountOut =
+                _attemptDex(_revealToken(_token), _revealToken(_borrowToken()), collateralNeeded, _amountOutMinimum);
+
+            IERC20(_token).approve(lpAddress, amountOut);
+            IERC20(_revealToken(_borrowToken())).safeTransfer(lpAddress, amountOut);
+        } else {
+            IERC20(_token).approve(lpAddress, _amount);
+            IERC20(_revealToken(_borrowToken())).safeTransfer(lpAddress, _amount);
+        }
+    }
+
+    function liquidation(address _liquidator) public onlyLendingPool {
+        owner = _liquidator;
+        for (uint256 i = 1; i <= counter; i++) {
+            address token = tokenLists[i];
+            if (token == address(1)) {
+                IERC20(_WRAPPED_NATIVE()).safeTransfer(_liquidator, IERC20(_WRAPPED_NATIVE()).balanceOf(address(this)));
+            } else {
+                IERC20(token).safeTransfer(_liquidator, IERC20(token).balanceOf(address(this)));
+            }
+        }
+    }
+
+    function totalCollateral() public view returns (uint256) {
+        uint256 userCollateral = 0;
+        for (uint256 i = 1; i <= counter; i++) {
+            address token = tokenLists[i];
+            userCollateral += _tokenCalculator(
+                _revealToken(token),
+                _revealToken(_collateralToken()),
+                IERC20(_revealToken(token)).balanceOf(address(this))
+            );
+        }
+        return userCollateral;
+    }
+
+    // =============================================================
+    //                    INTERNAL HELPER FUNCTIONS
+    // =============================================================
+
+    function _router() internal view returns (address) {
+        return ILendingPool(lpAddress).router();
+    }
+
+    function _factory() internal view returns (address) {
+        return ILPRouter(_router()).factory();
+    }
+
+    function _collateralToken() internal view returns (address) {
+        return ILPRouter(_router()).collateralToken();
+    }
+
+    function _borrowToken() internal view returns (address) {
+        return ILPRouter(_router()).borrowToken();
+    }
+
+    function _tokenDataStream() internal view returns (address) {
+        return IFactory(_factory()).tokenDataStream();
+    }
+
+    function _WRAPPED_NATIVE() internal view returns (address) {
+        return IFactory(_factory()).WRAPPED_NATIVE();
+    }
+
+    function _DEX_ROUTER() internal view returns (address) {
+        return IFactory(_factory()).DEX_ROUTER();
+    }
+
+    function _totalBorrowAssets() internal view returns (uint256) {
+        return ILPRouter(_router()).totalBorrowAssets();
+    }
+
+    /**
+     * @notice Calculates the output amount for a token swap based on price feeds
+     * @param _tokenIn The address of the input token
+     * @param _tokenOut The address of the output token
+     * @param _amountIn The amount of input tokens
+     * @return Calculated output amount
+     * @dev Uses PriceFeedIOracle price feeds to determine exchange rates
+     * @dev Handles different token decimals automatically
+     */
+
+    function _tokenCalculator(address _tokenIn, address _tokenOut, uint256 _amountIn) public view returns (uint256) {
+        uint256 tokenInDecimal = _tokenDecimals(_tokenIn);
+        uint256 tokenOutDecimal = _tokenDecimals(_tokenOut);
+        uint256 quotePrice = _tokenPrice(_tokenIn);
+        uint256 basePrice = _tokenPrice(_tokenOut);
+
+        uint256 amountOut =
+            (_amountIn * ((uint256(quotePrice) * (10 ** tokenOutDecimal)) / uint256(basePrice))) / 10 ** tokenInDecimal;
+
+        return amountOut;
+    }
+
+    function _withdrawCollateralTransfer(uint256 amount, address _user) internal {
+        if (_collateralToken() == address(1)) {
+            _withdrawing = true;
+            IERC20(_WRAPPED_NATIVE()).approve(_WRAPPED_NATIVE(), amount);
+            IWrappedNative(_WRAPPED_NATIVE()).withdraw(amount);
+            (bool sent,) = _user.call{value: amount}("");
+            if (!sent) revert TransferFailed();
+            _withdrawing = false;
+        } else {
+            IERC20(_collateralToken()).safeTransfer(_user, amount);
+        }
+    }
+
+    function _calculateCollateralNeeded(address _collateral, address _borrow, uint256 _amount)
+        internal
+        view
+        returns (uint256)
+    {
+        uint256 borrowPrice = _tokenPrice(_borrow);
+        uint256 collateralPrice = _tokenPrice(_collateral);
+        uint256 borrowDecimal = _tokenDecimals(_revealToken(_borrow));
+        uint256 collateralDecimal = _tokenDecimals(_revealToken(_collateral));
+        uint256 collateralNeeded =
+            (_amount * borrowPrice * (10 ** collateralDecimal)) / (collateralPrice * (10 ** borrowDecimal));
+        return collateralNeeded;
+    }
+
+    // =============================================================
+    // =============================================================
+
+    /**
+     * @notice Attempts DEX with slippage protection
+     * @param _tokenIn The address of the input token
+     * @param _tokenOut The address of the output token
+     * @param _amountIn The amount of input tokens to swap
+     * @param _amountOutMinimum The minimum amount of output tokens received
+     * @return amountOut The amount of output tokens received
+     */
+    function _attemptDex(address _tokenIn, address _tokenOut, uint256 _amountIn, uint256 _amountOutMinimum)
+        internal
+        returns (uint256 amountOut)
+    {
+        IERC20(_tokenIn).approve(_DEX_ROUTER(), _amountIn);
+        IDexRouter.ExactInputSingleParams memory params = IDexRouter.ExactInputSingleParams({
+            tokenIn: _tokenIn,
+            tokenOut: _revealToken(_tokenOut),
+            fee: 1000, // 0.1% fee tier
+            recipient: address(this),
+            deadline: block.timestamp + 300, // 5 minutes deadline
+            amountIn: _amountIn,
+            amountOutMinimum: _amountOutMinimum, // Slippage protection
+            sqrtPriceLimitX96: 0 // No price limit
+        });
+
+        amountOut = IDexRouter(_DEX_ROUTER()).exactInputSingle(params);
+        if (amountOut < _amountOutMinimum) revert InsufficientOutputAmount(amountOut, _amountOutMinimum);
+        return amountOut;
+    }
+
+    function _checkTokenList(address _token) internal {
+        if (tokenListsId[_token] == 0) {
+            ++counter;
+            tokenLists[counter] = _token;
+            tokenListsId[_token] = counter;
+        }
+    }
+
+    function _onlyLendingPool() internal view {
+        if (msg.sender != lpAddress) revert OnlyForLendingPool();
+    }
+
+    function _tokenPrice(address _token) internal view returns (uint256) {
+        (, uint256 price,,,) = ITokenDataStream(_tokenDataStream()).latestRoundData(_token);
+        return price;
+    }
+
+    /// @notice Gets the number of decimals used by an ERC20 token
+    /// @dev Used to properly normalize token amounts for value calculations
+    /// @param _token The token address to get decimals for
+    /// @return The number of decimals used by the ERC20 token
+    function _tokenDecimals(address _token) internal view returns (uint256) {
+        if (_token == _WRAPPED_NATIVE()) {
+            return 18;
+        }
+        return IERC20Metadata(_token).decimals();
+    }
+
+    function _revealToken(address _token) internal view returns (address) {
+        if (_token == address(1)) {
+            return _WRAPPED_NATIVE();
+        }
+        return _token;
+    }
+
+    /**
      * @notice Allows the contract to receive native tokens and automatically wraps them to Wrapped Native
      * @dev Required for native token collateral functionality
      * @dev Avoids infinite loop when Wrapped Native contract sends native tokens during withdrawal
@@ -120,363 +392,5 @@ contract Position is ReentrancyGuard {
     fallback() external payable {
         // Fallback should not accept native tokens to prevent accidental loss
         revert("Fallback not allowed");
-    }
-
-    /**
-     * @notice Modifier to check and register tokens in the position's token list
-     * @param _token The address of the token to check
-     * @dev Automatically adds new tokens to the position's token tracking system
-     */
-    modifier checkTokenList(address _token) {
-        _checkTokenList(_token);
-        _;
-    }
-
-    /**
-     * @notice Withdraws collateral from the position
-     * @param amount The amount of collateral to withdraw
-     * @param _user The address of the user to receive the collateral
-     * @param unwrapToNative Whether to unwrap Wrapped Native to native for user
-     * @dev Only authorized contracts can call this function
-     * @dev Transfers collateral tokens to the specified user
-     */
-    function withdrawCollateral(uint256 amount, address _user, bool unwrapToNative) public {
-        _onlyAuthorizedWithdrawal();
-        if (amount == 0) revert ZeroAmount();
-        if (_collateralToken() == address(1)) {
-            if (unwrapToNative) {
-                _withdrawing = true;
-                IERC20(_WRAPPED_NATIVE()).approve(_WRAPPED_NATIVE(), amount);
-                IWrappedNative(_WRAPPED_NATIVE()).withdraw(amount);
-                (bool sent,) = _user.call{value: amount}("");
-                if (!sent) revert TransferFailed();
-                _withdrawing = false;
-            } else {
-                IERC20(_WRAPPED_NATIVE()).safeTransfer(_user, amount);
-            }
-        } else {
-            IERC20(_collateralToken()).safeTransfer(_user, amount);
-        }
-        emit WithdrawCollateral(_user, amount);
-    }
-
-    /**
-     * @notice Swaps tokens within the position using DEX
-     * @param _tokenIn The address of the input token
-     * @param _tokenOut The address of the output token
-     * @param amountIn The amount of input tokens to swap
-     * @param slippageTolerance The slippage tolerance in basis points (e.g., 500 = 5%)
-     * @return amountOut The amount of output tokens received
-     * @dev Only the position owner can call this function
-     * @dev Uses DEX router for token swapping with slippage protection
-     */
-    function swapTokenByPosition(address _tokenIn, address _tokenOut, uint256 amountIn, uint256 slippageTolerance)
-        public
-        checkTokenList(_tokenIn)
-        checkTokenList(_tokenOut)
-        returns (uint256 amountOut)
-    {
-        uint256 balances = IERC20(_tokenIn).balanceOf(address(this));
-        if (amountIn == 0) revert ZeroAmount();
-        if (balances < amountIn) revert InsufficientBalance();
-        if (_tokenIn == _tokenOut) revert InvalidParameter();
-        if (
-            IFactory(_factory()).tokenDataStream(_tokenIn) == address(0)
-                || IFactory(_factory()).tokenDataStream(_tokenOut) == address(0)
-        ) revert OracleOnTokenNotSet();
-        if (msg.sender != owner && msg.sender != lpAddress) revert NotForSwap();
-        if (slippageTolerance > 10000) revert InvalidParameter(); // Max 100% slippage
-
-        amountOut = _performDex(_tokenIn, _tokenOut, amountIn, slippageTolerance);
-
-        emit SwapTokenByPosition(msg.sender, _tokenIn, _tokenOut, amountIn, amountOut);
-    }
-
-    /**
-     * @notice Repays a loan using a selected token
-     * @param amount The amount to repay
-     * @param _token The address of the token to use for repayment
-     * @param slippageTolerance Slippage tolerance in basis points (e.g., 500 = 5%)
-     * @dev Only authorized contracts can call this function
-     * @dev If the selected token is not the borrow asset, it will be swapped first
-     * @dev Any excess tokens after repayment are swapped back to the original token
-     */
-    function repayWithSelectedToken(uint256 amount, address _token, uint256 slippageTolerance) public payable {
-        _onlyAuthorizedWithdrawal();
-
-        uint256 balance = IERC20(_token).balanceOf(address(this));
-        if (balance < amount) revert InsufficientBalance();
-
-        if (_token != _borrowToken()) {
-            uint256 amountOut = swapTokenByPosition(_token, _borrowToken(), balance, slippageTolerance);
-            if (amountOut < amount) revert InsufficientBalance();
-
-            IERC20(_token).approve(lpAddress, amount);
-            IERC20(_borrowToken() == address(1) ? _WRAPPED_NATIVE() : _borrowToken()).safeTransfer(lpAddress, amount);
-
-            uint256 remaining = amountOut - amount;
-            if (remaining > 0) {
-                swapTokenByPosition(_borrowToken(), _token, remaining, slippageTolerance);
-            }
-        } else {
-            IERC20(_token).approve(lpAddress, amount);
-            IERC20(_borrowToken() == address(1) ? _WRAPPED_NATIVE() : _borrowToken()).safeTransfer(lpAddress, amount);
-        }
-    }
-
-    /**
-     * @notice Calculates the output amount for a token swap based on price feeds
-     * @param _tokenIn The address of the input token
-     * @param _tokenOut The address of the output token
-     * @param _amountIn The amount of input tokens
-     * @param _tokenInPrice The address of the input token's price feed
-     * @param _tokenOutPrice The address of the output token's price feed
-     * @return Calculated output amount
-     * @dev Uses PriceFeedIOracle price feeds to determine exchange rates
-     * @dev Handles different token decimals automatically
-     */
-    function tokenCalculator(
-        address _tokenIn,
-        address _tokenOut,
-        uint256 _amountIn,
-        address _tokenInPrice,
-        address _tokenOutPrice
-    ) public view returns (uint256) {
-        uint256 tokenInDecimal = _tokenIn == _WRAPPED_NATIVE() ? 18 : IERC20Metadata(_tokenIn).decimals();
-        uint256 tokenOutDecimal = _tokenOut == _WRAPPED_NATIVE() ? 18 : IERC20Metadata(_tokenOut).decimals();
-        (, uint256 quotePrice,,,) = IOracle(_tokenInPrice).latestRoundData();
-        (, uint256 basePrice,,,) = IOracle(_tokenOutPrice).latestRoundData();
-
-        uint256 amountOut =
-            (_amountIn * ((uint256(quotePrice) * (10 ** tokenOutDecimal)) / uint256(basePrice))) / 10 ** tokenInDecimal;
-
-        return amountOut;
-    }
-
-    /**
-     * @notice Calculates the USD value of a token balance in the position
-     * @param token The address of the token to calculate value for
-     * @return The USD value of the token balance (in 18 decimals)
-     * @dev Uses PriceFeedIOracle price feeds to get current token prices
-     * @dev Returns value normalized to 18 decimals for consistency
-     */
-    function tokenValue(address token) public view returns (uint256) {
-        uint256 tokenBalance;
-        uint256 tokenDecimals;
-
-        if (token == address(1)) {
-            // Wrapped Native token
-            tokenBalance = IERC20(_WRAPPED_NATIVE()).balanceOf(address(this));
-            tokenDecimals = 18;
-        } else {
-            // ERC20 token
-            tokenBalance = IERC20(token).balanceOf(address(this));
-            tokenDecimals = IERC20Metadata(token).decimals();
-        }
-
-        (, uint256 tokenPrice,,,) = IOracle(_tokenDataStream(token)).latestRoundData();
-        uint256 tokenAdjustedPrice = uint256(tokenPrice) * 1e18 / (10 ** _oracleDecimal(token)); // token standarize to 18 decimal, and divide by price decimals
-        uint256 value = (tokenBalance * tokenAdjustedPrice) / (10 ** tokenDecimals);
-
-        return value;
-    }
-
-    function _checkTokenList(address _token) internal {
-        if (tokenListsId[_token] == 0) {
-            ++counter;
-            tokenLists[counter] = _token;
-            tokenListsId[_token] = counter;
-        }
-    }
-
-    /**
-     * @notice Checks if the caller is authorized to perform withdrawal operations
-     * @dev Only lending pool, IsHealthy contract, or Liquidator contract can call
-     */
-    function _onlyAuthorizedWithdrawal() internal view {
-        address factory = _factory();
-        address isHealthyContract = IFactory(factory).isHealthy();
-        address liquidatorContract = IIsHealthy(isHealthyContract).liquidator();
-
-        if (msg.sender != lpAddress && msg.sender != isHealthyContract && msg.sender != liquidatorContract) {
-            revert NotForWithdraw();
-        }
-    }
-
-    function _router() internal view returns (address) {
-        return ILendingPool(lpAddress).router();
-    }
-
-    function _factory() internal view returns (address) {
-        return ILPRouter(_router()).factory();
-    }
-
-    function _collateralToken() internal view returns (address) {
-        return ILPRouter(_router()).collateralToken();
-    }
-
-    function _borrowToken() internal view returns (address) {
-        return ILPRouter(_router()).borrowToken();
-    }
-
-    function _oracleDecimal(address _token) internal view returns (uint256) {
-        return IOracle(_tokenDataStream(_token)).decimals();
-    }
-
-    function _tokenDataStream(address _token) internal view returns (address) {
-        return IFactory(_factory()).tokenDataStream(_token);
-    }
-
-    function _WRAPPED_NATIVE() internal view returns (address) {
-        return IFactory(_factory()).WRAPPED_NATIVE();
-    }
-
-    /**
-     * @notice Internal function to perform token swap using DEX
-     * @param _tokenIn The address of the input token
-     * @param _tokenOut The address of the output token
-     * @param amountIn The amount of input tokens to swap
-     * @param slippageTolerance The slippage tolerance in basis points
-     * @return amountOut The amount of output tokens received
-     * @dev Uses DEX router for token swapping with slippage protection
-     */
-    function _performDex(address _tokenIn, address _tokenOut, uint256 amountIn, uint256 slippageTolerance)
-        internal
-        returns (uint256 amountOut)
-    {
-        // Perform swap with DEX
-        amountOut = _attemptDex(_tokenIn, _tokenOut, amountIn, slippageTolerance);
-    }
-
-    /**
-     * @notice Performs DEX with slippage protection
-     * @param _tokenIn The address of the input token
-     * @param _tokenOut The address of the output token
-     * @param amountIn The amount of input tokens to swap
-     * @param slippageTolerance The slippage tolerance in basis points
-     * @return amountOut The amount of output tokens received
-     */
-    function _attemptDex(address _tokenIn, address _tokenOut, uint256 amountIn, uint256 slippageTolerance)
-        internal
-        returns (uint256 amountOut)
-    {
-        // Calculate expected amount using price feeds
-        uint256 expectedAmount = _calculateExpectedAmount(_tokenIn, _tokenOut, amountIn);
-
-        // Calculate minimum amount out with slippage protection
-        uint256 amountOutMinimum = expectedAmount * (10000 - slippageTolerance) / 10000;
-
-        // Approve DEX router to spend tokens
-        IERC20(_tokenIn).approve(_DEX_ROUTER(), amountIn);
-
-        // Prepare swap parameters
-        IDexRouter.ExactInputSingleParams memory params = IDexRouter.ExactInputSingleParams({
-            tokenIn: _tokenIn,
-            tokenOut: _tokenOut == address(1) ? _WRAPPED_NATIVE() : _tokenOut,
-            fee: 1000, // 0.1% fee tier
-            recipient: address(this),
-            deadline: block.timestamp + 300, // 5 minutes deadline
-            amountIn: amountIn,
-            amountOutMinimum: amountOutMinimum, // Slippage protection
-            sqrtPriceLimitX96: 0 // No price limit
-        });
-
-        // Perform the swap
-        amountOut = IDexRouter(_DEX_ROUTER()).exactInputSingle(params);
-    }
-
-    /**
-     * @notice Calculates expected amount out using dynamic price feeds
-     * @param _tokenIn The address of the input token
-     * @param _tokenOut The address of the output token
-     * @param amountIn The amount of input tokens
-     * @return expectedAmount The expected amount of output tokens
-     * @dev Uses the existing price oracle infrastructure to calculate dynamic exchange rates
-     * @dev Handles different token decimals automatically
-     * @dev Falls back to 1:1 ratio if price feeds are not available
-     */
-    function _calculateExpectedAmount(address _tokenIn, address _tokenOut, uint256 amountIn)
-        internal
-        view
-        returns (uint256 expectedAmount)
-    {
-        // Handle case where we're swapping to the same token
-        if (_tokenIn == _tokenOut) {
-            return amountIn;
-        }
-
-        try this._calculateExpectedAmountWithPriceFeeds(_tokenIn, _tokenOut, amountIn) returns (uint256 amount) {
-            expectedAmount = amount;
-        } catch {
-            uint256 tokenInDecimals = _getTokenDecimals(_tokenIn);
-            uint256 tokenOutDecimals = _getTokenDecimals(_tokenOut);
-
-            if (tokenInDecimals > tokenOutDecimals) {
-                expectedAmount = amountIn / (10 ** (tokenInDecimals - tokenOutDecimals));
-            } else if (tokenOutDecimals > tokenInDecimals) {
-                expectedAmount = amountIn * (10 ** (tokenOutDecimals - tokenInDecimals));
-            } else {
-                expectedAmount = amountIn;
-            }
-        }
-    }
-
-    /**
-     * @notice Internal function to calculate expected amount using price feeds
-     * @param _tokenIn The address of the input token
-     * @param _tokenOut The address of the output token
-     * @param amountIn The amount of input tokens
-     * @return expectedAmount The expected amount of output tokens
-     * @dev This function will revert if price feeds are not available
-     */
-    function _calculateExpectedAmountWithPriceFeeds(address _tokenIn, address _tokenOut, uint256 amountIn)
-        external
-        view
-        returns (uint256 expectedAmount)
-    {
-        // Only allow calls from this contract
-        require(msg.sender == address(this), "Unauthorized");
-
-        // Get token decimals
-        uint256 tokenInDecimals = _getTokenDecimals(_tokenIn);
-        uint256 tokenOutDecimals = _getTokenDecimals(_tokenOut);
-
-        // Get price feed addresses
-        address tokenInPriceFeed = _tokenDataStream(_tokenIn);
-        address tokenOutPriceFeed = _tokenDataStream(_tokenOut);
-
-        // Get current prices from oracles
-        (, uint256 tokenInPrice,,,) = IOracle(tokenInPriceFeed).latestRoundData();
-        (, uint256 tokenOutPrice,,,) = IOracle(tokenOutPriceFeed).latestRoundData();
-
-        // Get oracle decimals for price normalization
-        uint256 tokenInPriceDecimals = _oracleDecimal(_tokenIn);
-        uint256 tokenOutPriceDecimals = _oracleDecimal(_tokenOut);
-
-        // Normalize prices to 18 decimals for calculation
-        uint256 normalizedTokenInPrice = tokenInPrice * 1e18 / (10 ** tokenInPriceDecimals);
-        uint256 normalizedTokenOutPrice = tokenOutPrice * 1e18 / (10 ** tokenOutPriceDecimals);
-
-        // Calculate expected amount out
-        // Formula: (amountIn * tokenInPrice / tokenOutPrice) adjusted for decimals
-        expectedAmount = (amountIn * normalizedTokenInPrice * (10 ** tokenOutDecimals))
-            / (normalizedTokenOutPrice * (10 ** tokenInDecimals));
-    }
-
-    /**
-     * @notice Helper function to get token decimals
-     * @param _token The address of the token
-     * @return decimals The number of decimals for the token
-     */
-    function _getTokenDecimals(address _token) internal view returns (uint256 decimals) {
-        if (_token == address(1) || _token == _WRAPPED_NATIVE()) {
-            decimals = 18;
-        } else {
-            decimals = IERC20Metadata(_token).decimals();
-        }
-    }
-
-    function _DEX_ROUTER() internal view returns (address) {
-        return IFactory(_factory()).DEX_ROUTER();
     }
 }
