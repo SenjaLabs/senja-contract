@@ -37,8 +37,23 @@ interface IIsHealthy {
         view
         returns (bool isLiquidatable, uint256 borrowValue, uint256 collateralValue, uint256 liquidationAllocation);
 
+    /**
+     * @notice Sets the liquidation threshold for a lending pool
+     * @param router The address of the lending pool router
+     * @param liquidationThreshold The new liquidation threshold value
+     */
     function setLiquidationThreshold(address router, uint256 liquidationThreshold) external;
 
+    /**
+     * @notice Sets the liquidation bonus for a lending pool
+     * @param router The address of the lending pool router
+     * @param liquidationBonus The new liquidation bonus value
+     */
     function setLiquidationBonus(address router, uint256 liquidationBonus) external;
+
+    /**
+     * @notice Sets the factory address
+     * @param factory The address of the factory contract
+     */
     function setFactory(address factory) external;
 }

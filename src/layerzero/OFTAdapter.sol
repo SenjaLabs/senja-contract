@@ -8,19 +8,44 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
+/**
+ * @title OFTadapter
+ * @notice Generic LayerZero OFT Adapter for token cross-chain transfers with configurable decimals
+ * @dev Enables bridging of tokens between chains with lock/unlock on source chain (8217) and mint/burn on destination chains
+ */
 contract OFTadapter is OFTAdapter, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
+    /// @notice Address of the OFT token being bridged
     address public tokenOFT;
+
+    /// @notice Address of the elevated minter/burner contract
     address public elevatedMinterBurner;
 
+    /// @dev Immutable shared decimals configuration for cross-chain transfers
     uint8 public immutable _SHAREDDECIMALS;
 
+    /// @notice Error thrown when contract has insufficient balance for transfer
     error InsufficientBalance();
 
+    /// @notice Emitted when tokens are credited to a user on destination chain
+    /// @param to Recipient address
+    /// @param amount Amount of tokens credited
     event Credit(address to, uint256 amount);
+
+    /// @notice Emitted when tokens are debited from a user on source chain
+    /// @param from Sender address
+    /// @param amount Amount of tokens debited
     event Debit(address from, uint256 amount);
 
+    /**
+     * @notice Constructs the generic OFT Adapter with configurable decimals
+     * @param _token Address of the token to bridge
+     * @param _elevatedMinterBurner Address of the minter/burner contract
+     * @param _lzEndpoint Address of the LayerZero endpoint
+     * @param _owner Address of the contract owner
+     * @param _sharedDecimals Number of decimals to use for cross-chain transfers
+     */
     constructor(
         address _token,
         address _elevatedMinterBurner,
@@ -33,10 +58,21 @@ contract OFTadapter is OFTAdapter, ReentrancyGuard {
         _SHAREDDECIMALS = _sharedDecimals;
     }
 
+    /**
+     * @notice Returns the shared decimals used for cross-chain transfers
+     * @return Number of shared decimals configured at deployment
+     */
     function sharedDecimals() public view override returns (uint8) {
         return _SHAREDDECIMALS;
     }
 
+    /**
+     * @notice Internal function to credit tokens to recipient on destination chain
+     * @param _to Recipient address
+     * @param _amountLD Amount in local decimals
+     * @return amountReceivedLD Amount actually received
+     * @dev On chain 8217 (Klaytn), transfers from adapter. On other chains, mints tokens.
+     */
     function _credit(address _to, uint256 _amountLD, uint32)
         internal
         virtual
@@ -54,6 +90,16 @@ contract OFTadapter is OFTAdapter, ReentrancyGuard {
         return _amountLD;
     }
 
+    /**
+     * @notice Internal function to debit tokens from sender on source chain
+     * @param _from Sender address
+     * @param _amountLD Amount in local decimals
+     * @param _minAmountLD Minimum amount to receive
+     * @param _dstEid Destination endpoint ID
+     * @return amountSentLD Amount sent
+     * @return amountReceivedLD Amount to be received on destination
+     * @dev On chain 8217 (Klaytn), locks tokens in adapter. On other chains, burns tokens.
+     */
     function _debit(address _from, uint256 _amountLD, uint256 _minAmountLD, uint32 _dstEid)
         internal
         virtual
@@ -71,6 +117,11 @@ contract OFTadapter is OFTAdapter, ReentrancyGuard {
         emit Debit(_from, _amountLD);
     }
 
+    /**
+     * @notice Sets the elevated minter/burner contract address
+     * @param _elevatedMinterBurner New minter/burner address
+     * @dev Only callable by contract owner
+     */
     function setElevatedMinterBurner(address _elevatedMinterBurner) external onlyOwner {
         elevatedMinterBurner = _elevatedMinterBurner;
     }

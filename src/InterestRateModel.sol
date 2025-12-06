@@ -214,18 +214,38 @@ contract InterestRateModel is Initializable, AccessControlUpgradeable, UUPSUpgra
         emit ScaledPercentageSet(_percentage);
     }
 
+    /**
+     * @notice Internal function to get total supply assets from lending pool router
+     * @param _router Address of the lending pool router
+     * @return Total supply assets in the pool
+     */
     function _totalSupplyAssets(address _router) internal view returns (uint256) {
         return ILPRouter(_router).totalSupplyAssets();
     }
 
+    /**
+     * @notice Internal function to get total borrow assets from lending pool router
+     * @param _router Address of the lending pool router
+     * @return Total borrow assets in the pool
+     */
     function _totalBorrowAssets(address _router) internal view returns (uint256) {
         return ILPRouter(_router).totalBorrowAssets();
     }
 
+    /**
+     * @notice Internal function to get the borrow token address from lending pool router
+     * @param _router Address of the lending pool router
+     * @return Address of the borrow token
+     */
     function _borrowToken(address _router) internal view returns (address) {
         return ILPRouter(_router).borrowToken();
     }
 
+    /**
+     * @notice Internal function to get the collateral token address from lending pool router
+     * @param _router Address of the lending pool router
+     * @return Address of the collateral token
+     */
     function _collateralToken(address _router) internal view returns (address) {
         return ILPRouter(_router).collateralToken();
     }

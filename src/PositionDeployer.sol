@@ -15,22 +15,50 @@ import {Position} from "./Position.sol";
  * operations for a specific token pair.
  */
 contract PositionDeployer {
+    /*//////////////////////////////////////////////////////////////
+                                 ERRORS
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @notice Thrown when a caller other than the owner attempts to execute an owner-only function
+     */
     error OnlyOwnerCanCall();
 
+    /*//////////////////////////////////////////////////////////////
+                            STATE VARIABLES
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice The address of the contract owner who has administrative privileges
     address public owner;
 
+    /*//////////////////////////////////////////////////////////////
+                               CONSTRUCTOR
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @notice Initializes the PositionDeployer contract
+     * @dev Sets the contract deployer as the initial owner
+     */
     constructor() {
         owner = msg.sender;
     }
 
+    /*//////////////////////////////////////////////////////////////
+                               MODIFIERS
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @notice Restricts function access to only the contract owner
+     * @dev Calls internal _onlyOwner function to verify caller is the owner
+     */
     modifier onlyOwner() {
         _onlyOwner();
         _;
     }
 
-    function _onlyOwner() internal view {
-        if (msg.sender != owner) revert OnlyOwnerCanCall();
-    }
+    /*//////////////////////////////////////////////////////////////
+                          EXTERNAL FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
 
     /**
      * @notice Deploys a new Position contract with specified parameters
@@ -54,7 +82,34 @@ contract PositionDeployer {
         return address(position);
     }
 
+    /**
+     * @notice Updates the owner address of the contract
+     * @param _owner The address of the new owner
+     * @dev Only the current owner can transfer ownership to a new address
+     *
+     * Requirements:
+     * - Caller must be the current owner
+     * - _owner should be a valid address (non-zero for safety, though not enforced)
+     *
+     * @custom:security Consider using a two-step ownership transfer pattern for production
+     */
     function setOwner(address _owner) public onlyOwner {
         owner = _owner;
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                          INTERNAL FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @notice Internal function to verify that the caller is the owner
+     * @dev Reverts with OnlyOwnerCanCall error if the caller is not the owner
+     *
+     * This function is called by the onlyOwner modifier to enforce access control.
+     * Using an internal function instead of inline code in the modifier reduces
+     * bytecode size when the modifier is used multiple times.
+     */
+    function _onlyOwner() internal view {
+        if (msg.sender != owner) revert OnlyOwnerCanCall();
     }
 }

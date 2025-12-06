@@ -5,32 +5,22 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
- * @title STOKEN
- * @notice ERC20 token with operator-controlled minting and burning capabilities
- * @dev Extends OpenZeppelin's ERC20 and Ownable contracts with custom decimal support
+ * @title sUSDT
+ * @notice Synthetic USDT token representing USDT deposits in the Senja protocol
+ * @dev ERC20 token with operator-controlled minting and burning, fixed 6 decimals to match USDT
  */
-contract STOKEN is ERC20, Ownable {
+contract sUSDT is ERC20, Ownable {
     /// @notice Mapping to track authorized operators who can mint and burn tokens
     mapping(address => bool) public operator;
-
-    /// @dev Immutable decimal places for the token
-    uint8 private immutable _DECIMALS;
 
     /// @notice Error thrown when a non-operator attempts to call operator-only functions
     error NotOperator();
 
     /**
-     * @notice Constructs the STOKEN contract
-     * @param _name The name of the token
-     * @param _symbol The symbol of the token
-     * @param __decimals The number of decimal places for the token
+     * @notice Constructs the sUSDT token contract
+     * @dev Initializes with name "USD Tether representative" and symbol "sUSDT"
      */
-    constructor(string memory _name, string memory _symbol, uint8 __decimals)
-        ERC20(_name, _symbol)
-        Ownable(msg.sender)
-    {
-        _DECIMALS = __decimals;
-    }
+    constructor() ERC20("USD Tether representative", "sUSDT") Ownable(msg.sender) {}
 
     /**
      * @notice Modifier to restrict function access to authorized operators only
@@ -51,10 +41,10 @@ contract STOKEN is ERC20, Ownable {
 
     /**
      * @notice Returns the number of decimals used for token amounts
-     * @return The number of decimal places
+     * @return Always returns 6 decimals to match USDT standard
      */
-    function decimals() public view override returns (uint8) {
-        return _DECIMALS;
+    function decimals() public pure override returns (uint8) {
+        return 6;
     }
 
     /**

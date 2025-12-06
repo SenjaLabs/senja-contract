@@ -3,53 +3,53 @@ pragma solidity ^0.8.30;
 
 /**
  * @title ILendingPool
- * @dev Interface for lending pool functionality
- * @notice This interface defines the core lending pool operations including supply, borrow, and repay
+ * @notice Interface for lending pool functionality
+ * @dev Defines the core lending pool operations including supply, borrow, and repay
  * @author Senja Team
  * @custom:version 1.0.0
  */
 interface ILendingPool {
+    /**
+     * @notice Returns the address of the lending pool router
+     * @return Address of the router contract
+     */
     function router() external view returns (address);
 
     /**
-     * @dev Supplies collateral to the lending pool
+     * @notice Supplies collateral to the lending pool
+     * @param _user Address of the user to supply collateral for
      * @param _amount Amount of collateral to supply
-     * @param _user Address of the user to supply collateral
-     * @notice This function allows users to deposit collateral
-     * @custom:security Users must approve tokens before calling this function
+     * @dev Users must approve tokens before calling this function
      */
     function supplyCollateral(address _user, uint256 _amount) external payable;
 
     /**
-     * @dev Supplies liquidity to the lending pool
-     * @param _user Address of the user to supply liquidity
+     * @notice Supplies liquidity to the lending pool
+     * @param _user Address of the user to supply liquidity for
      * @param _amount Amount of liquidity to supply
-     * @notice This function allows users to provide liquidity for borrowing
-     * @custom:security Users must approve tokens before calling this function
+     * @dev Users must approve tokens before calling this function. Liquidity providers earn interest from borrowers.
      */
     function supplyLiquidity(address _user, uint256 _amount) external payable;
 
     /**
-     * @dev Borrows debt from the lending pool
+     * @notice Borrows debt from the lending pool
      * @param _amount Amount to borrow
      * @param _chainId Chain ID for cross-chain operations
-     * @param _addExecutorLzReceiveOption Executor options for LayerZero
-     * @notice This function allows users to borrow against their collateral
-     * @custom:security Users must have sufficient collateral to borrow
+     * @param _addExecutorLzReceiveOption Executor options for LayerZero messaging
+     * @dev Users must have sufficient collateral to borrow. Cross-chain borrowing uses LayerZero.
      */
     function borrowDebt(uint256 _amount, uint256 _chainId, uint128 _addExecutorLzReceiveOption)
         external
         payable;
 
     /**
-     * @dev Repays debt using selected token
-     * @param _shares Number of shares to repay
-     * @param _token Address of the token used for repayment
-     * @param _fromPosition Whether to repay from position balance
+     * @notice Repays debt using selected token
      * @param _user Address of the user repaying the debt
-     * @param _amountOutMinimum Slippage tolerance in basis points (e.g., 500 = 5%)
-     * @notice This function allows users to repay their borrowed debt
-     * @custom:security Users must approve tokens before calling this function
+     * @param _token Address of the token used for repayment
+     * @param _shares Number of borrow shares to repay
+     * @param _amountOutMinimum Minimum amount of borrow token expected from swap
+     * @param _fromPosition Whether to repay from position balance or user wallet
+     * @dev Users must approve tokens before calling this function. If token differs from borrow token, it will be swapped.
      */
     function repayWithSelectedToken(
         address _user,
@@ -60,28 +60,35 @@ interface ILendingPool {
     ) external payable;
 
     /**
-     * @dev Withdraws supplied liquidity by redeeming shares
+     * @notice Withdraws supplied liquidity by redeeming shares
      * @param _shares Number of shares to redeem for underlying tokens
-     * @notice This function allows users to withdraw their supplied liquidity
-     * @custom:security Users must have sufficient shares to withdraw
+     * @dev Users must have sufficient shares to withdraw
      */
     function withdrawLiquidity(uint256 _shares) external payable;
 
     /**
-     * @dev Withdraws supplied collateral from the user's position
+     * @notice Withdraws supplied collateral from the user's position
      * @param _amount Amount of collateral to withdraw
-     * @notice This function allows users to withdraw their collateral
-     * @custom:security Users must have sufficient collateral and maintain healthy positions
+     * @dev Users must have sufficient collateral and maintain healthy positions after withdrawal
      */
     function withdrawCollateral(uint256 _amount) external;
 
     /**
-     * @dev Liquidates an unhealthy position
+     * @notice Liquidates an unhealthy position
      * @param borrower The address of the borrower to liquidate
-     * @notice Anyone can call this function to liquidate unhealthy positions
+     * @dev Anyone can call this function to liquidate unhealthy positions and receive liquidation bonus
      */
     function liquidation(address borrower) external;
 
+    /**
+     * @notice Swaps tokens within a position
+     * @param _tokenIn Address of the input token
+     * @param _tokenOut Address of the output token
+     * @param amountIn Amount of input tokens to swap
+     * @param slippageTolerance Slippage tolerance for the swap (in basis points)
+     * @return amountOut Amount of output tokens received
+     * @dev Allows users to rebalance their collateral by swapping tokens within their position
+     */
     function swapTokenByPosition(address _tokenIn, address _tokenOut, uint256 amountIn, uint256 slippageTolerance)
         external
         returns (uint256 amountOut);

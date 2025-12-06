@@ -19,47 +19,146 @@ import {OptionsBuilder} from "@layerzerolabs/oapp-evm/contracts/oapp/libs/Option
 import {STOKEN} from "../../src/BridgeToken/STOKEN.sol";
 import {MyOApp} from "../../src/layerzero/MyOApp.sol";
 
+/**
+ * @title DeployAllOFT
+ * @notice Deployment script for deploying and configuring OFT (Omnichain Fungible Token) adapters across multiple chains
+ * @dev This script handles the complete deployment and configuration of LayerZero OFT infrastructure including:
+ *      - Deploying mock tokens or using existing tokens
+ *      - Deploying ElevatedMinterBurner contracts
+ *      - Deploying OFT adapters
+ *      - Configuring LayerZero libraries (send and receive)
+ *      - Setting up DVN (Decentralized Verifier Network) configurations
+ *      - Configuring executor settings
+ *      - Setting up peer connections (optional)
+ *      - Configuring enforced options (optional)
+ *      Supports KAIA mainnet (8217), BASE (8453), GLMR (1284), and KAIA testnet (1001)
+ */
 contract DeployAllOFT is Script, Helper {
     using OptionsBuilder for bytes;
 
+    // ============================================
+    // STATE VARIABLES - DEPLOYMENT CONFIGURATION
+    // ============================================
+
+    /// @notice The owner address for deployed contracts, loaded from environment variable
     address owner = vm.envAddress("PUBLIC_KEY");
+
+    /// @notice The private key used for broadcasting transactions, loaded from environment variable
     uint256 privateKey = vm.envUint("PRIVATE_KEY");
 
-    // Mock tokens
+    // ============================================
+    // STATE VARIABLES - MOCK TOKENS
+    // ============================================
+
+    /// @notice Mock USDT token instance for testing purposes
     MOCKUSDT public mockUSDT;
+
+    /// @notice Mock WKAIA token instance for testing purposes
     MOCKWKAIA public mockWKAIA;
+
+    /// @notice Mock WETH token instance for testing purposes
     MOCKWETH public mockWETH;
+
+    /// @notice Generic mock token instance for flexible token deployment
     MOCKTOKEN public mockTOKEN;
 
+    /// @notice STOKEN (bridge token) instance for cross-chain token representation
     STOKEN public sToken;
 
+    // ============================================
+    // STATE VARIABLES - OFT CONTRACTS
+    // ============================================
+
+    /// @notice OFT adapter contract that wraps the underlying token for cross-chain transfers
     OFTadapter public oftadapter;
+
+    /// @notice Elevated minter/burner contract with special permissions for OFT operations
     ElevatedMinterBurner public elevatedMinterBurner;
 
-    // State variables
+    // ============================================
+    // STATE VARIABLES - TOKEN AND NETWORK CONFIG
+    // ============================================
+
+    /// @notice The address of the token to be bridged via OFT
     address public TOKEN;
 
+    /// @notice LayerZero endpoint address for the current chain
     address endpoint;
+
+    /// @notice Primary OApp (Omnichain Application) address, typically the OFT adapter
     address oapp;
+
+    /// @notice Secondary OApp address for peer configuration
     address oapp2;
+
+    /// @notice Send library address for LayerZero messaging
     address sendLib;
+
+    /// @notice Receive library address for LayerZero messaging
     address receiveLib;
+
+    /// @notice Source endpoint ID for the current chain
     uint32 srcEid;
+
+    /// @notice Grace period for library upgrades (in seconds)
     uint32 gracePeriod;
 
+    // ============================================
+    // STATE VARIABLES - DVN AND EXECUTOR CONFIG
+    // ============================================
+
+    /// @notice First Decentralized Verifier Network address
     address dvn1;
+
+    /// @notice Second Decentralized Verifier Network address
     address dvn2;
+
+    /// @notice Executor address for LayerZero message execution
     address executor;
 
+    // ============================================
+    // STATE VARIABLES - EID AND TYPE CONSTANTS
+    // ============================================
+
+    /// @notice Shared decimals for token normalization across chains
     uint8 public _SHAREDDECIMALS;
+
+    /// @notice Endpoint ID for the source chain
     uint32 eid0;
+
+    /// @notice Endpoint ID for the destination chain
     uint32 eid1;
+
+    /// @notice Configuration type constant for executor settings
     uint32 constant EXECUTOR_CONFIG_TYPE = 1;
+
+    /// @notice Configuration type constant for ULN (Ultra Light Node) settings
     uint32 constant ULN_CONFIG_TYPE = 2;
+
+    /// @notice Configuration type constant for receive settings
     uint32 constant RECEIVE_CONFIG_TYPE = 2;
+
+    /// @notice Name of the current chain (e.g., "KAIA", "BASE", "GLMR")
     string chainName;
+
+    /// @notice Flag indicating if the current chain is a destination chain for minting
     bool isDestination;
 
+    // ============================================
+    // MAIN EXECUTION FUNCTION
+    // ============================================
+
+    /**
+     * @notice Main execution function that orchestrates the complete OFT deployment
+     * @dev Executes the following steps:
+     *      1. Creates and selects fork for KAIA mainnet
+     *      2. Retrieves chain-specific utilities and configurations
+     *      3. Deploys OFT adapter and related contracts
+     *      4. Sets up LayerZero libraries (send and receive)
+     *      5. Configures send and receive parameters
+     *      Note: Steps 2 (setPeers and setEnforcedOptions) are commented out and should be
+     *      executed separately after deployment on all chains
+     */
     function run() public {
         vm.createSelectFork(vm.rpcUrl("kaia_mainnet"));
         vm.startBroadcast(privateKey);
@@ -79,6 +178,19 @@ contract DeployAllOFT is Script, Helper {
         vm.stopBroadcast();
     }
 
+    // ============================================
+    // INTERNAL FUNCTIONS - CONFIGURATION
+    // ============================================
+
+    /**
+     * @notice Retrieves and sets chain-specific utilities and configuration parameters
+     * @dev Configures the deployment based on the current chain ID:
+     *      - KAIA mainnet (8217): Sets up KAIA-specific endpoints, libraries, DVNs, and executor
+     *      - BASE (8453): Sets up BASE-specific endpoints, libraries, DVNs, and executor
+     *      - GLMR (1284): Sets up Moonbeam-specific endpoints, libraries, DVNs, and executor
+     *      - KAIA testnet (1001): Deploys mock token only for testing
+     *      All configurations use the Helper contract's predefined constants
+     */
     function _getUtils() internal {
         if (block.chainid == 8217) {
             chainName = "KAIA";
@@ -132,16 +244,50 @@ contract DeployAllOFT is Script, Helper {
         }
     }
 
+    // ============================================
+    // INTERNAL FUNCTIONS - TOKEN DEPLOYMENT
+    // ============================================
+
+    /**
+     * @notice Deploys a mock ERC20 token for testing purposes
+     * @dev Creates a new instance of MOCKTOKEN with the specified parameters
+     * @param _name The full name of the token (e.g., "USD Tether")
+     * @param _symbol The token symbol (e.g., "USDT")
+     * @param _decimals The number of decimals for the token (e.g., 6 for USDT)
+     * @return The address of the newly deployed mock token
+     */
     function _deployMockToken(string memory _name, string memory _symbol, uint8 _decimals) internal returns (address) {
         mockTOKEN = new MOCKTOKEN(_name, _symbol, _decimals);
         return address(mockTOKEN);
     }
 
+    /**
+     * @notice Deploys a bridge token (STOKEN) for cross-chain representation
+     * @dev Creates a new instance of STOKEN which can be minted/burned for cross-chain transfers
+     * @param _name The full name of the bridge token
+     * @param _symbol The token symbol for the bridge token
+     * @param _decimals The number of decimals for the bridge token
+     * @return The address of the newly deployed STOKEN
+     */
     function _deploySTOKEN(string memory _name, string memory _symbol, uint8 _decimals) internal returns (address) {
         sToken = new STOKEN(_name, _symbol, _decimals);
         return address(sToken);
     }
 
+    // ============================================
+    // INTERNAL FUNCTIONS - OFT DEPLOYMENT
+    // ============================================
+
+    /**
+     * @notice Deploys and configures the OFT adapter and related contracts
+     * @dev Performs the following operations:
+     *      1. Deploys ElevatedMinterBurner with the token and owner
+     *      2. Deploys OFTadapter with token, minter/burner, endpoint, owner, and decimals
+     *      3. Sets the OFTadapter as an operator on the ElevatedMinterBurner
+     *      4. Logs deployment addresses for verification and tracking
+     *      5. If on a destination chain, grants operator role to ElevatedMinterBurner on the STOKEN
+     * @dev The console logs include chain ID and token symbol for easy identification
+     */
     function _deployOFT() internal {
         elevatedMinterBurner = new ElevatedMinterBurner(TOKEN, owner);
         oftadapter = new OFTadapter(TOKEN, address(elevatedMinterBurner), endpoint, owner, _getDecimals(TOKEN));
@@ -159,12 +305,32 @@ contract DeployAllOFT is Script, Helper {
         if (isDestination) STOKEN(TOKEN).setOperator(address(elevatedMinterBurner), true);
     }
 
+    // ============================================
+    // INTERNAL FUNCTIONS - LAYERZERO CONFIGURATION
+    // ============================================
+
+    /**
+     * @notice Configures LayerZero send and receive libraries for the OFT adapter
+     * @dev Sets up the messaging libraries for both source and destination chains:
+     *      - Configures send library for both eid0 (source) and eid1 (destination)
+     *      - Configures receive library for the source endpoint with grace period
+     *      This enables the OFT to send and receive cross-chain messages through LayerZero
+     */
     function _setLibraries() internal {
         ILayerZeroEndpointV2(endpoint).setSendLibrary(oapp, eid0, sendLib);
         ILayerZeroEndpointV2(endpoint).setSendLibrary(oapp, eid1, sendLib);
         ILayerZeroEndpointV2(endpoint).setReceiveLibrary(oapp, srcEid, receiveLib, gracePeriod);
     }
 
+    /**
+     * @notice Configures the send parameters for cross-chain messaging
+     * @dev Sets up ULN (Ultra Light Node) and Executor configurations:
+     *      - ULN Config: 15 confirmations, 2 required DVNs, no optional DVNs
+     *      - Executor Config: 10000 max message size
+     *      - Applies configuration to both eid0 and eid1 endpoints
+     *      The configuration ensures security through multiple DVN verification and
+     *      limits message size for gas optimization
+     */
     function _setSendConfig() internal {
         UlnConfig memory uln = UlnConfig({
             confirmations: 15,
@@ -185,6 +351,14 @@ contract DeployAllOFT is Script, Helper {
         ILayerZeroEndpointV2(endpoint).setConfig(oapp, sendLib, params);
     }
 
+    /**
+     * @notice Configures the receive parameters for cross-chain messaging
+     * @dev Sets up ULN configuration for receiving messages:
+     *      - ULN Config: 15 confirmations, 2 required DVNs, no optional DVNs
+     *      - Applies configuration to both eid0 and eid1 endpoints
+     *      The configuration mirrors the send config to ensure consistent security
+     *      across both directions of cross-chain communication
+     */
     function _setReceiveConfig() internal {
         UlnConfig memory uln = UlnConfig({
             confirmations: 15,
@@ -202,6 +376,14 @@ contract DeployAllOFT is Script, Helper {
         ILayerZeroEndpointV2(endpoint).setConfig(oapp, receiveLib, params);
     }
 
+    /**
+     * @notice Sets up peer connections between OFT adapters on different chains
+     * @dev Configures the trusted remote addresses for cross-chain communication:
+     *      - Converts oapp and oapp2 addresses to bytes32 format
+     *      - Sets peer for eid0 (source chain) and eid1 (destination chain)
+     *      This function should be called after deploying OFT adapters on all chains
+     *      to establish the trusted connection between them
+     */
     function _setPeers() internal {
         bytes32 oftPeer = bytes32(uint256(uint160(address(oapp))));
         bytes32 oftPeer2 = bytes32(uint256(uint160(address(oapp2))));
@@ -209,6 +391,15 @@ contract DeployAllOFT is Script, Helper {
         OFTadapter(oapp).setPeer(eid1, oftPeer2);
     }
 
+    /**
+     * @notice Configures enforced execution options for cross-chain messages
+     * @dev Sets up gas limits for message execution on destination chains:
+     *      - eid0: 80000 gas limit for lzReceive execution
+     *      - eid1: 100000 gas limit for lzReceive execution
+     *      - SEND message type (1) is configured with these options
+     *      Enforced options ensure sufficient gas is provided for reliable message delivery
+     *      and execution on the destination chain
+     */
     function _setEnforcedOptions() internal {
         uint16 SEND = 1;
         bytes memory options1 = OptionsBuilder.newOptions().addExecutorLzReceiveOption(80000, 0);
@@ -221,6 +412,16 @@ contract DeployAllOFT is Script, Helper {
         MyOApp(oapp).setEnforcedOptions(enforcedOptions);
     }
 
+    // ============================================
+    // INTERNAL FUNCTIONS - UTILITY HELPERS
+    // ============================================
+
+    /**
+     * @notice Converts a fixed-size array to a dynamic array
+     * @dev Helper function for converting address[2] to address[] for LayerZero configurations
+     * @param fixedArray A fixed-size array of 2 addresses (typically DVN addresses)
+     * @return dynamicArray A dynamic array containing the same addresses
+     */
     function _toDynamicArray(address[2] memory fixedArray) internal pure returns (address[] memory) {
         address[] memory dynamicArray = new address[](2);
         dynamicArray[0] = fixedArray[0];
@@ -228,10 +429,22 @@ contract DeployAllOFT is Script, Helper {
         return dynamicArray;
     }
 
+    /**
+     * @notice Retrieves the symbol of an ERC20 token
+     * @dev Calls the symbol() function on the ERC20Metadata interface
+     * @param _token The address of the token to query
+     * @return The token symbol as a string (e.g., "USDT", "WETH")
+     */
     function _getSymbol(address _token) internal view returns (string memory) {
         return IERC20Metadata(_token).symbol();
     }
 
+    /**
+     * @notice Retrieves the number of decimals for an ERC20 token
+     * @dev Calls the decimals() function on the ERC20Metadata interface
+     * @param _token The address of the token to query
+     * @return The number of decimals for the token (e.g., 6 for USDT, 18 for WETH)
+     */
     function _getDecimals(address _token) internal view returns (uint8) {
         return IERC20Metadata(_token).decimals();
     }

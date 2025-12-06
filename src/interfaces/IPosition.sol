@@ -87,7 +87,17 @@ interface IPosition {
      */
     function totalCollateral() external view returns (uint256);
 
+    /**
+     * @notice Liquidates a position and transfers collateral to the liquidator
+     * @param _liquidator Address of the liquidator
+     */
     function liquidation(address _liquidator) external;
 
+    /**
+     * @notice Swaps a token to the borrow token
+     * @param _token Address of the input token
+     * @param _amount Amount of input tokens to swap
+     * @param _amountOutMinimum Minimum amount of borrow tokens expected from swap
+     */
     function swapTokenToBorrow(address _token, uint256 _amount, uint256 _amountOutMinimum) external;
 }

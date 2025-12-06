@@ -12,23 +12,67 @@ import {Helper} from "../DevTools/Helper.sol";
 
 /// @title LayerZero Send Configuration Script (A → B)
 /// @notice Defines and applies ULN (DVN) + Executor configs for cross‑chain messages sent from Chain A to Chain B via LayerZero Endpoint V2.
+/// @dev This script configures the send libraries and DVN settings for OFT adapters on BASE and KAIA chains.
+///      It sets up both ULN (Ultra Light Node) configuration with DVNs (Decentralized Verifier Networks)
+///      and Executor configuration for message size limits. The script uses Foundry's forge script
+///      capabilities to broadcast transactions to mainnet networks.
 contract SetSendConfig is Script, Helper {
+    /*//////////////////////////////////////////////////////////////
+                            STATE VARIABLES
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice The owner address loaded from the PUBLIC_KEY environment variable
+    /// @dev Used for verification and authorization purposes
     address owner = vm.envAddress("PUBLIC_KEY");
+
+    /// @notice The private key loaded from environment for transaction signing
+    /// @dev Used in vm.startBroadcast() to sign and send transactions
     uint256 privateKey = vm.envUint("PRIVATE_KEY");
-    // destination
+
+    /// @notice The endpoint ID for BASE chain
+    /// @dev Loaded from Helper contract constants
     uint32 eid0 = BASE_EID;
+
+    /// @notice The endpoint ID for KAIA chain
+    /// @dev Loaded from Helper contract constants
     uint32 eid1 = KAIA_EID;
 
+    /// @notice Configuration type identifier for Executor configuration
+    /// @dev Used in SetConfigParam to specify the type of configuration being set
     uint32 constant EXECUTOR_CONFIG_TYPE = 1;
+
+    /// @notice Configuration type identifier for ULN (Ultra Light Node) configuration
+    /// @dev Used in SetConfigParam to specify the type of configuration being set
     uint32 constant ULN_CONFIG_TYPE = 2;
 
+    /// @notice The LayerZero endpoint address for the current chain
+    /// @dev Set dynamically in _getUtils() based on block.chainid
     address endpoint;
+
+    /// @notice The send library address for the current chain
+    /// @dev Set dynamically in _getUtils() based on block.chainid
     address sendLib;
+
+    /// @notice The first Decentralized Verifier Network (DVN) address
+    /// @dev Set dynamically in _getUtils() based on block.chainid
     address dvn1;
+
+    /// @notice The second Decentralized Verifier Network (DVN) address
+    /// @dev Set dynamically in _getUtils() based on block.chainid
     address dvn2;
+
+    /// @notice The executor address for processing cross-chain messages
+    /// @dev Set dynamically in _getUtils() based on block.chainid
     address executor;
 
-    /// @notice Helper function to convert fixed-size array to dynamic array
+    /*//////////////////////////////////////////////////////////////
+                            INTERNAL FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Converts a fixed-size array of 2 addresses to a dynamic array
+    /// @dev This is required because LayerZero UlnConfig expects dynamic arrays for DVN addresses
+    /// @param fixedArray The fixed-size array containing 2 addresses
+    /// @return dynamicArray A dynamic array containing the same addresses
     function _toDynamicArray(address[2] memory fixedArray) internal pure returns (address[] memory) {
         address[] memory dynamicArray = new address[](2);
         dynamicArray[0] = fixedArray[0];
@@ -36,12 +80,20 @@ contract SetSendConfig is Script, Helper {
         return dynamicArray;
     }
 
+    /// @notice Converts a fixed-size array of 1 address to a dynamic array
+    /// @dev This is a utility function for cases where only one DVN address is needed
+    /// @param fixedArray The fixed-size array containing 1 address
+    /// @return dynamicArray A dynamic array containing the same address
     function _toDynamicArray1(address[1] memory fixedArray) internal pure returns (address[] memory) {
         address[] memory dynamicArray = new address[](1);
         dynamicArray[0] = fixedArray[0];
         return dynamicArray;
     }
 
+    /// @notice Loads chain-specific LayerZero configuration addresses based on the current chain ID
+    /// @dev Populates endpoint, sendLib, dvn1, dvn2, and executor state variables.
+    ///      Supports BASE (chain ID 8453) and KAIA (chain ID 8217) networks.
+    ///      All addresses are loaded from the Helper contract constants.
     function _getUtils() internal {
         if (block.chainid == 8453) {
             endpoint = BASE_LZ_ENDPOINT;
@@ -86,10 +138,10 @@ contract SetSendConfig is Script, Helper {
         params[2] = SetConfigParam(eid1, EXECUTOR_CONFIG_TYPE, encodedExec);
         params[3] = SetConfigParam(eid1, ULN_CONFIG_TYPE, encodedUln);
         vm.startBroadcast(privateKey);
-        ILayerZeroEndpointV2(endpoint).setConfig(BASE_OFT_USDTK_ADAPTER, sendLib, params);
-        ILayerZeroEndpointV2(endpoint).setConfig(BASE_OFT_WKAIAK_ADAPTER, sendLib, params);
-        ILayerZeroEndpointV2(endpoint).setConfig(BASE_OFT_WBTCK_ADAPTER, sendLib, params);
-        ILayerZeroEndpointV2(endpoint).setConfig(BASE_OFT_WETHK_ADAPTER, sendLib, params);
+        ILayerZeroEndpointV2(endpoint).setConfig(BASE_OFT_SUSDT_ADAPTER, sendLib, params);
+        ILayerZeroEndpointV2(endpoint).setConfig(BASE_OFT_SWKAIA_ADAPTER, sendLib, params);
+        ILayerZeroEndpointV2(endpoint).setConfig(BASE_OFT_SWBTC_ADAPTER, sendLib, params);
+        ILayerZeroEndpointV2(endpoint).setConfig(BASE_OFT_SWETH_ADAPTER, sendLib, params);
         vm.stopBroadcast();
     }
 

@@ -27,8 +27,18 @@ contract TokenDataStream is Ownable {
     /// @notice Thrown when attempting to access price data for a token without a configured price feed
     /// @param token The token address that doesn't have a price feed configured
     error TokenPriceFeedNotSet(address token);
+
+    /// @notice Thrown when the price feed returns a negative price value
+    /// @param price The negative price value that was returned
     error NegativePriceAnswer(int256 price);
+
+    /// @notice Thrown when a zero address is provided as a parameter
     error ZeroAddress();
+
+    /// @notice Thrown when the price data is stale (older than 1 hour)
+    /// @param token The token address for which the price is stale
+    /// @param priceFeed The price feed contract address that returned stale data
+    /// @param updatedAt The timestamp when the price was last updated
     error PriceStale(address token, address priceFeed, uint256 updatedAt);
 
     // =============================================================
@@ -61,7 +71,8 @@ contract TokenDataStream is Ownable {
     // =============================================================
 
     /// @notice Sets or updates the price feed contract for a token
-    /// @dev Only the contract owner can call this function
+    /// @dev Only the contract owner can call this function. Validates that neither the token
+    ///      nor the price feed address is zero. Emits TokenPriceFeedSet event on success.
     /// @param _token The token address to configure
     /// @param _priceFeed The price feed contract address for this token
     function setTokenPriceFeed(address _token, address _priceFeed) public onlyOwner {
@@ -76,7 +87,8 @@ contract TokenDataStream is Ownable {
     // =============================================================
 
     /// @notice Returns the number of decimals used by a token's price feed
-    /// @dev Calls the decimals function on the configured price feed contract
+    /// @dev Calls the decimals function on the configured price feed contract.
+    ///      Reverts if no price feed is configured for the given token.
     /// @param _token The token address to get decimals for
     /// @return The number of decimals used by the token's price feed
     function decimals(address _token) public view returns (uint256) {
@@ -85,14 +97,18 @@ contract TokenDataStream is Ownable {
     }
 
     /// @notice Returns the latest price data for a token in Chainlink-compatible format
-    /// @dev Retrieves price data from the configured price feed and converts int256 price to uint256
-    ///      Validates that price data is not stale
+    /// @dev Retrieves price data from the configured price feed and converts int256 price to uint256.
+    ///      Validates that:
+    ///      - A price feed is configured for the token
+    ///      - The price data is not stale (updated within the last hour)
+    ///      - The price is not negative
+    ///      Note: startedAt and answeredInRound are returned as 0 for compatibility
     /// @param _token The token address to get price data for
     /// @return roundId The round ID from the price feed
     /// @return price The price value (converted from int256 to uint256)
-    /// @return startedAt Timestamp when the round started
+    /// @return startedAt Timestamp when the round started (always returns 0)
     /// @return updatedAt Timestamp when the price was last updated
-    /// @return answeredInRound The round when this answer was computed
+    /// @return answeredInRound The round when this answer was computed (always returns 0)
     function latestRoundData(address _token) public view returns (uint80, uint256, uint256, uint256, uint80) {
         if (tokenPriceFeed[_token] == address(0)) revert TokenPriceFeedNotSet(_token);
         address _priceFeed = tokenPriceFeed[_token];

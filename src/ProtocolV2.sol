@@ -9,83 +9,105 @@ import {IWrappedNative} from "./interfaces/IWrappedNative.sol";
 import {IDexRouter} from "./interfaces/IDexRouter.sol";
 
 /**
- * @title Protocol
- * @dev Protocol contract for managing protocol fees and withdrawals
- * @notice This contract handles protocol-level operations including fee collection and withdrawals
+ * @title ProtocolV2
+ * @notice This contract handles protocol-level operations including fee collection, buyback execution, and withdrawals
+ * @dev Protocol contract for managing protocol fees and withdrawals with automated buyback functionality
+ * @dev Implements a 95/5 split between protocol locked balance and owner available balance for buybacks
  * @author Senja Team
- * @custom:version 1.0.0
+ * @custom:version 2.0.0
+ * @custom:security-contact security@senja.io
  */
 contract ProtocolV2 is ReentrancyGuard, Ownable {
     using SafeERC20 for IERC20;
 
-    // Wrapped Native contract address
+    // ============ Constants ============
+
+    /// @notice Address of the Wrapped Native token contract (e.g., WKAIA)
+    /// @dev Hardcoded to prevent manipulation of critical infrastructure address
     address public constant WRAPPED_NATIVE = 0x19Aac5f612f524B754CA7e7c41cbFa2E981A4432;
 
-    // DEX router address
+    /// @notice Address of the DEX router for executing swaps
+    /// @dev Used for buyback operations to swap tokens for Wrapped Native
     address public constant DEX_ROUTER = 0xA324880f884036E3d21a09B90269E1aC57c7EC8a;
 
-    // Buyback configuration
-    uint256 public constant PROTOCOL_SHARE = 95; // 95% for protocol (locked)
-    uint256 public constant OWNER_SHARE = 5; // 5% for owner
+    /// @notice Protocol's share of buyback proceeds (95%)
+    /// @dev This portion is locked and tracked separately from owner's share
+    uint256 public constant PROTOCOL_SHARE = 95;
+
+    /// @notice Owner's share of buyback proceeds (5%)
+    /// @dev This portion is available for owner withdrawal
+    uint256 public constant OWNER_SHARE = 5;
+
+    /// @notice Divisor for percentage calculations
+    /// @dev Used to calculate shares: amount * SHARE / PERCENTAGE_DIVISOR
     uint256 public constant PERCENTAGE_DIVISOR = 100;
 
-    // State variables for buyback tracking
-    mapping(address => uint256) public protocolLockedBalance; // Token => locked amount for protocol
-    mapping(address => uint256) public ownerAvailableBalance; // Token => available amount for owner
+    // ============ State Variables ============
+
+    /// @notice Mapping of token addresses to protocol's locked balance
+    /// @dev Tracks the 95% protocol share from buybacks that is locked
+    /// @dev Token address => locked amount for protocol
+    mapping(address => uint256) public protocolLockedBalance;
+
+    /// @notice Mapping of token addresses to owner's available balance
+    /// @dev Tracks the 5% owner share from buybacks that is available for withdrawal
+    /// @dev Token address => available amount for owner
+    mapping(address => uint256) public ownerAvailableBalance;
 
     // ============ Errors ============
 
     /**
-     * @dev Error thrown when there are insufficient tokens for withdrawal
+     * @notice Thrown when there are insufficient tokens for withdrawal
      * @param token Address of the token with insufficient balance
      * @param amount Amount that was attempted to withdraw
      */
     error InsufficientBalance(address token, uint256 amount);
 
     /**
-     * @dev Error thrown when swap fails
-     * @param tokenIn Address of the input token
-     * @param tokenOut Address of the output token
-     * @param amountIn Amount of input tokens
+     * @notice Thrown when a swap operation fails on the DEX
+     * @param tokenIn Address of the input token being swapped
+     * @param tokenOut Address of the output token expected
+     * @param amountIn Amount of input tokens that failed to swap
      */
     error SwapFailed(address tokenIn, address tokenOut, uint256 amountIn);
 
     /**
-     * @dev Error thrown when insufficient output amount is received
-     * @param expectedMinimum Expected minimum output amount
-     * @param actualOutput Actual output amount received
+     * @notice Thrown when the output amount from a swap is less than the minimum expected
+     * @param expectedMinimum Expected minimum output amount specified
+     * @param actualOutput Actual output amount received from the swap
      */
     error InsufficientOutputAmount(uint256 expectedMinimum, uint256 actualOutput);
 
     /**
-     * @dev Error thrown when invalid token address is provided
+     * @notice Thrown when an invalid token address (zero address) is provided
      */
     error InvalidTokenAddress();
 
     /**
-     * @dev Error thrown when amount is zero or invalid
+     * @notice Thrown when an amount is zero or invalid
      */
     error InvalidAmount();
 
     /**
-     * @dev Error thrown when deadline has passed
+     * @notice Thrown when the transaction deadline has passed
      */
     error DeadlinePassed();
 
     /**
-     * @dev Error thrown when trying to swap Wrapped Native for Wrapped Native
+     * @notice Thrown when attempting to swap Wrapped Native for Wrapped Native
+     * @dev This would be a no-op and waste gas, so it's prevented
      */
     error CannotSwapWNativeForWNative();
 
     // ============ Events ============
 
     /**
-     * @dev Emitted when buyback is executed
-     * @param tokenIn Address of the input token used for buyback
-     * @param totalAmountIn Total amount of input tokens used
-     * @param protocolAmount Amount allocated to protocol (locked)
-     * @param ownerAmount Amount allocated to owner
-     * @param wnativeReceived Total Wrapped Native received from buyback
+     * @notice Emitted when a buyback operation is successfully executed
+     * @param tokenIn Address of the input token used for the buyback
+     * @param totalAmountIn Total amount of input tokens used in the buyback
+     * @param protocolAmount Amount of input tokens allocated to protocol (95%)
+     * @param ownerAmount Amount of input tokens allocated to owner (5%)
+     * @param wnativeReceived Total amount of Wrapped Native received from the buyback
      */
     event BuybackExecuted(
         address indexed tokenIn,
@@ -95,15 +117,21 @@ contract ProtocolV2 is ReentrancyGuard, Ownable {
         uint256 wnativeReceived
     );
 
+    // ============ Constructor ============
+
     /**
-     * @dev Constructor for the Protocol contract
-     * @notice Initializes the protocol contract with the deployer as owner
+     * @notice Initializes the ProtocolV2 contract
+     * @dev Sets the deployer as the initial owner via the Ownable constructor
+     * @dev Inherits ReentrancyGuard protection for all nonReentrant functions
      */
     constructor() Ownable(msg.sender) {}
 
+    // ============ Receive & Fallback Functions ============
+
     /**
-     * @dev Allows the contract to receive native tokens and auto-wraps them to Wrapped Native
-     * @notice Required for protocol fee collection in native tokens
+     * @notice Allows the contract to receive native tokens and automatically wraps them
+     * @dev Automatically converts received native tokens to Wrapped Native for consistent handling
+     * @dev Required for protocol fee collection in native tokens
      */
     receive() external payable {
         if (msg.value > 0) {
@@ -113,22 +141,32 @@ contract ProtocolV2 is ReentrancyGuard, Ownable {
     }
 
     /**
-     * @dev Fallback function - rejects calls with data to prevent accidental interactions
+     * @notice Fallback function that rejects calls with data
+     * @dev Prevents accidental interactions with the contract using invalid function selectors
      */
     fallback() external {
         revert("Fallback not allowed");
     }
 
+    // ============ External Functions ============
+
     /**
-     * @dev Executes buyback using protocol's accumulated balance
-     * @param tokenIn Address of the token to use for buyback
-     * @param amountIn Amount of tokens to use for buyback
+     * @notice Executes a buyback using the protocol's accumulated token balance
+     * @dev Swaps tokens for Wrapped Native and splits the output 95/5 between protocol and owner
+     * @dev Protected against reentrancy attacks
+     * @param tokenIn Address of the token to use for the buyback
+     * @param amountIn Amount of tokens to use for the buyback
      * @param amountOutMinimum Minimum amount of Wrapped Native to receive (slippage protection)
-     * @param fee Fee tier for the swap (0.05% = 500, 0.3% = 3000, 1% = 10000)
-     * @param deadline Deadline for the swap transaction
-     * @return totalWNativeReceived Total amount of Wrapped Native received from buyback
-     * @notice Uses protocol's balance to buy Wrapped Native, splits 95% to protocol (locked) and 5% to owner
-     * @custom:security Only the owner can execute buyback
+     * @param fee Fee tier for the swap (e.g., 500 for 0.05%, 3000 for 0.3%, 10000 for 1%)
+     * @param deadline Unix timestamp after which the transaction will revert
+     * @return totalWNativeReceived Total amount of Wrapped Native received from the buyback
+     * @custom:security Requires owner privileges to execute
+     * @custom:throws InvalidTokenAddress if tokenIn is zero address
+     * @custom:throws InvalidAmount if amountIn is zero
+     * @custom:throws DeadlinePassed if deadline has expired
+     * @custom:throws CannotSwapWNativeForWNative if tokenIn is Wrapped Native
+     * @custom:throws InsufficientBalance if protocol doesn't have enough tokens
+     * @custom:throws SwapFailed if the DEX swap operation fails
      */
     function executeBuyback(address tokenIn, uint256 amountIn, uint256 amountOutMinimum, uint24 fee, uint256 deadline)
         external
@@ -139,14 +177,167 @@ contract ProtocolV2 is ReentrancyGuard, Ownable {
     }
 
     /**
-     * @dev Internal function to execute buyback using protocol's accumulated balance
-     * @param tokenIn Address of the token to use for buyback
-     * @param amountIn Amount of tokens to use for buyback
+     * @notice Executes a buyback with a default 1-hour deadline for convenience
+     * @dev Wrapper function that calls _executeBuyback with block.timestamp + 3600 as deadline
+     * @dev Only callable by the contract owner
+     * @param tokenIn Address of the token to use for the buyback
+     * @param amountIn Amount of tokens to use for the buyback
      * @param amountOutMinimum Minimum amount of Wrapped Native to receive (slippage protection)
-     * @param fee Fee tier for the swap (0.05% = 500, 0.3% = 3000, 1% = 10000)
-     * @param deadline Deadline for the swap transaction
-     * @return totalWNativeReceived Total amount of Wrapped Native received from buyback
-     * @notice Uses protocol's balance to buy Wrapped Native, splits 95% to protocol (locked) and 5% to owner
+     * @param fee Fee tier for the swap (e.g., 500 for 0.05%, 3000 for 0.3%, 10000 for 1%)
+     * @return totalWNativeReceived Total amount of Wrapped Native received from the buyback
+     * @custom:security Requires owner privileges to execute
+     */
+    function executeBuybackSimple(address tokenIn, uint256 amountIn, uint256 amountOutMinimum, uint24 fee)
+        external
+        onlyOwner
+        returns (uint256 totalWNativeReceived)
+    {
+        return _executeBuyback(tokenIn, amountIn, amountOutMinimum, fee, block.timestamp + 3600);
+    }
+
+    /**
+     * @notice Withdraws tokens from the protocol contract with option to unwrap
+     * @dev Allows the owner to withdraw accumulated protocol fees
+     * @dev Protected against reentrancy attacks
+     * @param token Address of the token to withdraw (can be Wrapped Native or any ERC20)
+     * @param amount Amount of tokens to withdraw
+     * @param unwrapToNative If true and token is Wrapped Native, unwraps to native token before sending
+     * @custom:security Only the owner can withdraw tokens
+     * @custom:throws InsufficientBalance if contract doesn't have enough tokens
+     */
+    function withdraw(address token, uint256 amount, bool unwrapToNative) public nonReentrant onlyOwner {
+        if (token == WRAPPED_NATIVE) {
+            // Handle Wrapped Native withdrawal
+            if (IERC20(WRAPPED_NATIVE).balanceOf(address(this)) < amount) {
+                revert InsufficientBalance(token, amount);
+            }
+
+            if (unwrapToNative) {
+                // Unwrap Wrapped Native to native and send to owner
+                IWrappedNative(WRAPPED_NATIVE).withdraw(amount);
+                (bool sent,) = msg.sender.call{value: amount}("");
+                require(sent, "Failed to send native token");
+            } else {
+                // Send Wrapped Native directly to owner
+                IERC20(WRAPPED_NATIVE).safeTransfer(msg.sender, amount);
+            }
+        } else {
+            // Handle ERC20 token withdrawal
+            if (IERC20(token).balanceOf(address(this)) < amount) {
+                revert InsufficientBalance(token, amount);
+            }
+            IERC20(token).safeTransfer(msg.sender, amount);
+        }
+    }
+
+    /**
+     * @notice Withdraws tokens from the protocol contract (backward compatibility)
+     * @dev Defaults to not unwrapping Wrapped Native tokens
+     * @dev Overloaded version of withdraw that calls the main withdraw function
+     * @param token Address of the token to withdraw
+     * @param amount Amount of tokens to withdraw
+     * @custom:security Only the owner can withdraw tokens
+     */
+    function withdraw(address token, uint256 amount) public nonReentrant onlyOwner {
+        withdraw(token, amount, false);
+    }
+
+    /**
+     * @notice Withdraws from the owner's available balance (5% share from buybacks)
+     * @dev Owner can only withdraw up to their tracked available balance
+     * @dev Protected against reentrancy attacks
+     * @param token Address of the token to withdraw
+     * @param amount Amount of tokens to withdraw from owner's balance
+     * @param unwrapToNative If true and token is Wrapped Native, unwraps to native token before sending
+     * @custom:security Only the owner can withdraw their balance
+     * @custom:throws InsufficientBalance if owner doesn't have enough available balance
+     */
+    function withdrawOwnerBalance(address token, uint256 amount, bool unwrapToNative) public nonReentrant onlyOwner {
+        if (amount > ownerAvailableBalance[token]) {
+            revert InsufficientBalance(token, amount);
+        }
+
+        ownerAvailableBalance[token] -= amount;
+
+        if (token == WRAPPED_NATIVE) {
+            // Handle Wrapped Native withdrawal
+            if (unwrapToNative) {
+                // Unwrap Wrapped Native to native and send to owner
+                IWrappedNative(WRAPPED_NATIVE).withdraw(amount);
+                (bool sent,) = msg.sender.call{value: amount}("");
+                require(sent, "Failed to send native token");
+            } else {
+                // Send Wrapped Native directly to owner
+                IERC20(WRAPPED_NATIVE).safeTransfer(msg.sender, amount);
+            }
+        } else {
+            // Handle ERC20 token withdrawal
+            IERC20(token).safeTransfer(msg.sender, amount);
+        }
+    }
+
+    /**
+     * @notice Withdraws from the owner's available balance (backward compatibility)
+     * @dev Defaults to not unwrapping Wrapped Native tokens
+     * @dev Overloaded version that calls the main withdrawOwnerBalance function
+     * @param token Address of the token to withdraw
+     * @param amount Amount of tokens to withdraw from owner's balance
+     * @custom:security Only the owner can withdraw their balance
+     */
+    function withdrawOwnerBalance(address token, uint256 amount) public onlyOwner {
+        withdrawOwnerBalance(token, amount, false);
+    }
+
+    // ============ View Functions ============
+
+    /**
+     * @notice Gets the protocol's locked balance for a specific token
+     * @dev Returns the 95% protocol share from buybacks that is locked
+     * @param token Address of the token to query
+     * @return The locked balance amount for the protocol
+     */
+    function getProtocolLockedBalance(address token) public view returns (uint256) {
+        return protocolLockedBalance[token];
+    }
+
+    /**
+     * @notice Gets the owner's available balance for a specific token
+     * @dev Returns the 5% owner share from buybacks that is available for withdrawal
+     * @param token Address of the token to query
+     * @return The available balance amount for the owner
+     */
+    function getOwnerAvailableBalance(address token) public view returns (uint256) {
+        return ownerAvailableBalance[token];
+    }
+
+    /**
+     * @notice Gets the total balance held by the protocol contract for a specific token
+     * @dev Returns the actual ERC20 balance, which includes both locked and available amounts
+     * @param token Address of the token to query
+     * @return The total token balance held by the protocol contract
+     */
+    function getTotalProtocolBalance(address token) public view returns (uint256) {
+        return IERC20(token).balanceOf(address(this));
+    }
+
+    // ============ Internal Functions ============
+
+    /**
+     * @notice Internal function to execute the buyback logic
+     * @dev Validates inputs, performs swaps, and updates balances accordingly
+     * @dev Splits the swap into two parts: 95% for protocol (locked) and 5% for owner (available)
+     * @param tokenIn Address of the token to use for the buyback
+     * @param amountIn Amount of tokens to use for the buyback
+     * @param amountOutMinimum Minimum amount of Wrapped Native to receive (slippage protection)
+     * @param fee Fee tier for the swap (e.g., 500 for 0.05%, 3000 for 0.3%, 10000 for 1%)
+     * @param deadline Unix timestamp after which the transaction will revert
+     * @return totalWNativeReceived Total amount of Wrapped Native received from both swaps
+     * @custom:throws InvalidTokenAddress if tokenIn is zero address
+     * @custom:throws InvalidAmount if amountIn is zero
+     * @custom:throws DeadlinePassed if deadline has expired
+     * @custom:throws CannotSwapWNativeForWNative if tokenIn is Wrapped Native
+     * @custom:throws InsufficientBalance if protocol doesn't have enough tokens
+     * @custom:throws SwapFailed if either DEX swap operation fails
      */
     function _executeBuyback(address tokenIn, uint256 amountIn, uint256 amountOutMinimum, uint24 fee, uint256 deadline)
         internal
@@ -214,132 +405,5 @@ contract ProtocolV2 is ReentrancyGuard, Ownable {
 
         // Emit buyback event
         emit BuybackExecuted(tokenIn, amountIn, protocolAmount, ownerAmount, totalWNativeReceived);
-    }
-
-    /**
-     * @dev Executes buyback with default deadline (1 hour)
-     * @param tokenIn Address of the token to use for buyback
-     * @param amountIn Amount of tokens to use for buyback
-     * @param amountOutMinimum Minimum amount of Wrapped Native to receive (slippage protection)
-     * @param fee Fee tier for the swap (0.05% = 500, 0.3% = 3000, 1% = 10000)
-     * @return totalWNativeReceived Total amount of Wrapped Native received from buyback
-     */
-    function executeBuybackSimple(address tokenIn, uint256 amountIn, uint256 amountOutMinimum, uint24 fee)
-        external
-        onlyOwner
-        returns (uint256 totalWNativeReceived)
-    {
-        return _executeBuyback(tokenIn, amountIn, amountOutMinimum, fee, block.timestamp + 3600);
-    }
-
-    /**
-     * @dev Withdraws tokens from the protocol contract
-     * @param token Address of the token to withdraw (Wrapped Native)
-     * @param amount Amount of tokens to withdraw
-     * @param unwrapToNative Whether to unwrap Wrapped Native to native token
-     * @notice This function allows the owner to withdraw accumulated protocol fees
-     * @custom:security Only the owner can withdraw tokens
-     */
-    function withdraw(address token, uint256 amount, bool unwrapToNative) public nonReentrant onlyOwner {
-        if (token == WRAPPED_NATIVE) {
-            // Handle Wrapped Native withdrawal
-            if (IERC20(WRAPPED_NATIVE).balanceOf(address(this)) < amount) {
-                revert InsufficientBalance(token, amount);
-            }
-
-            if (unwrapToNative) {
-                // Unwrap Wrapped Native to native and send to owner
-                IWrappedNative(WRAPPED_NATIVE).withdraw(amount);
-                (bool sent,) = msg.sender.call{value: amount}("");
-                require(sent, "Failed to send native token");
-            } else {
-                // Send Wrapped Native directly to owner
-                IERC20(WRAPPED_NATIVE).safeTransfer(msg.sender, amount);
-            }
-        } else {
-            // Handle ERC20 token withdrawal
-            if (IERC20(token).balanceOf(address(this)) < amount) {
-                revert InsufficientBalance(token, amount);
-            }
-            IERC20(token).safeTransfer(msg.sender, amount);
-        }
-    }
-
-    /**
-     * @dev Withdraws tokens from the protocol contract (backward compatibility)
-     * @param token Address of the token to withdraw
-     * @param amount Amount of tokens to withdraw
-     * @notice Defaults to not unwrapping Wrapped Native
-     */
-    function withdraw(address token, uint256 amount) public nonReentrant onlyOwner {
-        withdraw(token, amount, false);
-    }
-
-    /**
-     * @dev Withdraws owner's available balance
-     * @param token Address of the token to withdraw
-     * @param amount Amount of tokens to withdraw
-     * @param unwrapToNative Whether to unwrap Wrapped Native to native
-     * @notice Owner can only withdraw their available balance (5% share from buybacks)
-     */
-    function withdrawOwnerBalance(address token, uint256 amount, bool unwrapToNative) public nonReentrant onlyOwner {
-        if (amount > ownerAvailableBalance[token]) {
-            revert InsufficientBalance(token, amount);
-        }
-
-        ownerAvailableBalance[token] -= amount;
-
-        if (token == WRAPPED_NATIVE) {
-            // Handle Wrapped Native withdrawal
-            if (unwrapToNative) {
-                // Unwrap Wrapped Native to native and send to owner
-                IWrappedNative(WRAPPED_NATIVE).withdraw(amount);
-                (bool sent,) = msg.sender.call{value: amount}("");
-                require(sent, "Failed to send native token");
-            } else {
-                // Send Wrapped Native directly to owner
-                IERC20(WRAPPED_NATIVE).safeTransfer(msg.sender, amount);
-            }
-        } else {
-            // Handle ERC20 token withdrawal
-            IERC20(token).safeTransfer(msg.sender, amount);
-        }
-    }
-
-    /**
-     * @dev Withdraws owner's available balance (backward compatibility)
-     * @param token Address of the token to withdraw
-     * @param amount Amount of tokens to withdraw
-     * @notice Defaults to not unwrapping Wrapped Native
-     */
-    function withdrawOwnerBalance(address token, uint256 amount) public onlyOwner {
-        withdrawOwnerBalance(token, amount, false);
-    }
-
-    /**
-     * @dev Gets the total protocol locked balance for a token
-     * @param token Address of the token
-     * @return The locked balance for the protocol
-     */
-    function getProtocolLockedBalance(address token) public view returns (uint256) {
-        return protocolLockedBalance[token];
-    }
-
-    /**
-     * @dev Gets the owner's available balance for a token
-     * @param token Address of the token
-     * @return The available balance for the owner
-     */
-    function getOwnerAvailableBalance(address token) public view returns (uint256) {
-        return ownerAvailableBalance[token];
-    }
-
-    /**
-     * @dev Gets the total protocol balance (locked + available) for a token
-     * @param token Address of the token
-     * @return The total balance held by the protocol
-     */
-    function getTotalProtocolBalance(address token) public view returns (uint256) {
-        return IERC20(token).balanceOf(address(this));
     }
 }

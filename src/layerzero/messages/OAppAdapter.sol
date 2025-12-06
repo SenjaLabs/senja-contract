@@ -10,7 +10,23 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
+/**
+ * @title OAppAdapter
+ * @notice Adapter contract for coordinating cross-chain token bridging and liquidity operations
+ * @dev Combines OFT token transfers with OApp messaging to enable complex cross-chain operations
+ */
 contract OAppAdapter is ReentrancyGuard {
+    /// @notice Emitted when a bridge operation is initiated
+    /// @param _oapp Address of the OApp contract handling the message
+    /// @param _oft Address of the OFT adapter for token transfer
+    /// @param _lendingPoolDst Destination lending pool address
+    /// @param _tokenSrc Source token address
+    /// @param _tokenDst Destination token address
+    /// @param _toAddress Recipient address
+    /// @param _dstEid Destination endpoint ID
+    /// @param _amount Amount being bridged
+    /// @param _oftFee Fee for OFT token transfer
+    /// @param _oappFee Fee for OApp messaging
     event sendBridgeOApp(
         address _oapp,
         address _oft,
@@ -27,6 +43,20 @@ contract OAppAdapter is ReentrancyGuard {
     using SafeERC20 for IERC20;
     using OptionsBuilder for bytes;
 
+    /**
+     * @notice Initiates a cross-chain bridge operation combining token transfer and messaging
+     * @param _oapp Address of the OApp contract for messaging
+     * @param _oft Address of the OFT adapter for token transfer
+     * @param _lendingPoolDst Destination lending pool address
+     * @param _tokenSrc Source chain token address
+     * @param _tokenDst Destination chain token address
+     * @param _toAddress Recipient address on destination chain
+     * @param _dstEid Destination endpoint ID
+     * @param _amount Amount of tokens to bridge
+     * @param _oftFee Native fee for OFT transfer
+     * @param _oappFee Native fee for OApp messaging
+     * @dev Combines OFT send and OApp message in a single atomic operation
+     */
     function sendBridge(
         address _oapp,
         address _oft,
@@ -49,6 +79,16 @@ contract OAppAdapter is ReentrancyGuard {
         );
     }
 
+    /**
+     * @notice Internal utility to prepare OFT send parameters
+     * @param _dstEid Destination endpoint ID
+     * @param _toAddress Recipient address
+     * @param _amount Amount to send
+     * @param _oft OFT adapter address
+     * @return sendParam Prepared send parameters
+     * @return fee Calculated messaging fee
+     * @dev Configures LayerZero options with 65000 gas for execution
+     */
     function _utils(uint32 _dstEid, address _toAddress, uint256 _amount, address _oft)
         internal
         view
@@ -69,6 +109,11 @@ contract OAppAdapter is ReentrancyGuard {
         fee = OFTAdapter(_oft).quoteSend(sendParam, false);
     }
 
+    /**
+     * @notice Converts an address to bytes32 format for LayerZero
+     * @param _addr Address to convert
+     * @return bytes32 representation of the address
+     */
     function _addressToBytes32(address _addr) internal pure returns (bytes32) {
         return bytes32(uint256(uint160(_addr)));
     }

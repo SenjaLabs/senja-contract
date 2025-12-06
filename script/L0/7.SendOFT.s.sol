@@ -10,9 +10,24 @@ import {Helper} from "../DevTools/Helper.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
+/// @title SendOFT
+/// @notice Foundry script for sending OFT (Omnichain Fungible Token) tokens cross-chain using LayerZero
+/// @dev This script demonstrates how to send tokens from Kaia Mainnet to other chains via LayerZero OFT adapter.
+///      The script handles token approval, fee calculation, and cross-chain message execution.
+///      Configuration parameters must be set in environment variables and within the run() function.
 contract SendOFT is Script, Helper {
+    // ============================================
+    // LIBRARIES
+    // ============================================
+
     using OptionsBuilder for bytes;
 
+    // ============================================
+    // SETUP FUNCTIONS
+    // ============================================
+
+    /// @notice Sets up the test environment by forking Kaia Mainnet
+    /// @dev Creates a fork of the Kaia Mainnet network using the RPC URL from foundry.toml or environment
     function setUp() public {
         vm.createSelectFork(vm.rpcUrl("kaia_mainnet"));
     }

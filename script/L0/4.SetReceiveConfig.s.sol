@@ -9,17 +9,48 @@ import {Helper} from "../DevTools/Helper.sol";
 
 /// @title LayerZero Receive Configuration Script (B ← A)
 /// @notice Defines and applies ULN (DVN) config for inbound message verification on Chain B for messages received from Chain A via LayerZero Endpoint V2.
+/// @dev This script configures the receive-side (inbound) message verification settings for LayerZero OFT adapters
+///      across multiple chains (Base and Kaia). It sets up DVN (Decentralized Verifier Network) configurations
+///      to ensure secure cross-chain message receipt and verification.
 contract SetReceiveConfig is Script, Helper {
+    // ========================================
+    // CONSTANTS
+    // ========================================
+
+    /// @notice Configuration type identifier for receive (inbound) configurations in LayerZero protocol
+    /// @dev Type 2 represents receive library configuration in IMessageLibManager
     uint32 constant RECEIVE_CONFIG_TYPE = 2;
 
-    // destination
+    // ========================================
+    // STATE VARIABLES
+    // ========================================
+
+    /// @notice Endpoint ID for Base chain (destination chain)
+    /// @dev Used to configure cross-chain communication parameters for Base network
     uint32 eid0 = BASE_EID;
+
+    /// @notice Endpoint ID for Kaia chain (destination chain)
+    /// @dev Used to configure cross-chain communication parameters for Kaia network
     uint32 eid1 = KAIA_EID;
 
+    /// @notice Address of the LayerZero endpoint contract on the current chain
+    /// @dev Set dynamically based on the chain ID in _getUtils() function
     address endpoint;
+
+    /// @notice Address of the OApp (Omnichain Application) being configured
+    /// @dev Currently unused but reserved for future OApp-specific configurations
     address oapp;
+
+    /// @notice Address of the receive message library contract
+    /// @dev Handles inbound message verification and processing on the current chain
     address receiveLib;
+
+    /// @notice Address of the first required DVN (Decentralized Verifier Network)
+    /// @dev Part of the required DVN set for message verification, chain-specific
     address dvn1;
+
+    /// @notice Address of the second required DVN (Decentralized Verifier Network)
+    /// @dev Part of the required DVN set for message verification, chain-specific
     address dvn2;
 
     /// @notice Helper function to convert fixed-size array to dynamic array
@@ -76,10 +107,10 @@ contract SetReceiveConfig is Script, Helper {
         params[1] = SetConfigParam(eid1, RECEIVE_CONFIG_TYPE, encodedUln);
 
         vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
-        ILayerZeroEndpointV2(endpoint).setConfig(BASE_OFT_USDTK_ADAPTER, receiveLib, params);
-        ILayerZeroEndpointV2(endpoint).setConfig(BASE_OFT_WKAIAK_ADAPTER, receiveLib, params);
-        ILayerZeroEndpointV2(endpoint).setConfig(BASE_OFT_WBTCK_ADAPTER, receiveLib, params);
-        ILayerZeroEndpointV2(endpoint).setConfig(BASE_OFT_WETHK_ADAPTER, receiveLib, params);
+        ILayerZeroEndpointV2(endpoint).setConfig(BASE_OFT_SUSDT_ADAPTER, receiveLib, params);
+        ILayerZeroEndpointV2(endpoint).setConfig(BASE_OFT_SWKAIA_ADAPTER, receiveLib, params);
+        ILayerZeroEndpointV2(endpoint).setConfig(BASE_OFT_SWBTC_ADAPTER, receiveLib, params);
+        ILayerZeroEndpointV2(endpoint).setConfig(BASE_OFT_SWETH_ADAPTER, receiveLib, params);
         vm.stopBroadcast();
     }
 

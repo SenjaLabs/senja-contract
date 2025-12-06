@@ -11,23 +11,55 @@ import {IFactory} from "../interfaces/IFactory.sol";
 import {IOracle} from "../interfaces/IOracle.sol";
 import {ITokenDataStream} from "../interfaces/ITokenDataStream.sol";
 
+/**
+ * @title MockDex
+ * @notice Mock decentralized exchange for testing token swaps with oracle-based pricing
+ * @dev Simulates DEX functionality by burning input tokens and minting output tokens based on oracle prices
+ */
 contract MockDex is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
+    /// @notice Address of the factory contract
     address public factory;
 
+    /// @notice Emitted when a token swap is executed
+    /// @param tokenIn Address of the input token
+    /// @param tokenOut Address of the output token
+    /// @param amountIn Amount of input tokens swapped
+    /// @param amountOut Amount of output tokens received
+    /// @param amountOutMinimum Minimum amount of output tokens expected
     event ExactInputSingle(
         address indexed tokenIn, address indexed tokenOut, uint256 amountIn, uint256 amountOut, uint256 amountOutMinimum
     );
 
+    /**
+     * @notice Constructs the MockDex contract
+     * @param _factory Address of the factory contract
+     */
     constructor(address _factory) Ownable(msg.sender) {
         factory = _factory;
     }
 
+    /**
+     * @notice Sets the factory contract address
+     * @param _factory New factory contract address
+     * @dev Only callable by contract owner
+     */
     function setFactory(address _factory) external onlyOwner {
         factory = _factory;
     }
 
+    /**
+     * @notice Parameters for executing an exact input swap
+     * @param tokenIn Address of the input token
+     * @param tokenOut Address of the output token
+     * @param fee Fee tier for the swap (not used in mock implementation)
+     * @param recipient Address to receive the output tokens
+     * @param deadline Transaction deadline timestamp
+     * @param amountIn Exact amount of input tokens to swap
+     * @param amountOutMinimum Minimum amount of output tokens to receive
+     * @param sqrtPriceLimitX96 Price limit (not used in mock implementation)
+     */
     struct ExactInputSingleParams {
         address tokenIn;
         address tokenOut;
@@ -39,6 +71,12 @@ contract MockDex is Ownable, ReentrancyGuard {
         uint160 sqrtPriceLimitX96;
     }
 
+    /**
+     * @notice Executes a token swap with exact input amount
+     * @param params Swap parameters containing token addresses, amounts, and constraints
+     * @return amountOut Amount of output tokens received
+     * @dev Burns input tokens and mints output tokens based on oracle price ratio
+     */
     function exactInputSingle(ExactInputSingleParams memory params)
         external
         payable
@@ -55,6 +93,14 @@ contract MockDex is Ownable, ReentrancyGuard {
         emit ExactInputSingle(params.tokenIn, params.tokenOut, params.amountIn, amountOut, params.amountOutMinimum);
     }
 
+    /**
+     * @notice Calculates the output amount for a token swap based on oracle prices
+     * @param _tokenIn Address of the input token
+     * @param _tokenOut Address of the output token
+     * @param _amountIn Amount of input tokens
+     * @return Amount of output tokens calculated from price ratio
+     * @dev Uses oracle prices and adjusts for token decimals
+     */
     function tokenCalculator(address _tokenIn, address _tokenOut, uint256 _amountIn) public view returns (uint256) {
         uint256 tokenInDecimal = IERC20Metadata(_tokenIn).decimals();
         uint256 tokenOutDecimal = IERC20Metadata(_tokenOut).decimals();
@@ -67,14 +113,28 @@ contract MockDex is Ownable, ReentrancyGuard {
         return amountOut;
     }
 
+    /**
+     * @notice Internal function to get the token data stream contract address
+     * @return Address of the token data stream contract
+     */
     function _tokenDataStream() internal view returns (address) {
         return IFactory(factory).tokenDataStream();
     }
 
+    /**
+     * @notice Internal function to get the oracle address for a specific token
+     * @param _token Address of the token
+     * @return Address of the oracle for the given token
+     */
     function _oracleAddress(address _token) internal view returns (address) {
         return ITokenDataStream(_tokenDataStream()).tokenPriceFeed(_token);
     }
 
+    /**
+     * @notice Internal function to get the current price of a token from the oracle
+     * @param _token Address of the token
+     * @return Current price of the token from the oracle
+     */
     function _tokenPrice(address _token) internal view returns (uint256) {
         (, uint256 price,,,) = ITokenDataStream(_tokenDataStream()).latestRoundData(_token);
         return price;
