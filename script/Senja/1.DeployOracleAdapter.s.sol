@@ -8,29 +8,29 @@ import {Oracle} from "../../src/Oracle.sol";
 contract DeployOracleAdapter is Script, Helper {
     Oracle public oracle;
 
-    address native_usdt_adapter;
-    address usdt_usd_adapter;
-    address eth_usdt_adapter;
-    address btc_usdt_adapter;
+    address nativeUsdtAdapter;
+    address usdtUsdAdapter;
+    address ethUsdtAdapter;
+    address btcUsdtAdapter;
 
     function run() public {
         // vm.createSelectFork(vm.rpcUrl("kaia_mainnet"));
         vm.createSelectFork(vm.rpcUrl("kaia_testnet"));
 
         vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
-        oracle = new Oracle(native_usdt);
-        native_usdt_adapter = address(oracle);
-        oracle = new Oracle(usdt_usd);
-        usdt_usd_adapter = address(oracle);
-        oracle = new Oracle(eth_usdt);
-        eth_usdt_adapter = address(oracle);
-        oracle = new Oracle(btc_usdt);
-        btc_usdt_adapter = address(oracle);
+        oracle = new Oracle(NATIVE_USDT);
+        nativeUsdtAdapter = address(oracle);
+        oracle = new Oracle(USDT_USD);
+        usdtUsdAdapter = address(oracle);
+        oracle = new Oracle(ETH_USDT);
+        ethUsdtAdapter = address(oracle);
+        oracle = new Oracle(BTC_USDT);
+        btcUsdtAdapter = address(oracle);
 
-        console.log("address public %s_usdt_usd_adapter = %s;", _getChainName(), usdt_usd_adapter);
-        console.log("address public %s_native_usdt_adapter = %s;", _getChainName(), native_usdt_adapter);
-        console.log("address public %s_eth_usdt_adapter = %s;", _getChainName(), eth_usdt_adapter);
-        console.log("address public %s_btc_usdt_adapter = %s;", _getChainName(), btc_usdt_adapter);
+        console.log("address public %s_usdt_usd_adapter = %s;", _getChainName(), usdtUsdAdapter);
+        console.log("address public %s_native_usdt_adapter = %s;", _getChainName(), nativeUsdtAdapter);
+        console.log("address public %s_eth_usdt_adapter = %s;", _getChainName(), ethUsdtAdapter);
+        console.log("address public %s_btc_usdt_adapter = %s;", _getChainName(), btcUsdtAdapter);
 
         vm.stopBroadcast();
     }

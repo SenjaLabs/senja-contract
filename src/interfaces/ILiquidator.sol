@@ -5,7 +5,7 @@ pragma solidity ^0.8.30;
  * @title ILiquidator
  * @dev Interface for liquidation functionality
  * @notice This interface defines the contract for liquidating unhealthy positions
- * @author Senja Team
+ * @author Senja Labs
  * @custom:version 1.0.0
  */
 interface ILiquidator {
@@ -17,7 +17,7 @@ interface ILiquidator {
      * @param liquidationIncentive The liquidation incentive in basis points
      * @return liquidatedAmount Amount of debt repaid
      */
-    function liquidateByDEX(address borrower, address lendingPoolRouter, address factory, uint256 liquidationIncentive)
+    function liquidateByDex(address borrower, address lendingPoolRouter, address factory, uint256 liquidationIncentive)
         external
         returns (uint256 liquidatedAmount);
 
@@ -29,7 +29,7 @@ interface ILiquidator {
      * @param repayAmount Amount of debt the liquidator wants to repay
      * @param liquidationIncentive The liquidation incentive in basis points
      */
-    function liquidateByMEV(
+    function liquidateByMev(
         address borrower,
         address lendingPoolRouter,
         address factory,

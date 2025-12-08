@@ -83,8 +83,8 @@ contract DeployOFT is Script, Helper {
      *      Additional chains (Optimism, HyperEVM) are commented out for future expansion.
      */
     function run() public {
-        deployBASE();
-        deployKAIA();
+        deployBase();
+        deployKaia();
         // optimism
         // hyperevm
     }
@@ -105,7 +105,7 @@ contract DeployOFT is Script, Helper {
      *      Note: BASE_SUSDT, BASE_SKAIA, BASE_SWKAIA, BASE_SWBTC, BASE_SWETH are
      *      constants defined in the Helper contract representing previously deployed addresses.
      */
-    function deployBASE() public {
+    function deployBase() public {
         vm.createSelectFork(vm.rpcUrl("base_mainnet"));
         vm.startBroadcast(privateKey);
         console.log("deployed on ChainId: ", block.chainid);
@@ -180,7 +180,7 @@ contract DeployOFT is Script, Helper {
      *      - KAIA_WETH: Wrapped ETH token address
      *      - KAIA_LZ_ENDPOINT: LayerZero endpoint on KAIA chain
      */
-    function deployKAIA() public {
+    function deployKaia() public {
         vm.createSelectFork(vm.rpcUrl("kaia_mainnet"));
         vm.startBroadcast(privateKey);
         console.log("deployed on ChainId: ", block.chainid);

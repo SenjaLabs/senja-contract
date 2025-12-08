@@ -21,10 +21,10 @@ contract UpgradeContract is Script, Helper {
     address owner = vm.envAddress("PUBLIC_KEY");
     uint256 privateKey = vm.envUint("PRIVATE_KEY");
 
-    address USDT;
-    address WKAIA;
-    address MOCK_WNative;
-    address MOCK_USDT;
+    address usdt;
+    address wkaia;
+    address mockWNative;
+    address mockUsdt;
 
     address lendingPoolFactoryProxy;
 
@@ -90,17 +90,17 @@ contract UpgradeContract is Script, Helper {
     }
 
     function _createLendingPool() internal {
-        // LendingPoolFactory(lendingPoolFactoryProxy).createLendingPool(MOCK_WNative, MOCK_USDT, 886e15);
+        // LendingPoolFactory(lendingPoolFactoryProxy).createLendingPool(mockWNative, mockUsdt, 886e15);
     }
 
     function _getUtils() internal {
         if (block.chainid == 8217) {
             lendingPoolFactoryProxy = lendingPoolFactoryProxy;
             chainName = "KAIA";
-            WKAIA = KAIA_WKAIA;
-            USDT = KAIA_USDT;
-            MOCK_WNative = KAIA_MOCK_WKAIA;
-            MOCK_USDT = KAIA_MOCK_USDT;
+            wkaia = KAIA_WKAIA;
+            usdt = KAIA_USDT;
+            mockWNative = KAIA_MOCK_WKAIA;
+            mockUsdt = KAIA_MOCK_USDT;
         }
     }
 }

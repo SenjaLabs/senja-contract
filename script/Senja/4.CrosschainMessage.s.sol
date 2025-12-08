@@ -17,7 +17,7 @@ contract CrosschainMessage is Script, Helper {
 
     address owner = vm.envAddress("PUBLIC_KEY");
 
-    OAppSupplyLiquidityUSDT public oappSupplyLiquidityUSDT;
+    OAppSupplyLiquidityUSDT public oappSupplyLiquidityUsdt;
     OAppAdapter public oappAdapter;
 
     address endpoint;
@@ -48,7 +48,7 @@ contract CrosschainMessage is Script, Helper {
         // _setReceiveConfig();
         // _setPeers();
         // _setEnforcedOptions();
-        // _setOFTAddress();
+        // _setOftAddress();
         // _deployOappAdapter();
         // _setOFTToken();
         vm.stopBroadcast();
@@ -85,25 +85,25 @@ contract CrosschainMessage is Script, Helper {
     }
 
     function _deployOApp() internal {
-        oappSupplyLiquidityUSDT = new OAppSupplyLiquidityUSDT(endpoint, owner);
+        oappSupplyLiquidityUsdt = new OAppSupplyLiquidityUSDT(endpoint, owner);
         if (block.chainid == 8453) {
-            console.log("address public BASE_oappSupplyLiquidityUSDT =", address(oappSupplyLiquidityUSDT), ";");
+            console.log("address public BASE_OAPP_SUPPLY_LIQUIDITY_USDT =", address(oappSupplyLiquidityUsdt), ";");
         } else if (block.chainid == 8217) {
-            console.log("address public KAIA_oappSupplyLiquidityUSDT =", address(oappSupplyLiquidityUSDT), ";");
+            console.log("address public KAIA_OAPP_SUPPLY_LIQUIDITY_USDT =", address(oappSupplyLiquidityUsdt), ";");
         }
     }
 
     function _setLibraries() internal {
         if (block.chainid == 8453) {
-            ILayerZeroEndpointV2(endpoint).setSendLibrary(BASE_oappSupplyLiquidityUSDT, eid0, sendLib);
-            ILayerZeroEndpointV2(endpoint).setSendLibrary(BASE_oappSupplyLiquidityUSDT, eid1, sendLib);
+            ILayerZeroEndpointV2(endpoint).setSendLibrary(BASE_OAPP_SUPPLY_LIQUIDITY_USDT, eid0, sendLib);
+            ILayerZeroEndpointV2(endpoint).setSendLibrary(BASE_OAPP_SUPPLY_LIQUIDITY_USDT, eid1, sendLib);
             ILayerZeroEndpointV2(endpoint)
-                .setReceiveLibrary(BASE_oappSupplyLiquidityUSDT, srcEid, receiveLib, gracePeriod);
+                .setReceiveLibrary(BASE_OAPP_SUPPLY_LIQUIDITY_USDT, srcEid, receiveLib, gracePeriod);
         } else if (block.chainid == 8217) {
-            ILayerZeroEndpointV2(endpoint).setSendLibrary(KAIA_oappSupplyLiquidityUSDT, eid0, sendLib);
-            ILayerZeroEndpointV2(endpoint).setSendLibrary(KAIA_oappSupplyLiquidityUSDT, eid1, sendLib);
+            ILayerZeroEndpointV2(endpoint).setSendLibrary(KAIA_OAPP_SUPPLY_LIQUIDITY_USDT, eid0, sendLib);
+            ILayerZeroEndpointV2(endpoint).setSendLibrary(KAIA_OAPP_SUPPLY_LIQUIDITY_USDT, eid1, sendLib);
             ILayerZeroEndpointV2(endpoint)
-                .setReceiveLibrary(KAIA_oappSupplyLiquidityUSDT, srcEid, receiveLib, gracePeriod);
+                .setReceiveLibrary(KAIA_OAPP_SUPPLY_LIQUIDITY_USDT, srcEid, receiveLib, gracePeriod);
         }
     }
 
@@ -120,19 +120,19 @@ contract CrosschainMessage is Script, Helper {
         bytes memory encodedUln = abi.encode(uln);
         bytes memory encodedExec = abi.encode(exec);
         SetConfigParam[] memory params = new SetConfigParam[](4);
-        params[0] = SetConfigParam(eid0, EXECUTOR_CONFIG_TYPE, encodedExec);
-        params[1] = SetConfigParam(eid0, ULN_CONFIG_TYPE, encodedUln);
-        params[2] = SetConfigParam(eid1, EXECUTOR_CONFIG_TYPE, encodedExec);
-        params[3] = SetConfigParam(eid1, ULN_CONFIG_TYPE, encodedUln);
+        params[0] = SetConfigParam({eid: eid0, configType: EXECUTOR_CONFIG_TYPE, config: encodedExec});
+        params[1] = SetConfigParam({eid: eid0, configType: ULN_CONFIG_TYPE, config: encodedUln});
+        params[2] = SetConfigParam({eid: eid1, configType: EXECUTOR_CONFIG_TYPE, config: encodedExec});
+        params[3] = SetConfigParam({eid: eid1, configType: ULN_CONFIG_TYPE, config: encodedUln});
         if (block.chainid == 8453) {
-            ILayerZeroEndpointV2(endpoint).setConfig(BASE_oappSupplyLiquidityUSDT, sendLib, params);
+            ILayerZeroEndpointV2(endpoint).setConfig(BASE_OAPP_SUPPLY_LIQUIDITY_USDT, sendLib, params);
         } else if (block.chainid == 8217) {
-            ILayerZeroEndpointV2(endpoint).setConfig(KAIA_oappSupplyLiquidityUSDT, sendLib, params);
+            ILayerZeroEndpointV2(endpoint).setConfig(KAIA_OAPP_SUPPLY_LIQUIDITY_USDT, sendLib, params);
         }
     }
 
     function _setReceiveConfig() internal {
-        uint32 RECEIVE_CONFIG_TYPE = 2;
+        uint32 receiveConfigType = 2;
 
         UlnConfig memory uln = UlnConfig({
             confirmations: 15,
@@ -144,40 +144,40 @@ contract CrosschainMessage is Script, Helper {
         });
         bytes memory encodedUln = abi.encode(uln);
         SetConfigParam[] memory params = new SetConfigParam[](2);
-        params[0] = SetConfigParam(eid0, RECEIVE_CONFIG_TYPE, encodedUln);
-        params[1] = SetConfigParam(eid1, RECEIVE_CONFIG_TYPE, encodedUln);
+        params[0] = SetConfigParam({eid: eid0, configType: receiveConfigType, config: encodedUln});
+        params[1] = SetConfigParam({eid: eid1, configType: receiveConfigType, config: encodedUln});
 
         if (block.chainid == 8453) {
-            ILayerZeroEndpointV2(endpoint).setConfig(BASE_oappSupplyLiquidityUSDT, receiveLib, params);
+            ILayerZeroEndpointV2(endpoint).setConfig(BASE_OAPP_SUPPLY_LIQUIDITY_USDT, receiveLib, params);
         } else if (block.chainid == 8217) {
-            ILayerZeroEndpointV2(endpoint).setConfig(KAIA_oappSupplyLiquidityUSDT, receiveLib, params);
+            ILayerZeroEndpointV2(endpoint).setConfig(KAIA_OAPP_SUPPLY_LIQUIDITY_USDT, receiveLib, params);
         }
     }
 
     function _setPeers() internal {
-        bytes32 oftPeer = bytes32(uint256(uint160(KAIA_oappSupplyLiquidityUSDT)));
-        bytes32 oftPeer2 = bytes32(uint256(uint160(BASE_oappSupplyLiquidityUSDT)));
+        bytes32 oftPeer = bytes32(uint256(uint160(KAIA_OAPP_SUPPLY_LIQUIDITY_USDT)));
+        bytes32 oftPeer2 = bytes32(uint256(uint160(BASE_OAPP_SUPPLY_LIQUIDITY_USDT)));
         if (block.chainid == 8453) {
-            OAppSupplyLiquidityUSDT(BASE_oappSupplyLiquidityUSDT).setPeer(KAIA_EID, oftPeer);
-            OAppSupplyLiquidityUSDT(BASE_oappSupplyLiquidityUSDT).setPeer(BASE_EID, oftPeer2);
+            OAppSupplyLiquidityUSDT(BASE_OAPP_SUPPLY_LIQUIDITY_USDT).setPeer(KAIA_EID, oftPeer);
+            OAppSupplyLiquidityUSDT(BASE_OAPP_SUPPLY_LIQUIDITY_USDT).setPeer(BASE_EID, oftPeer2);
         } else if (block.chainid == 8217) {
-            OAppSupplyLiquidityUSDT(KAIA_oappSupplyLiquidityUSDT).setPeer(KAIA_EID, oftPeer);
-            OAppSupplyLiquidityUSDT(KAIA_oappSupplyLiquidityUSDT).setPeer(BASE_EID, oftPeer2);
+            OAppSupplyLiquidityUSDT(KAIA_OAPP_SUPPLY_LIQUIDITY_USDT).setPeer(KAIA_EID, oftPeer);
+            OAppSupplyLiquidityUSDT(KAIA_OAPP_SUPPLY_LIQUIDITY_USDT).setPeer(BASE_EID, oftPeer2);
         }
     }
 
     function _setEnforcedOptions() internal {
-        uint16 SEND = 1;
+        uint16 send = 1;
         bytes memory options1 = OptionsBuilder.newOptions().addExecutorLzReceiveOption(80000, 0);
         bytes memory options2 = OptionsBuilder.newOptions().addExecutorLzReceiveOption(100000, 0);
 
         EnforcedOptionParam[] memory enforcedOptions = new EnforcedOptionParam[](2);
-        enforcedOptions[0] = EnforcedOptionParam({eid: dstEid0, msgType: SEND, options: options1});
-        enforcedOptions[1] = EnforcedOptionParam({eid: dstEid1, msgType: SEND, options: options2});
+        enforcedOptions[0] = EnforcedOptionParam({eid: dstEid0, msgType: send, options: options1});
+        enforcedOptions[1] = EnforcedOptionParam({eid: dstEid1, msgType: send, options: options2});
         if (block.chainid == 8453) {
-            OAppSupplyLiquidityUSDT(BASE_oappSupplyLiquidityUSDT).setEnforcedOptions(enforcedOptions);
+            OAppSupplyLiquidityUSDT(BASE_OAPP_SUPPLY_LIQUIDITY_USDT).setEnforcedOptions(enforcedOptions);
         } else if (block.chainid == 8217) {
-            OAppSupplyLiquidityUSDT(KAIA_oappSupplyLiquidityUSDT).setEnforcedOptions(enforcedOptions);
+            OAppSupplyLiquidityUSDT(KAIA_OAPP_SUPPLY_LIQUIDITY_USDT).setEnforcedOptions(enforcedOptions);
         }
     }
 
@@ -188,18 +188,18 @@ contract CrosschainMessage is Script, Helper {
         return dynamicArray;
     }
 
-    function _setOFTAddress() internal {
+    function _setOftAddress() internal {
         if (block.chainid == 8453) {
-            OAppSupplyLiquidityUSDT(BASE_oappSupplyLiquidityUSDT).setOFTaddress(BASE_OFT_SUSDT_ADAPTER);
+            OAppSupplyLiquidityUSDT(BASE_OAPP_SUPPLY_LIQUIDITY_USDT).setOftAddress(BASE_OFT_SUSDT_ADAPTER);
         } else if (block.chainid == 8217) {
-            OAppSupplyLiquidityUSDT(KAIA_oappSupplyLiquidityUSDT).setOFTaddress(KAIA_OFT_MOCK_USDT_ADAPTER);
+            OAppSupplyLiquidityUSDT(KAIA_OAPP_SUPPLY_LIQUIDITY_USDT).setOftAddress(KAIA_OFT_MOCK_USDT_ADAPTER);
         }
     }
 
     function _deployOappAdapter() internal {
         oappAdapter = new OAppAdapter();
         if (block.chainid == 8453) {
-            console.log("address public BASE_oappAdapter =", address(oappAdapter), ";");
+            console.log("address public BASE_OAPP_ADAPTER =", address(oappAdapter), ";");
         } else if (block.chainid == 8217) {
             console.log("address public KAIA_oappAdapter =", address(oappAdapter), ";");
         }

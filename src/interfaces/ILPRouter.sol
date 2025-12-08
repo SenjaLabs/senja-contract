@@ -60,14 +60,8 @@ interface ILPRouter {
     /// @notice Returns the address of the factory contract
     function factory() external view returns (address);
 
-    /// @notice Calculates the current borrow rate
-    function calculateBorrowRate() external view returns (uint256);
-
-    /// @notice Returns the current utilization rate of the pool
-    function getUtilizationRate() external view returns (uint256);
-
-    /// @notice Calculates the current supply rate
-    function calculateSupplyRate() external view returns (uint256);
+    /// @notice Returns the total reserve assets in the pool
+    function totalReserveAssets() external view returns (uint256);
 
     // ** WRITE FUNCTIONS **
 
@@ -134,18 +128,10 @@ interface ILPRouter {
      * @notice Liquidates an unhealthy borrowing position
      * @param _borrower Address of the borrower to liquidate
      * @return userBorrowAssets Total borrow assets of the user
-     * @return borrowerCollateral Total collateral of the borrower
-     * @return liquidationAllocation Amount allocated for liquidation
-     * @return collateralToLiquidator Collateral transferred to liquidator
+     * @return liquidationBonus Liquidation bonus allocation
      * @return userPosition Address of the user's position contract
      */
     function liquidation(address _borrower)
         external
-        returns (
-            uint256 userBorrowAssets,
-            uint256 borrowerCollateral,
-            uint256 liquidationAllocation,
-            uint256 collateralToLiquidator,
-            address userPosition
-        );
+        returns (uint256 userBorrowAssets, uint256 liquidationBonus, address userPosition);
 }

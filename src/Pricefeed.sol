@@ -5,13 +5,13 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
  * @title Pricefeed
- * @author Senja Team
+ * @author Senja Labs
  * @notice Mock price feed contract that simulates Chainlink-style price feed functionality for testing purposes
  * @dev This contract provides a simple price oracle that mimics the Chainlink AggregatorV3Interface.
  *      It allows the owner to manually set prices and maintains round data compatible with Chainlink's format.
  *      This is intended for testing and development environments only, not for production use.
  * @custom:version 1.0.0
- * @custom:security-contact security@senja.io
+ * @custom:security-contact security@senja.finance
  */
 contract Pricefeed is Ownable {
     // ============ State Variables ============
@@ -26,7 +26,7 @@ contract Pricefeed is Ownable {
 
     /// @notice Current price of the token
     /// @dev Price is stored with the precision defined by the decimals variable (default 8 decimals)
-    uint256 public price;
+    int256 public price;
 
     /// @notice Timestamp when the current round started
     /// @dev This is set to block.timestamp when setPrice is called
@@ -65,7 +65,7 @@ contract Pricefeed is Ownable {
      * @custom:security Only callable by the contract owner
      * @custom:emits Could emit a PriceUpdated event if implemented
      */
-    function setPrice(uint256 _price) public onlyOwner {
+    function setPrice(int256 _price) public onlyOwner {
         roundId = 1;
         price = _price;
         startedAt = block.timestamp;
@@ -82,7 +82,7 @@ contract Pricefeed is Ownable {
      * @return updatedAt_ Timestamp when the price was last updated
      * @return answeredInRound_ The round ID in which the answer was computed
      */
-    function latestRoundData() public view returns (uint80 roundId_, uint256 answer_, uint256 startedAt_, uint256 updatedAt_, uint80 answeredInRound_) {
+    function latestRoundData() public view returns (uint80, int256, uint256, uint256, uint80) {
         return (roundId, price, startedAt, updatedAt, answeredInRound);
     }
 }

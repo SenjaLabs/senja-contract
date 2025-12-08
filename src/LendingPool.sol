@@ -13,7 +13,6 @@ import {IPosition} from "./interfaces/IPosition.sol";
 import {IIsHealthy} from "./interfaces/IIsHealthy.sol";
 import {ILPRouter} from "./interfaces/ILPRouter.sol";
 import {IWrappedNative} from "./interfaces/IWrappedNative.sol";
-import {ILiquidator} from "./interfaces/ILiquidator.sol";
 import {ITokenDataStream} from "./interfaces/ITokenDataStream.sol";
 
 /**
@@ -119,11 +118,6 @@ contract LendingPool is ReentrancyGuard {
     /// @param addExecutorLzReceiveOption LayerZero gas option
     event BorrowDebt(address user, uint256 amount, uint256 shares, uint256 chainId, uint256 addExecutorLzReceiveOption);
 
-    /// @notice Emitted when interest rate model is updated
-    /// @param oldModel Previous model address
-    /// @param newModel New model address
-    event InterestRateModelSet(address indexed oldModel, address indexed newModel);
-
     /// @notice Emitted when user withdraws collateral
     /// @param user User address
     /// @param amount Amount withdrawn
@@ -142,17 +136,13 @@ contract LendingPool is ReentrancyGuard {
     /// @param borrowToken Borrow token address
     /// @param collateralToken Collateral token address
     /// @param userBorrowAssets User's borrow assets
-    /// @param borrowerCollateral User's collateral
-    /// @param liquidationAllocation Liquidation bonus allocation
-    /// @param collateralToLiquidator Collateral sent to liquidator
+    /// @param liquidationBonus Liquidation bonus allocation
     event Liquidation(
         address borrower,
         address borrowToken,
         address collateralToken,
         uint256 userBorrowAssets,
-        uint256 borrowerCollateral,
-        uint256 liquidationAllocation,
-        uint256 collateralToLiquidator
+        uint256 liquidationBonus
     );
 
     /// @notice Address of the lending pool router contract
@@ -286,13 +276,14 @@ contract LendingPool is ReentrancyGuard {
     {
         _accrueInterest();
         (uint256 protocolFee, uint256 userAmount, uint256 shares) = _borrowDebt(_amount, msg.sender);
+        // Check health BEFORE transferring tokens to ensure user has sufficient collateral
+        IIsHealthy(_isHealthy()).isHealthy(msg.sender, router);
         if (_chainId != block.chainid) {
             // LAYERZERO IMPLEMENTATION
             _borrowDebtCrosschain(userAmount, protocolFee, _chainIdToEid(_chainId), _addExecutorLzReceiveOption);
         } else {
             _borrowDebtTransfer(userAmount, protocolFee);
         }
-        IIsHealthy(_isHealthy()).isHealthy(msg.sender, router);
         emit BorrowDebt(msg.sender, _amount, shares, _chainId, _addExecutorLzReceiveOption);
     }
 
@@ -357,26 +348,13 @@ contract LendingPool is ReentrancyGuard {
      * @dev Transfers borrow token from liquidator, sends collateral bonus to liquidator
      */
     function liquidation(address _borrower) public nonReentrant {
-        (
-            uint256 userBorrowAssets,
-            uint256 borrowerCollateral,
-            uint256 liquidationAllocation,
-            uint256 collateralToLiquidator,
-            address userPosition
-        ) = ILPRouter(router).liquidation(_borrower);
+        (uint256 userBorrowAssets, uint256 liquidationBonus, address userPosition) =
+            ILPRouter(router).liquidation(_borrower);
 
         _isNativeTransferFrom(_borrowToken(), userBorrowAssets);
-        // _isNativeTransferTo(msg.sender, _collateralToken(), collateralToLiquidator);
-        IPosition(userPosition).liquidation(msg.sender);
-        emit Liquidation(
-            _borrower,
-            _borrowToken(),
-            _collateralToken(),
-            userBorrowAssets,
-            borrowerCollateral,
-            liquidationAllocation,
-            collateralToLiquidator
-        );
+        IPosition(userPosition).liquidation(msg.sender, liquidationBonus);
+
+        emit Liquidation(_borrower, _borrowToken(), _collateralToken(), userBorrowAssets, liquidationBonus);
     }
 
     // =============================================================
@@ -418,14 +396,6 @@ contract LendingPool is ReentrancyGuard {
      */
     function _collateralToken() internal view returns (address) {
         return ILPRouter(router).collateralToken();
-    }
-
-    /**
-     * @notice Gets the loan-to-value ratio from router
-     * @return LTV ratio
-     */
-    function _ltv() internal view returns (uint256) {
-        return ILPRouter(router).ltv();
     }
 
     /**
@@ -513,8 +483,8 @@ contract LendingPool is ReentrancyGuard {
      * @notice Gets wrapped native token address from factory
      * @return Wrapped native token address
      */
-    function _WRAPPED_NATIVE() internal view returns (address) {
-        return IFactory(_factory()).WRAPPED_NATIVE();
+    function _wrappedNative() internal view returns (address) {
+        return IFactory(_factory()).wrappedNative();
     }
 
     /**
@@ -532,24 +502,6 @@ contract LendingPool is ReentrancyGuard {
      */
     function _chainIdToEid(uint256 _chainId) internal view returns (uint32) {
         return IFactory(_factory()).chainIdToEid(_chainId);
-    }
-
-    /**
-     * @notice Converts borrow shares to borrow amount
-     * @param _shares Shares to convert
-     * @return Corresponding borrow amount
-     */
-    function _shareToAmount(uint256 _shares) internal view returns (uint256) {
-        return _shares * _totalBorrowAssets() / _totalBorrowShares();
-    }
-
-    /**
-     * @notice Converts borrow amount to borrow shares
-     * @param _amount Amount to convert
-     * @return Corresponding borrow shares
-     */
-    function _amountToShare(uint256 _amount) internal view returns (uint256) {
-        return _amount * _totalBorrowShares() / _totalBorrowAssets();
     }
 
     // ======================================================================
@@ -580,7 +532,7 @@ contract LendingPool is ReentrancyGuard {
     function _supplyLiquidityTransfer(uint256 _amount) internal {
         if (_borrowToken() == address(1)) {
             if (msg.value != _amount) revert SupplyLiquidityWrongInputAmount(msg.value, _amount);
-            IWrappedNative(_WRAPPED_NATIVE()).deposit{value: _amount}();
+            IWrappedNative(_wrappedNative()).deposit{value: _amount}();
         } else {
             IERC20(_borrowToken()).safeTransferFrom(msg.sender, address(this), _amount);
         }
@@ -594,7 +546,7 @@ contract LendingPool is ReentrancyGuard {
     function _withdrawLiquidityTransfer(uint256 amount) internal {
         if (_borrowToken() == address(1)) {
             _withdrawing = true;
-            IWrappedNative(_WRAPPED_NATIVE()).withdraw(amount);
+            IWrappedNative(_wrappedNative()).withdraw(amount);
             (bool sent,) = msg.sender.call{value: amount}("");
             if (!sent) revert TransferFailed(amount);
             _withdrawing = false;
@@ -612,9 +564,9 @@ contract LendingPool is ReentrancyGuard {
     function _supplyCollateralTransfer(address _user, uint256 _amount) internal {
         if (_collateralToken() == address(1)) {
             if (msg.value != _amount) revert CollateralWrongInputAmount(msg.value, _amount);
-            IWrappedNative(_WRAPPED_NATIVE()).deposit{value: msg.value}();
-            IERC20(_WRAPPED_NATIVE()).approve(_addressPositions(_user), _amount);
-            IERC20(_WRAPPED_NATIVE()).safeTransfer(_addressPositions(_user), _amount);
+            IWrappedNative(_wrappedNative()).deposit{value: msg.value}();
+            IERC20(_wrappedNative()).approve(_addressPositions(_user), _amount);
+            IERC20(_wrappedNative()).safeTransfer(_addressPositions(_user), _amount);
         } else {
             IERC20(_collateralToken()).safeTransferFrom(_user, _addressPositions(_user), _amount);
         }
@@ -627,7 +579,7 @@ contract LendingPool is ReentrancyGuard {
      */
     function _withdrawCollateralTransfer(uint256 _amount) internal {
         address collateralToken = _collateralToken();
-        address tokenToCheck = collateralToken == address(1) ? _WRAPPED_NATIVE() : collateralToken;
+        address tokenToCheck = collateralToken == address(1) ? _wrappedNative() : collateralToken;
         uint256 userCollateralBalance = IERC20(tokenToCheck).balanceOf(_addressPositions(msg.sender));
 
         if (_amount > userCollateralBalance) {
@@ -677,11 +629,11 @@ contract LendingPool is ReentrancyGuard {
     function _borrowDebtTransfer(uint256 _userAmount, uint256 _protocolFee) internal {
         if (_borrowToken() == address(1)) {
             _withdrawing = true;
-            IWrappedNative(_WRAPPED_NATIVE()).withdraw(_userAmount);
+            IWrappedNative(_wrappedNative()).withdraw(_userAmount);
             (bool sent,) = _protocol().call{value: _protocolFee}("");
-            if (sent) revert TransferFailed(_protocolFee);
+            if (!sent) revert TransferFailed(_protocolFee);
             (bool sent2,) = msg.sender.call{value: _userAmount}("");
-            if (sent2) revert TransferFailed(_userAmount);
+            if (!sent2) revert TransferFailed(_userAmount);
             _withdrawing = false;
         } else {
             IERC20(_borrowToken()).safeTransfer(_protocol(), _protocolFee);
@@ -708,19 +660,19 @@ contract LendingPool is ReentrancyGuard {
         if (_token == _borrowToken() && !_fromPosition) {
             if (_borrowToken() == address(1) && msg.value > 0) {
                 if (msg.value != _amount) revert RepayWithSelectedTokenWrongInputAmount(msg.value, _amount);
-                IWrappedNative(_WRAPPED_NATIVE()).deposit{value: msg.value}();
+                IWrappedNative(_wrappedNative()).deposit{value: msg.value}();
             } else {
                 IERC20(_borrowToken()).safeTransferFrom(_user, address(this), _amount);
             }
         } else if (_fromPosition) {
             IPosition(_addressPositions(_user)).repayWithSelectedToken(_token, _amount, _amountOutMinimum);
         } else {
-            // revert("feature unavailable");
             IERC20(_token).safeTransferFrom(_user, address(this), _amount);
             IERC20(_token).approve(_addressPositions(_user), _amount);
             IPosition(_addressPositions(_user)).swapTokenToBorrow(_token, _amount, _amountOutMinimum);
         }
     }
+
     // ======================================================================
 
     /**
@@ -778,19 +730,10 @@ contract LendingPool is ReentrancyGuard {
     function _isNativeTransferFrom(address _token, uint256 _amount) internal {
         if (_token == address(1)) {
             if (msg.value != _amount) revert WrongInputAmount(msg.value, _amount);
-            IWrappedNative(_WRAPPED_NATIVE()).deposit{value: msg.value}();
+            IWrappedNative(_wrappedNative()).deposit{value: msg.value}();
         } else {
             IERC20(_token).safeTransferFrom(msg.sender, address(this), _amount);
         }
-    }
-
-    /**
-     * @notice Internal function to liquidate position
-     * @param _user User address
-     * @dev Calls liquidation on user's position contract
-     */
-    function _liquidToPosition(address _user) internal {
-        IPosition(_addressPositions(_user)).liquidation(msg.sender);
     }
 
     /**
@@ -800,7 +743,7 @@ contract LendingPool is ReentrancyGuard {
     receive() external payable {
         // Only auto-wrap if this is the native token lending pool and not during withdrawal
         if (msg.value > 0 && !_withdrawing && (_borrowToken() == address(1) || _collateralToken() == address(1))) {
-            IWrappedNative(_WRAPPED_NATIVE()).deposit{value: msg.value}();
+            IWrappedNative(_wrappedNative()).deposit{value: msg.value}();
         } else if (msg.value > 0 && _withdrawing) {
             // During withdrawal, don't wrap - just pass through
             return;

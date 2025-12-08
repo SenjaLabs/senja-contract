@@ -57,10 +57,10 @@ contract SenjaCoreContracts is Script, Helper {
             KAIA = KAIA_KAIA;
             WETH = KAIA_WETH;
             WBTC = KAIA_WBTC;
-            USDT_USD_ADAPTER = KAIA_usdt_usd_adapter;
-            NATIVE_USDT_ADAPTER = KAIA_kaia_usdt_adapter;
-            ETH_USDT_ADAPTER = KAIA_eth_usdt_adapter;
-            BTC_USDT_ADAPTER = KAIA_btc_usdt_adapter;
+            USDT_USD_ADAPTER = KAIA_USDT_USD_ADAPTER;
+            NATIVE_USDT_ADAPTER = KAIA_KAIA_USDT_ADAPTER;
+            ETH_USDT_ADAPTER = KAIA_ETH_USDT_ADAPTER;
+            BTC_USDT_ADAPTER = KAIA_BTC_USDT_ADAPTER;
 
             OFT_USDT = KAIA_OFT_MOCK_USDT_ADAPTER;
             OFT_USDT_STARGATE = KAIA_OFT_USDT_STARGATE_ADAPTER;
@@ -68,7 +68,7 @@ contract SenjaCoreContracts is Script, Helper {
             OFT_WNATIVE = KAIA_OFT_MOCK_WKAIA_ADAPTER;
             OFT_WETH = KAIA_OFT_WETH_ADAPTER;
             OFT_WBTC = KAIA_OFT_WBTC_ADAPTER;
-            factory = KAIA_lendingPoolFactoryProxy;
+            factory = KAIA_LENDING_POOL_FACTORY_PROXY;
         } else if (block.chainid == 1001) {
             chainName = "KAIA_TESTNET";
             USDT = _deployMockToken("USDT", "USDT", 6);
@@ -77,10 +77,10 @@ contract SenjaCoreContracts is Script, Helper {
             WKAIA = _deployMockToken("WKAIA", "WKAIA", 18);
             WETH = _deployMockToken("WETH", "WETH", 18);
             WBTC = _deployMockToken("WBTC", "WBTC", 8);
-            USDT_USD_ADAPTER = KAIA_TESTNET_usdt_usd_adapter;
-            NATIVE_USDT_ADAPTER = KAIA_TESTNET_native_usdt_adapter;
-            ETH_USDT_ADAPTER = KAIA_TESTNET_eth_usdt_adapter;
-            BTC_USDT_ADAPTER = KAIA_TESTNET_btc_usdt_adapter;
+            USDT_USD_ADAPTER = KAIA_TESTNET_USDT_USD_ADAPTER;
+            NATIVE_USDT_ADAPTER = KAIA_TESTNET_NATIVE_USDT_ADAPTER;
+            ETH_USDT_ADAPTER = KAIA_TESTNET_ETH_USDT_ADAPTER;
+            BTC_USDT_ADAPTER = KAIA_TESTNET_BTC_USDT_ADAPTER;
 
             OFT_USDT = address(0);
             OFT_USDT_STARGATE = address(0);

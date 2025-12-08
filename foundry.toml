@@ -12,14 +12,5 @@ arb_mainnet = "${ARB_MAINNET_RPC}"
 moonbeam_mainnet = "${MOONBEAM_MAINNET_RPC}"
 moonbeam_testnet = "${MOONBEAM_TESTNET_RPC}"
 
-[lint]
-exclude_lints = [
-    "mixed-case-variable",
-    "mixed-case-function",
-    "unsafe-typecast",
-    "named-struct-fields",
-    "erc20-unchecked-transfer",
-    "unused-import",
-]
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options

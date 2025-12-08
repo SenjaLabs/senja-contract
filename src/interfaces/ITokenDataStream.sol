@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 /**
  * @title ITokenDataStream
- * @author Senja Protocol Team
+ * @author Senja Labs
  * @notice Interface for the TokenDataStream contract that manages price feeds for tokens
  * @dev This interface defines functions for managing token price feeds and streaming status
  */

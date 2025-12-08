@@ -41,9 +41,9 @@ contract SendOFT is Script, Helper {
         address toAddress = vm.envAddress("PUBLIC_KEY");
         // *********FILL THIS*********
         address oftAddress = KAIA_OFT_WKAIA_ADAPTER; // src
-        address TOKEN = KAIA_WKAIA;
+        address token = KAIA_WKAIA;
         uint256 amount = 1_000; // amount to send
-        uint256 tokensToSend = amount * 10 ** IERC20Metadata(TOKEN).decimals(); // src
+        uint256 tokensToSend = amount * 10 ** IERC20Metadata(token).decimals(); // src
         uint256 privateKey = vm.envUint("PRIVATE_KEY");
         //*******
         //** DESTINATION
@@ -71,12 +71,12 @@ contract SendOFT is Script, Helper {
         console.log("Sending tokens...");
         console.log("Fee amount:", fee.nativeFee);
         console.log("eth before", address(toAddress).balance);
-        console.log("TOKEN Balance before", IERC20(TOKEN).balanceOf(toAddress));
+        console.log("token Balance before", IERC20(token).balanceOf(toAddress));
         // Send tokens
-        IERC20(TOKEN).approve(oftAddress, tokensToSend);
+        IERC20(token).approve(oftAddress, tokensToSend);
         oft.send{value: fee.nativeFee}(sendParam, fee, msg.sender);
         console.log("eth after", address(toAddress).balance);
-        console.log("TOKEN Balance after", IERC20(TOKEN).balanceOf(toAddress));
+        console.log("token Balance after", IERC20(token).balanceOf(toAddress));
 
         vm.stopBroadcast();
     }

@@ -6,7 +6,7 @@ import {IPriceFeed} from "./interfaces/IPriceFeed.sol";
 
 /**
  * @title TokenDataStream
- * @author Nusa Protocol Team
+ * @author Senja Labs
  * @notice Contract that manages price feed mappings for tokens in the lending protocol
  * @dev This contract acts as a registry that maps token addresses to their corresponding
  *      price feed contracts. It provides a unified interface for accessing token price data
@@ -115,6 +115,8 @@ contract TokenDataStream is Ownable {
         (uint80 idRound, int256 priceAnswer, uint256 updatedAt) = IPriceFeed(_priceFeed).latestRoundData();
         if (block.timestamp - updatedAt > 3600) revert PriceStale(_token, _priceFeed, updatedAt);
         if (priceAnswer < 0) revert NegativePriceAnswer(priceAnswer);
-        return (idRound, uint256(priceAnswer), updatedAt, 0, 0);
+
+        // forge-lint: disable-next-line(unsafe-typecast)
+        return (idRound, uint256(priceAnswer), 0, updatedAt, 0);
     }
 }

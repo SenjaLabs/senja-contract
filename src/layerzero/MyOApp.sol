@@ -68,13 +68,13 @@ contract MyOApp is OApp, OAppOptionsType3 {
         //    - _dstEid:   remote chain's Endpoint ID
         //    - _message:  ABI-encoded string
         //    - _options:  combined execution options (enforced + caller-provided)
-        //    - MessagingFee(msg.value, 0): pay all gas as native token; no ZRO
+        //    - MessagingFee({nativeFee: msg.value, lzTokenFee: 0}): pay all gas as native token; no ZRO
         //    - payable(msg.sender): refund excess gas to caller
         //
         //    combineOptions (from OAppOptionsType3) merges enforced options set by the contract owner
         //    with any additional execution options provided by the caller
         _lzSend(
-            _dstEid, _message, combineOptions(_dstEid, SEND, _options), MessagingFee(msg.value, 0), payable(msg.sender)
+            _dstEid, _message, combineOptions(_dstEid, SEND, _options), MessagingFee({nativeFee: msg.value, lzTokenFee: 0}), payable(msg.sender)
         );
     }
 

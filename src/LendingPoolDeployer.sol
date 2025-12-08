@@ -5,7 +5,7 @@ import {LendingPool} from "./LendingPool.sol";
 
 /**
  * @title LendingPoolDeployer
- * @author Senja Protocol
+ * @author Senja Labs
  * @notice A factory contract for deploying new LendingPool instances
  * @dev This contract is responsible for creating new lending pools with specified parameters
  *

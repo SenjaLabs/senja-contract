@@ -8,7 +8,6 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IMintableBurnable} from "../interfaces/IMintableBurnable.sol";
 import {IFactory} from "../interfaces/IFactory.sol";
-import {IOracle} from "../interfaces/IOracle.sol";
 import {ITokenDataStream} from "../interfaces/ITokenDataStream.sol";
 
 /**
@@ -83,7 +82,7 @@ contract MockDex is Ownable, ReentrancyGuard {
         nonReentrant
         returns (uint256 amountOut)
     {
-        IERC20(params.tokenIn).transferFrom(msg.sender, address(this), params.amountIn);
+        IERC20(params.tokenIn).safeTransferFrom(msg.sender, address(this), params.amountIn);
 
         amountOut = tokenCalculator(params.tokenIn, params.tokenOut, params.amountIn);
 

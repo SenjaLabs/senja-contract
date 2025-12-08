@@ -5,7 +5,7 @@ pragma solidity ^0.8.30;
  * @title ITokenSwap
  * @dev Interface for token swap and bridge functionality
  * @notice This interface defines the contract for token minting, burning, and cross-chain bridging
- * @author Senja Team
+ * @author Senja Labs
  * @custom:version 1.0.0
  */
 interface ITokenSwap {

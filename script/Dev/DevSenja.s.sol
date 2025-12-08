@@ -38,10 +38,10 @@ contract DevSenja is Script, Helper {
     // ========================================
 
     /// @notice Mock USDT token contract instance
-    MOCKUSDT public mockUSDT;
+    MOCKUSDT public mockUsdt;
 
     /// @notice Mock Wrapped KAIA token contract instance
-    MOCKWKAIA public mockWKAIA;
+    MOCKWKAIA public mockWkaia;
 
     // ========================================
     // STATE VARIABLES - LayerZero Components
@@ -128,7 +128,7 @@ contract DevSenja is Script, Helper {
     uint32 constant RECEIVE_CONFIG_TYPE = 2;
 
     /// @notice Message type identifier for sendString function
-    uint16 SEND = 1;
+    uint16 send = 1;
 
     // ========================================
     // MAIN EXECUTION
@@ -155,13 +155,13 @@ contract DevSenja is Script, Helper {
         vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
         _deployTokens();
         _getUtils();
-        _deployOFT();
+        _deployOft();
         _setLibraries();
         _setSendConfig();
         _setReceiveConfig();
         _setPeers();
-        _setEnforcedOFT();
-        _setOFTAddress();
+        _setEnforcedOft();
+        _setOftAddress();
         vm.stopBroadcast();
     }
 
@@ -175,10 +175,10 @@ contract DevSenja is Script, Helper {
      *      to the console for reference in subsequent deployment steps
      */
     function _deployTokens() internal {
-        mockUSDT = new MOCKUSDT();
-        mockWKAIA = new MOCKWKAIA();
-        console.log("address public BASE_mockUSDT =", address(mockUSDT), ";");
-        console.log("address public BASE_mockWKAIA =", address(mockWKAIA), ";");
+        mockUsdt = new MOCKUSDT();
+        mockWkaia = new MOCKWKAIA();
+        console.log("address public BASE_mockUSDT =", address(mockUsdt), ";");
+        console.log("address public BASE_mockWKAIA =", address(mockWkaia), ";");
     }
 
     /**
@@ -238,7 +238,7 @@ contract DevSenja is Script, Helper {
      *
      *      All deployed addresses are logged to the console for reference
      */
-    function _deployOFT() internal {
+    function _deployOft() internal {
         elevatedminterburner = new ElevatedMinterBurner(address(KAIA_MOCK_USDT), owner);
         console.log("address public KAIA_MOCK_USDT_ELEVATED_MINTER_BURNER =", address(elevatedminterburner), ";");
         oftusdtadapter =
@@ -313,10 +313,10 @@ contract DevSenja is Script, Helper {
         bytes memory encodedExec = abi.encode(exec);
 
         SetConfigParam[] memory params = new SetConfigParam[](4);
-        params[0] = SetConfigParam(eid0, EXECUTOR_CONFIG_TYPE, encodedExec);
-        params[1] = SetConfigParam(eid0, ULN_CONFIG_TYPE, encodedUln);
-        params[2] = SetConfigParam(eid1, EXECUTOR_CONFIG_TYPE, encodedExec);
-        params[3] = SetConfigParam(eid1, ULN_CONFIG_TYPE, encodedUln);
+        params[0] = SetConfigParam({eid: eid0, configType: EXECUTOR_CONFIG_TYPE, config: encodedExec});
+        params[1] = SetConfigParam({eid: eid0, configType: ULN_CONFIG_TYPE, config: encodedUln});
+        params[2] = SetConfigParam({eid: eid1, configType: EXECUTOR_CONFIG_TYPE, config: encodedExec});
+        params[3] = SetConfigParam({eid: eid1, configType: ULN_CONFIG_TYPE, config: encodedUln});
 
         ILayerZeroEndpointV2(endpoint).setConfig(oftusdt, sendLib, params);
         ILayerZeroEndpointV2(endpoint).setConfig(oftwkaia, sendLib, params);
@@ -351,8 +351,8 @@ contract DevSenja is Script, Helper {
         });
         bytes memory encodedUln = abi.encode(uln);
         SetConfigParam[] memory params = new SetConfigParam[](2);
-        params[0] = SetConfigParam(eid0, RECEIVE_CONFIG_TYPE, encodedUln);
-        params[1] = SetConfigParam(eid1, RECEIVE_CONFIG_TYPE, encodedUln);
+        params[0] = SetConfigParam({eid: eid0, configType: RECEIVE_CONFIG_TYPE, config: encodedUln});
+        params[1] = SetConfigParam({eid: eid1, configType: RECEIVE_CONFIG_TYPE, config: encodedUln});
 
         ILayerZeroEndpointV2(endpoint).setConfig(oftusdt, receiveLib, params);
         ILayerZeroEndpointV2(endpoint).setConfig(oftwkaia, receiveLib, params);
@@ -396,13 +396,13 @@ contract DevSenja is Script, Helper {
      *
      *      Applies these options to both USDT and WKAIA OFT adapters on KAIA chain.
      */
-    function _setEnforcedOFT() internal {
+    function _setEnforcedOft() internal {
         bytes memory options1 = OptionsBuilder.newOptions().addExecutorLzReceiveOption(80000, 0);
         bytes memory options2 = OptionsBuilder.newOptions().addExecutorLzReceiveOption(100000, 0);
 
         EnforcedOptionParam[] memory enforcedOptions = new EnforcedOptionParam[](2);
-        enforcedOptions[0] = EnforcedOptionParam({eid: eid0, msgType: SEND, options: options1});
-        enforcedOptions[1] = EnforcedOptionParam({eid: eid1, msgType: SEND, options: options2});
+        enforcedOptions[0] = EnforcedOptionParam({eid: eid0, msgType: send, options: options1});
+        enforcedOptions[1] = EnforcedOptionParam({eid: eid1, msgType: send, options: options2});
 
         MyOApp(KAIA_OFT_MOCK_USDT_ADAPTER).setEnforcedOptions(enforcedOptions);
         MyOApp(KAIA_OFT_MOCK_WKAIA_ADAPTER).setEnforcedOptions(enforcedOptions);
@@ -417,9 +417,9 @@ contract DevSenja is Script, Helper {
      *      This allows the lending pool factory to recognize and use these OFT adapters
      *      for cross-chain token operations within the Senja protocol.
      */
-    function _setOFTAddress() internal {
-        IFactory(KAIA_lendingPoolFactoryProxy).setOftAddress(KAIA_MOCK_USDT, oftusdt);
-        IFactory(KAIA_lendingPoolFactoryProxy).setOftAddress(KAIA_MOCK_WKAIA, oftwkaia);
+    function _setOftAddress() internal {
+        IFactory(KAIA_LENDING_POOL_FACTORY_PROXY).setOftAddress(KAIA_MOCK_USDT, oftusdt);
+        IFactory(KAIA_LENDING_POOL_FACTORY_PROXY).setOftAddress(KAIA_MOCK_WKAIA, oftwkaia);
     }
 
     // ========================================

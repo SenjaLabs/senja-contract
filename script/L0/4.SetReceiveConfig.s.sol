@@ -82,13 +82,13 @@ contract SetReceiveConfig is Script, Helper {
     }
 
     function run() external {
-        deployBASE();
-        deployKAIA();
+        deployBase();
+        deployKaia();
         // optimism
         // hyperevm
     }
 
-    function deployBASE() public {
+    function deployBase() public {
         vm.createSelectFork(vm.rpcUrl("base_mainnet"));
         _getUtils();
         UlnConfig memory uln;
@@ -103,8 +103,8 @@ contract SetReceiveConfig is Script, Helper {
         bytes memory encodedUln = abi.encode(uln);
         SetConfigParam[] memory params;
         params = new SetConfigParam[](2);
-        params[0] = SetConfigParam(eid0, RECEIVE_CONFIG_TYPE, encodedUln);
-        params[1] = SetConfigParam(eid1, RECEIVE_CONFIG_TYPE, encodedUln);
+        params[0] = SetConfigParam({eid: eid0, configType: RECEIVE_CONFIG_TYPE, config: encodedUln});
+        params[1] = SetConfigParam({eid: eid1, configType: RECEIVE_CONFIG_TYPE, config: encodedUln});
 
         vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
         ILayerZeroEndpointV2(endpoint).setConfig(BASE_OFT_SUSDT_ADAPTER, receiveLib, params);
@@ -114,7 +114,7 @@ contract SetReceiveConfig is Script, Helper {
         vm.stopBroadcast();
     }
 
-    function deployKAIA() public {
+    function deployKaia() public {
         vm.createSelectFork(vm.rpcUrl("kaia_mainnet"));
         _getUtils();
         UlnConfig memory uln = UlnConfig({
@@ -127,8 +127,8 @@ contract SetReceiveConfig is Script, Helper {
         });
         bytes memory encodedUln = abi.encode(uln);
         SetConfigParam[] memory params = new SetConfigParam[](2);
-        params[0] = SetConfigParam(eid0, RECEIVE_CONFIG_TYPE, encodedUln);
-        params[1] = SetConfigParam(eid1, RECEIVE_CONFIG_TYPE, encodedUln);
+        params[0] = SetConfigParam({eid: eid0, configType: RECEIVE_CONFIG_TYPE, config: encodedUln});
+        params[1] = SetConfigParam({eid: eid1, configType: RECEIVE_CONFIG_TYPE, config: encodedUln});
 
         vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
         ILayerZeroEndpointV2(endpoint).setConfig(KAIA_OFT_USDT_ADAPTER, receiveLib, params);

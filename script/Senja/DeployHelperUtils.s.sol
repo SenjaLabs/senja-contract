@@ -27,10 +27,10 @@ contract DeployHelperUtils is Script, Helper {
 
     function _getUtils() internal {
         if (block.chainid == 8217) {
-            lendingPoolFactoryProxy = KAIA_lendingPoolFactoryProxy;
+            lendingPoolFactoryProxy = KAIA_LENDING_POOL_FACTORY_PROXY;
             chainName = "KAIA";
         } else if (block.chainid == 1001) {
-            lendingPoolFactoryProxy = KAIA_TESTNET_lendingPoolFactoryProxy;
+            lendingPoolFactoryProxy = KAIA_TESTNET_LENDING_POOL_FACTORY_PROXY;
             chainName = "KAIA_TESTNET";
         }
     }

@@ -112,13 +112,13 @@ contract SetSendConfig is Script, Helper {
 
     /// @notice Broadcasts transactions to set both Send ULN and Executor configurations for messages sent from Chain A to Chain B
     function run() external {
-        deployBASE();
-        deployKAIA();
+        deployBase();
+        deployKaia();
         // optimism
         // hyperevm
     }
 
-    function deployBASE() public {
+    function deployBase() public {
         vm.createSelectFork(vm.rpcUrl("base_mainnet"));
         _getUtils();
         UlnConfig memory uln = UlnConfig({
@@ -133,10 +133,10 @@ contract SetSendConfig is Script, Helper {
         bytes memory encodedUln = abi.encode(uln);
         bytes memory encodedExec = abi.encode(exec);
         SetConfigParam[] memory params = new SetConfigParam[](4);
-        params[0] = SetConfigParam(eid0, EXECUTOR_CONFIG_TYPE, encodedExec);
-        params[1] = SetConfigParam(eid0, ULN_CONFIG_TYPE, encodedUln);
-        params[2] = SetConfigParam(eid1, EXECUTOR_CONFIG_TYPE, encodedExec);
-        params[3] = SetConfigParam(eid1, ULN_CONFIG_TYPE, encodedUln);
+        params[0] = SetConfigParam({eid: eid0, configType: EXECUTOR_CONFIG_TYPE, config: encodedExec});
+        params[1] = SetConfigParam({eid: eid0, configType: ULN_CONFIG_TYPE, config: encodedUln});
+        params[2] = SetConfigParam({eid: eid1, configType: EXECUTOR_CONFIG_TYPE, config: encodedExec});
+        params[3] = SetConfigParam({eid: eid1, configType: ULN_CONFIG_TYPE, config: encodedUln});
         vm.startBroadcast(privateKey);
         ILayerZeroEndpointV2(endpoint).setConfig(BASE_OFT_SUSDT_ADAPTER, sendLib, params);
         ILayerZeroEndpointV2(endpoint).setConfig(BASE_OFT_SWKAIA_ADAPTER, sendLib, params);
@@ -145,7 +145,7 @@ contract SetSendConfig is Script, Helper {
         vm.stopBroadcast();
     }
 
-    function deployKAIA() public {
+    function deployKaia() public {
         vm.createSelectFork(vm.rpcUrl("kaia_mainnet"));
         _getUtils();
         UlnConfig memory uln = UlnConfig({
@@ -160,10 +160,10 @@ contract SetSendConfig is Script, Helper {
         bytes memory encodedUln = abi.encode(uln);
         bytes memory encodedExec = abi.encode(exec);
         SetConfigParam[] memory params = new SetConfigParam[](4);
-        params[0] = SetConfigParam(eid0, EXECUTOR_CONFIG_TYPE, encodedExec);
-        params[1] = SetConfigParam(eid0, ULN_CONFIG_TYPE, encodedUln);
-        params[2] = SetConfigParam(eid1, EXECUTOR_CONFIG_TYPE, encodedExec);
-        params[3] = SetConfigParam(eid1, ULN_CONFIG_TYPE, encodedUln);
+        params[0] = SetConfigParam({eid: eid0, configType: EXECUTOR_CONFIG_TYPE, config: encodedExec});
+        params[1] = SetConfigParam({eid: eid0, configType: ULN_CONFIG_TYPE, config: encodedUln});
+        params[2] = SetConfigParam({eid: eid1, configType: EXECUTOR_CONFIG_TYPE, config: encodedExec});
+        params[3] = SetConfigParam({eid: eid1, configType: ULN_CONFIG_TYPE, config: encodedUln});
         vm.startBroadcast(privateKey);
         ILayerZeroEndpointV2(endpoint).setConfig(KAIA_OFT_USDT_ADAPTER, sendLib, params);
         ILayerZeroEndpointV2(endpoint).setConfig(KAIA_OFT_USDT_STARGATE_ADAPTER, sendLib, params);

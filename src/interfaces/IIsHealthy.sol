@@ -5,10 +5,22 @@ pragma solidity ^0.8.30;
  * @title IIsHealthy
  * @dev Interface for health check functionality in lending pools
  * @notice This interface defines the contract for checking the health status of lending positions
- * @author Senja Team
+ * @author Senja Labs
  * @custom:version 1.0.0
  */
 interface IIsHealthy {
+    /// @notice Thrown when user tries to borrow more than allowed by LTV ratio
+    /// @param borrowValue Total value user is trying to borrow
+    /// @param maxBorrowValue Maximum borrow value allowed by LTV
+    /// @param ltv The loan-to-value ratio (e.g., 0.6e18 = 60%)
+    error ExceedsMaxLTV(uint256 borrowValue, uint256 maxBorrowValue, uint256 ltv);
+
+    /// @notice Thrown when a position is at risk of liquidation (exceeds liquidation threshold)
+    /// @param borrowValue Total value of borrowed assets
+    /// @param maxCollateralValue Maximum collateral value at liquidation threshold
+    /// @param liquidationThreshold The liquidation threshold (e.g., 0.85e18 = 85%)
+    error LiquidationAlert(uint256 borrowValue, uint256 maxCollateralValue, uint256 liquidationThreshold);
+
     /**
      * @dev Checks if a lending position is healthy based on various parameters
      * @param user The address of the user to check

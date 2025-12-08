@@ -17,8 +17,8 @@ contract SetPeers is Script, Helper {
     ///      Currently configures BASE and KAIA mainnet deployments
     ///      Additional chains (Optimism, HyperEVM) are commented out for future implementation
     function run() external {
-        deployBASE();
-        deployKAIA();
+        deployBase();
+        deployKaia();
         // optimism
         // hyperevm
     }
@@ -32,7 +32,7 @@ contract SetPeers is Script, Helper {
     ///      Broadcasts transactions using the PRIVATE_KEY environment variable
     /// @dev Security consideration: Ensure PRIVATE_KEY has sufficient permissions and ETH for gas
     /// @dev Adapters configured: sUSDT, sWKAIA, sWBTC, sWETH, and Mock USDT
-    function deployBASE() public {
+    function deployBase() public {
         vm.createSelectFork(vm.rpcUrl("base_mainnet"));
         vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
 
@@ -64,7 +64,7 @@ contract SetPeers is Script, Helper {
         vm.stopBroadcast();
     }
 
-    function deployKAIA() public {
+    function deployKaia() public {
         vm.createSelectFork(vm.rpcUrl("kaia_mainnet"));
         vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
 

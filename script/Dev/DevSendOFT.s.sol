@@ -36,7 +36,7 @@ contract DevSendOFT is Script, Helper {
 
     /// @notice Address of the source token contract on the origin chain
     /// @dev This is the actual ERC20 token being sent cross-chain
-    address TOKEN = KAIA_MOCK_USDT;
+    address token = KAIA_MOCK_USDT;
 
     /// @notice The base amount of tokens to send (in token's native decimals)
     /// @dev Set to 1e6 for USDT (6 decimals)
@@ -118,10 +118,10 @@ contract DevSendOFT is Script, Helper {
         MessagingFee memory fee = oft.quoteSend(sendParam, false);
         console.log("Sending tokens...");
         console.log("Fee amount:", fee.nativeFee);
-        console.log("TOKEN Balance before", IERC20(TOKEN).balanceOf(toAddress));
-        IERC20(TOKEN).approve(oftAddress, tokensToSend);
+        console.log("token Balance before", IERC20(token).balanceOf(toAddress));
+        IERC20(token).approve(oftAddress, tokensToSend);
         oft.send{value: fee.nativeFee}(sendParam, fee, toAddress);
-        console.log("TOKEN Balance after", IERC20(TOKEN).balanceOf(toAddress));
+        console.log("token Balance after", IERC20(token).balanceOf(toAddress));
 
         vm.stopBroadcast();
     }

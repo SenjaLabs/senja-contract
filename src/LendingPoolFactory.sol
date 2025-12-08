@@ -17,7 +17,7 @@ import {IIsHealthy} from "./interfaces/IIsHealthy.sol";
 
 /**
  * @title LendingPoolFactory
- * @author Senja Protocol
+ * @author Senja Labs
  * @notice Factory contract for creating and managing lending pools
  * @dev This contract serves as the main entry point for creating new lending pools.
  * It maintains a registry of all created pools and manages token data streams,
@@ -156,6 +156,13 @@ contract LendingPoolFactory is
     event InterestRateModelSet(address indexed interestRateModel);
 
     /**
+     * @notice Emitted when a chain ID to endpoint ID mapping is set
+     * @param chainId The blockchain chain ID
+     * @param eid The LayerZero endpoint ID
+     */
+    event ChainIdToEidSet(uint256 indexed chainId, uint32 indexed eid);
+
+    /**
      * @notice Thrown when attempting to use a token without a configured oracle
      * @param token The address of the token missing an oracle configuration
      */
@@ -181,10 +188,10 @@ contract LendingPoolFactory is
     address public positionDeployer;
 
     /// @notice The address of the wrapped native token (e.g., WETH, WMATIC)
-    address public WRAPPED_NATIVE;
+    address public wrappedNative;
 
     /// @notice The address of the DEX router for token swaps
-    address public DEX_ROUTER;
+    address public dexRouter;
 
     /// @notice The address of the lending pool router deployer contract
     address public lendingPoolRouterDeployer;
@@ -206,9 +213,6 @@ contract LendingPoolFactory is
 
     /// @notice Mapping of blockchain chain IDs to LayerZero endpoint IDs
     mapping(uint256 => uint32) public chainIdToEid;
-
-    /// @notice Total number of lending pools created by this factory
-    uint256 public poolCount;
 
     /**
      * @notice Modifier to check if a token has an oracle configured
@@ -420,7 +424,7 @@ contract LendingPoolFactory is
      * @param _wrappedNative The address of the wrapped native token
      */
     function setWrappedNative(address _wrappedNative) public onlyRole(OWNER_ROLE) {
-        WRAPPED_NATIVE = _wrappedNative;
+        wrappedNative = _wrappedNative;
         emit WrappedNativeSet(_wrappedNative);
     }
 
@@ -430,7 +434,7 @@ contract LendingPoolFactory is
      * @param _dexRouter The address of the DEX router contract
      */
     function setDexRouter(address _dexRouter) public onlyRole(OWNER_ROLE) {
-        DEX_ROUTER = _dexRouter;
+        dexRouter = _dexRouter;
         emit DexRouterSet(_dexRouter);
     }
 
@@ -456,6 +460,17 @@ contract LendingPoolFactory is
     function setInterestRateModel(address _interestRateModel) public onlyRole(OWNER_ROLE) {
         interestRateModel = _interestRateModel;
         emit InterestRateModelSet(_interestRateModel);
+    }
+
+    /**
+     * @notice Sets the LayerZero endpoint ID for a specific chain ID
+     * @dev Only callable by addresses with OWNER_ROLE. Used for cross-chain messaging.
+     * @param _chainId The blockchain chain ID
+     * @param _eid The LayerZero endpoint ID corresponding to the chain
+     */
+    function setChainIdToEid(uint256 _chainId, uint32 _eid) public onlyRole(OWNER_ROLE) {
+        chainIdToEid[_chainId] = _eid;
+        emit ChainIdToEidSet(_chainId, _eid);
     }
 
     /**

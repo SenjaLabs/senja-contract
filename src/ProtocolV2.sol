@@ -13,9 +13,9 @@ import {IDexRouter} from "./interfaces/IDexRouter.sol";
  * @notice This contract handles protocol-level operations including fee collection, buyback execution, and withdrawals
  * @dev Protocol contract for managing protocol fees and withdrawals with automated buyback functionality
  * @dev Implements a 95/5 split between protocol locked balance and owner available balance for buybacks
- * @author Senja Team
+ * @author Senja Labs
  * @custom:version 2.0.0
- * @custom:security-contact security@senja.io
+ * @custom:security-contact security@senja.finance
  */
 contract ProtocolV2 is ReentrancyGuard, Ownable {
     using SafeERC20 for IERC20;
@@ -53,6 +53,11 @@ contract ProtocolV2 is ReentrancyGuard, Ownable {
     /// @dev Tracks the 5% owner share from buybacks that is available for withdrawal
     /// @dev Token address => available amount for owner
     mapping(address => uint256) public ownerAvailableBalance;
+
+    /// @notice Mapping of token addresses to protocol fees
+    /// @dev Tracks the protocol fee percentage for each token (e.g., 1e15 = 0.1%)
+    /// @dev Token address => protocol fee
+    mapping(address => uint256) public protocolFees;
 
     // ============ Errors ============
 
@@ -116,6 +121,13 @@ contract ProtocolV2 is ReentrancyGuard, Ownable {
         uint256 ownerAmount,
         uint256 wnativeReceived
     );
+
+    /**
+     * @notice Emitted when the protocol fee is set or updated
+     * @param token The address of the token that the protocol fee is set for
+     * @param fee The protocol fee
+     */
+    event ProtocolFeeSet(address indexed token, uint256 fee);
 
     // ============ Constructor ============
 
@@ -318,6 +330,30 @@ contract ProtocolV2 is ReentrancyGuard, Ownable {
      */
     function getTotalProtocolBalance(address token) public view returns (uint256) {
         return IERC20(token).balanceOf(address(this));
+    }
+
+    /**
+     * @notice Gets the protocol fee for a specific token
+     * @dev Returns the configured protocol fee, or default 0.1% (1e15) if not set
+     * @param _token Address of the token to query
+     * @return The protocol fee for the token
+     */
+    function getProtocolFee(address _token) public view returns (uint256) {
+        if (protocolFees[_token] == 0) return 1e15; // Default 0.1%
+        return protocolFees[_token];
+    }
+
+    // ============ Admin Functions ============
+
+    /**
+     * @notice Sets the protocol fee for a specific token
+     * @dev Only the owner can set protocol fees
+     * @param _token Address of the token
+     * @param _fee The protocol fee to set (e.g., 1e15 = 0.1%)
+     */
+    function setProtocolFee(address _token, uint256 _fee) public onlyOwner {
+        protocolFees[_token] = _fee;
+        emit ProtocolFeeSet(_token, _fee);
     }
 
     // ============ Internal Functions ============

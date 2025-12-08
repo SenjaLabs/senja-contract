@@ -23,7 +23,7 @@ contract SetEnforcedOptions is Script, Helper {
     /// @notice Message type identifier for send operations
     /// @dev Used to specify which type of cross-chain message these enforced options apply to.
     ///      Value of 1 corresponds to the sendString function in the OApp contract.
-    uint16 SEND = 1;
+    uint16 send = 1;
 
     // ========================================
     // MAIN FUNCTIONS
@@ -34,8 +34,8 @@ contract SetEnforcedOptions is Script, Helper {
     ///      Additional chains (Optimism, Hyperevm) are commented out for future expansion.
     ///      This function orchestrates the complete setup process across all chains.
     function run() external {
-        deployBASE();
-        deployKAIA();
+        deployBase();
+        deployKaia();
         // optimism
         // hyperevm
     }
@@ -49,7 +49,7 @@ contract SetEnforcedOptions is Script, Helper {
     ///      3. Applies these options to all OFT adapters on BASE (sUSDT, sWKAIA, sWBTC, sWETH, MOCK_USDT)
     ///      Higher gas limit for KAIA reflects additional overhead of cross-chain messaging.
     ///      All transactions are broadcast using the private key from environment variables.
-    function deployBASE() public {
+    function deployBase() public {
         vm.createSelectFork(vm.rpcUrl("base_mainnet"));
 
         // Define destination endpoint IDs
@@ -64,8 +64,8 @@ contract SetEnforcedOptions is Script, Helper {
 
         // Construct enforced option parameters array
         EnforcedOptionParam[] memory enforcedOptions = new EnforcedOptionParam[](2);
-        enforcedOptions[0] = EnforcedOptionParam({eid: dstEid1, msgType: SEND, options: options1});
-        enforcedOptions[1] = EnforcedOptionParam({eid: dstEid2, msgType: SEND, options: options2});
+        enforcedOptions[0] = EnforcedOptionParam({eid: dstEid1, msgType: send, options: options1});
+        enforcedOptions[1] = EnforcedOptionParam({eid: dstEid2, msgType: send, options: options2});
 
         // Broadcast configuration to all BASE OFT adapters
         vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
@@ -80,7 +80,7 @@ contract SetEnforcedOptions is Script, Helper {
         console.log("Enforced options set successfully!");
     }
 
-    function deployKAIA() public {
+    function deployKaia() public {
         vm.createSelectFork(vm.rpcUrl("kaia_mainnet"));
         uint32 dstEid1 = KAIA_EID;
         uint32 dstEid2 = BASE_EID;
@@ -88,8 +88,8 @@ contract SetEnforcedOptions is Script, Helper {
         bytes memory options2 = OptionsBuilder.newOptions().addExecutorLzReceiveOption(100000, 0);
 
         EnforcedOptionParam[] memory enforcedOptions = new EnforcedOptionParam[](2);
-        enforcedOptions[0] = EnforcedOptionParam({eid: dstEid1, msgType: SEND, options: options1});
-        enforcedOptions[1] = EnforcedOptionParam({eid: dstEid2, msgType: SEND, options: options2});
+        enforcedOptions[0] = EnforcedOptionParam({eid: dstEid1, msgType: send, options: options1});
+        enforcedOptions[1] = EnforcedOptionParam({eid: dstEid2, msgType: send, options: options2});
 
         vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
         MyOApp(KAIA_OFT_USDT_ADAPTER).setEnforcedOptions(enforcedOptions);

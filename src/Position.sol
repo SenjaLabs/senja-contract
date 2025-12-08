@@ -5,18 +5,16 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import {IOracle} from "./interfaces/IOracle.sol";
 import {IFactory} from "./interfaces/IFactory.sol";
 import {ILendingPool} from "./interfaces/ILendingPool.sol";
 import {ILPRouter} from "./interfaces/ILPRouter.sol";
 import {IDexRouter} from "./interfaces/IDexRouter.sol";
 import {IWrappedNative} from "./interfaces/IWrappedNative.sol";
-import {IIsHealthy} from "./interfaces/IIsHealthy.sol";
 import {ITokenDataStream} from "./interfaces/ITokenDataStream.sol";
 
 /**
  * @title Position
- * @author Senja Protocol
+ * @author Senja Labs
  * @notice A contract that manages lending positions with collateral and borrow assets
  * @dev This contract handles position management, token swapping, and collateral operations
  *
@@ -282,21 +280,23 @@ contract Position is ReentrancyGuard {
     /**
      * @notice Liquidates the position and transfers all tokens to the liquidator
      * @param _liquidator The address of the liquidator who will receive all tokens
+     * @param _liquidationBonus The amount of liquidation bonus to be transferred to the liquidator
      * @dev Only the lending pool can call this function
      * @dev Transfers ownership to the liquidator
      * @dev Iterates through all tokens in the position and transfers their balances
      * @dev Handles both wrapped native tokens and regular ERC20 tokens
      */
-    function liquidation(address _liquidator) public onlyLendingPool {
-        owner = _liquidator;
+    function liquidation(address _liquidator, uint256 _liquidationBonus) public onlyLendingPool {
         for (uint256 i = 1; i <= counter; i++) {
             address token = tokenLists[i];
-            if (token == address(1)) {
-                IERC20(_WRAPPED_NATIVE()).safeTransfer(_liquidator, IERC20(_WRAPPED_NATIVE()).balanceOf(address(this)));
-            } else {
-                IERC20(token).safeTransfer(_liquidator, IERC20(token).balanceOf(address(this)));
-            }
+            uint256 balance = IERC20(_revealToken(token)).balanceOf(address(this));
+            uint256 toLiquidator = (balance * (1e18 - _liquidationBonus)) / 1e18;
+            uint256 toProtocol = (balance * _liquidationBonus) / 1e18;
+
+            IERC20(_revealToken(token)).safeTransfer(_liquidator, toLiquidator);
+            IERC20(_revealToken(token)).safeTransfer(_protocol(), toProtocol);
         }
+        owner = _liquidator;
     }
 
     /**
@@ -373,8 +373,8 @@ contract Position is ReentrancyGuard {
      * @return The address of the wrapped native token (e.g., WETH, WMATIC)
      * @dev Internal function to retrieve wrapped native token configuration
      */
-    function _WRAPPED_NATIVE() internal view returns (address) {
-        return IFactory(_factory()).WRAPPED_NATIVE();
+    function _wrappedNative() internal view returns (address) {
+        return IFactory(_factory()).wrappedNative();
     }
 
     /**
@@ -382,8 +382,8 @@ contract Position is ReentrancyGuard {
      * @return The address of the DEX router used for token swaps
      * @dev Internal function to retrieve DEX router configuration
      */
-    function _DEX_ROUTER() internal view returns (address) {
-        return IFactory(_factory()).DEX_ROUTER();
+    function _dexRouter() internal view returns (address) {
+        return IFactory(_factory()).dexRouter();
     }
 
     /**
@@ -393,6 +393,10 @@ contract Position is ReentrancyGuard {
      */
     function _totalBorrowAssets() internal view returns (uint256) {
         return ILPRouter(_router()).totalBorrowAssets();
+    }
+
+    function _protocol() internal view returns (address) {
+        return IFactory(_factory()).protocol();
     }
 
     /**
@@ -429,8 +433,8 @@ contract Position is ReentrancyGuard {
     function _withdrawCollateralTransfer(uint256 amount, address _user) internal {
         if (_collateralToken() == address(1)) {
             _withdrawing = true;
-            IERC20(_WRAPPED_NATIVE()).approve(_WRAPPED_NATIVE(), amount);
-            IWrappedNative(_WRAPPED_NATIVE()).withdraw(amount);
+            IERC20(_wrappedNative()).approve(_wrappedNative(), amount);
+            IWrappedNative(_wrappedNative()).withdraw(amount);
             (bool sent,) = _user.call{value: amount}("");
             if (!sent) revert TransferFailed();
             _withdrawing = false;
@@ -483,7 +487,7 @@ contract Position is ReentrancyGuard {
         internal
         returns (uint256 amountOut)
     {
-        IERC20(_tokenIn).approve(_DEX_ROUTER(), _amountIn);
+        IERC20(_tokenIn).approve(_dexRouter(), _amountIn);
         IDexRouter.ExactInputSingleParams memory params = IDexRouter.ExactInputSingleParams({
             tokenIn: _tokenIn,
             tokenOut: _revealToken(_tokenOut),
@@ -495,7 +499,7 @@ contract Position is ReentrancyGuard {
             sqrtPriceLimitX96: 0 // No price limit
         });
 
-        amountOut = IDexRouter(_DEX_ROUTER()).exactInputSingle(params);
+        amountOut = IDexRouter(_dexRouter()).exactInputSingle(params);
         if (amountOut < _amountOutMinimum) revert InsufficientOutputAmount(amountOut, _amountOutMinimum);
         return amountOut;
     }
@@ -543,7 +547,7 @@ contract Position is ReentrancyGuard {
      * @dev For other tokens, queries the decimals() function via IERC20Metadata
      */
     function _tokenDecimals(address _token) internal view returns (uint256) {
-        if (_token == _WRAPPED_NATIVE()) {
+        if (_token == _wrappedNative()) {
             return 18;
         }
         return IERC20Metadata(_token).decimals();
@@ -558,7 +562,7 @@ contract Position is ReentrancyGuard {
      */
     function _revealToken(address _token) internal view returns (address) {
         if (_token == address(1)) {
-            return _WRAPPED_NATIVE();
+            return _wrappedNative();
         }
         return _token;
     }
@@ -578,7 +582,7 @@ contract Position is ReentrancyGuard {
     receive() external payable {
         // Only wrap if this position handles native tokens and not during withdrawal
         if (msg.value > 0 && !_withdrawing && _collateralToken() == address(1)) {
-            IWrappedNative(_WRAPPED_NATIVE()).deposit{value: msg.value}();
+            IWrappedNative(_wrappedNative()).deposit{value: msg.value}();
         } else if (msg.value > 0 && _withdrawing) {
             // During withdrawal, accept native tokens without wrapping
             return;

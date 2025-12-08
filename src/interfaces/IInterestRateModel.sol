@@ -5,7 +5,7 @@ pragma solidity ^0.8.30;
  * @title IInterestRateModel
  * @notice Interface for dynamic interest rate calculation
  * @dev Defines the contract for calculating dynamic interest rates based on utilization
- * @author Senja Team
+ * @author Senja Labs
  */
 interface IInterestRateModel {
     /**
@@ -20,8 +20,13 @@ interface IInterestRateModel {
      * @param _lendingPool The lending pool address to calculate interest for
      * @param _elapsedTime Time elapsed since last accrual in seconds
      * @return interest The interest amount accrued
+     * @return supplyYield The yield for suppliers
+     * @return reserveYield The yield for reserve
      */
-    function calculateInterest(address _lendingPool, uint256 _elapsedTime) external view returns (uint256 interest);
+    function calculateInterest(address _lendingPool, uint256 _elapsedTime)
+        external
+        view
+        returns (uint256 interest, uint256 supplyYield, uint256 reserveYield);
 
     /**
      * @notice Returns the maximum utilization rate for a lending pool

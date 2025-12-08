@@ -5,7 +5,7 @@ pragma solidity ^0.8.30;
  * @title ILendingPool
  * @notice Interface for lending pool functionality
  * @dev Defines the core lending pool operations including supply, borrow, and repay
- * @author Senja Team
+ * @author Senja Labs
  * @custom:version 1.0.0
  */
 interface ILendingPool {
@@ -38,9 +38,7 @@ interface ILendingPool {
      * @param _addExecutorLzReceiveOption Executor options for LayerZero messaging
      * @dev Users must have sufficient collateral to borrow. Cross-chain borrowing uses LayerZero.
      */
-    function borrowDebt(uint256 _amount, uint256 _chainId, uint128 _addExecutorLzReceiveOption)
-        external
-        payable;
+    function borrowDebt(uint256 _amount, uint256 _chainId, uint128 _addExecutorLzReceiveOption) external payable;
 
     /**
      * @notice Repays debt using selected token

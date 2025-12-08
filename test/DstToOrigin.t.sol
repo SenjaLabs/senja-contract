@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
-import {Test, console} from "forge-std/Test.sol";
+import {Test} from "forge-std/Test.sol";
 import {Helper} from "../script/DevTools/Helper.sol";
 import {OAppSupplyLiquidityUSDT} from "../src/layerzero/messages/OAppSupplyLiquidityUSDT.sol";
 import {ILayerZeroEndpointV2} from "@layerzerolabs/lz-evm-protocol-v2/contracts/interfaces/ILayerZeroEndpointV2.sol";
@@ -20,7 +20,7 @@ contract DstToOriginTest is Test, Helper {
     using OptionsBuilder for bytes;
 
     OAppAdapter public oappAdapter;
-    OAppSupplyLiquidityUSDT public oappSupplyLiquidityUSDT;
+    OAppSupplyLiquidityUSDT public oappSupplyLiquidityUsdt;
 
     address public owner = vm.envAddress("PUBLIC_KEY");
 
@@ -43,7 +43,7 @@ contract DstToOriginTest is Test, Helper {
     uint32 constant EXECUTOR_CONFIG_TYPE = 1;
     uint32 constant ULN_CONFIG_TYPE = 2;
 
-    address KAIA_lendingPool = 0xf9C899692C42B2f5fC598615dD529360D533E6Ce;
+    address kaiaLendingPool = 0xf9C899692C42B2f5fC598615dD529360D533E6Ce;
 
     function setUp() public {
         vm.createSelectFork(vm.rpcUrl("base_mainnet"));
@@ -88,17 +88,17 @@ contract DstToOriginTest is Test, Helper {
     function _deployOApp() internal {
         oappAdapter = new OAppAdapter();
         if (block.chainid == 8217) {
-            oappSupplyLiquidityUSDT = new OAppSupplyLiquidityUSDT(KAIA_LZ_ENDPOINT, owner);
+            oappSupplyLiquidityUsdt = new OAppSupplyLiquidityUSDT(KAIA_LZ_ENDPOINT, owner);
         } else if (block.chainid == 8453) {
-            oappSupplyLiquidityUSDT = new OAppSupplyLiquidityUSDT(BASE_LZ_ENDPOINT, owner);
+            oappSupplyLiquidityUsdt = new OAppSupplyLiquidityUSDT(BASE_LZ_ENDPOINT, owner);
         }
     }
 
     function _setLibraries() internal {
-        ILayerZeroEndpointV2(endpoint).setSendLibrary(address(oappSupplyLiquidityUSDT), dstEid0, sendLib);
-        ILayerZeroEndpointV2(endpoint).setSendLibrary(address(oappSupplyLiquidityUSDT), dstEid1, sendLib);
+        ILayerZeroEndpointV2(endpoint).setSendLibrary(address(oappSupplyLiquidityUsdt), dstEid0, sendLib);
+        ILayerZeroEndpointV2(endpoint).setSendLibrary(address(oappSupplyLiquidityUsdt), dstEid1, sendLib);
         ILayerZeroEndpointV2(endpoint)
-            .setReceiveLibrary(address(oappSupplyLiquidityUSDT), srcEid, receiveLib, gracePeriod);
+            .setReceiveLibrary(address(oappSupplyLiquidityUsdt), srcEid, receiveLib, gracePeriod);
     }
 
     function _setSendConfig() internal {
@@ -114,15 +114,15 @@ contract DstToOriginTest is Test, Helper {
         bytes memory encodedUln = abi.encode(uln);
         bytes memory encodedExec = abi.encode(exec);
         SetConfigParam[] memory params = new SetConfigParam[](4);
-        params[0] = SetConfigParam(eid0, EXECUTOR_CONFIG_TYPE, encodedExec);
-        params[1] = SetConfigParam(eid0, ULN_CONFIG_TYPE, encodedUln);
-        params[2] = SetConfigParam(eid1, EXECUTOR_CONFIG_TYPE, encodedExec);
-        params[3] = SetConfigParam(eid1, ULN_CONFIG_TYPE, encodedUln);
-        ILayerZeroEndpointV2(endpoint).setConfig(address(oappSupplyLiquidityUSDT), sendLib, params);
+        params[0] = SetConfigParam({eid: eid0, configType: EXECUTOR_CONFIG_TYPE, config: encodedExec});
+        params[1] = SetConfigParam({eid: eid0, configType: ULN_CONFIG_TYPE, config: encodedUln});
+        params[2] = SetConfigParam({eid: eid1, configType: EXECUTOR_CONFIG_TYPE, config: encodedExec});
+        params[3] = SetConfigParam({eid: eid1, configType: ULN_CONFIG_TYPE, config: encodedUln});
+        ILayerZeroEndpointV2(endpoint).setConfig(address(oappSupplyLiquidityUsdt), sendLib, params);
     }
 
     function _setReceiveConfig() internal {
-        uint32 RECEIVE_CONFIG_TYPE = 2;
+        uint32 receiveConfigType = 2;
 
         UlnConfig memory uln = UlnConfig({
             confirmations: 15,
@@ -134,40 +134,40 @@ contract DstToOriginTest is Test, Helper {
         });
         bytes memory encodedUln = abi.encode(uln);
         SetConfigParam[] memory params = new SetConfigParam[](2);
-        params[0] = SetConfigParam(eid0, RECEIVE_CONFIG_TYPE, encodedUln);
-        params[1] = SetConfigParam(eid1, RECEIVE_CONFIG_TYPE, encodedUln);
+        params[0] = SetConfigParam({eid: eid0, configType: receiveConfigType, config: encodedUln});
+        params[1] = SetConfigParam({eid: eid1, configType: receiveConfigType, config: encodedUln});
 
-        ILayerZeroEndpointV2(endpoint).setConfig(address(oappSupplyLiquidityUSDT), receiveLib, params);
+        ILayerZeroEndpointV2(endpoint).setConfig(address(oappSupplyLiquidityUsdt), receiveLib, params);
     }
 
     function _setPeers() internal {
-        bytes32 oftPeer = bytes32(uint256(uint160(address(oappSupplyLiquidityUSDT))));
-        OAppSupplyLiquidityUSDT(address(oappSupplyLiquidityUSDT)).setPeer(BASE_EID, oftPeer);
-        OAppSupplyLiquidityUSDT(address(oappSupplyLiquidityUSDT)).setPeer(KAIA_EID, oftPeer);
+        bytes32 oftPeer = bytes32(uint256(uint160(address(oappSupplyLiquidityUsdt))));
+        OAppSupplyLiquidityUSDT(address(oappSupplyLiquidityUsdt)).setPeer(BASE_EID, oftPeer);
+        OAppSupplyLiquidityUSDT(address(oappSupplyLiquidityUsdt)).setPeer(KAIA_EID, oftPeer);
     }
 
     function _setEnforcedOptions() internal {
-        uint16 SEND = 1;
+        uint16 send = 1;
         bytes memory options1 = OptionsBuilder.newOptions().addExecutorLzReceiveOption(80000, 0);
         bytes memory options2 = OptionsBuilder.newOptions().addExecutorLzReceiveOption(100000, 0);
 
         EnforcedOptionParam[] memory enforcedOptions = new EnforcedOptionParam[](2);
-        enforcedOptions[0] = EnforcedOptionParam({eid: dstEid0, msgType: SEND, options: options1});
-        enforcedOptions[1] = EnforcedOptionParam({eid: dstEid1, msgType: SEND, options: options2});
+        enforcedOptions[0] = EnforcedOptionParam({eid: dstEid0, msgType: send, options: options1});
+        enforcedOptions[1] = EnforcedOptionParam({eid: dstEid1, msgType: send, options: options2});
 
-        OAppSupplyLiquidityUSDT(address(oappSupplyLiquidityUSDT)).setEnforcedOptions(enforcedOptions);
+        OAppSupplyLiquidityUSDT(address(oappSupplyLiquidityUsdt)).setEnforcedOptions(enforcedOptions);
     }
 
     // RUN
     // forge test -vvvv --match-test test_SupplyLiquidityCrosschain
     function test_SupplyLiquidityCrosschain() public {
         vm.startPrank(owner);
-        oappSupplyLiquidityUSDT.setOFTaddress(BASE_OFT_SUSDT_ADAPTER);
+        oappSupplyLiquidityUsdt.setOftAddress(BASE_OFT_SUSDT_ADAPTER);
 
         bytes memory extraOptions = OptionsBuilder.newOptions().addExecutorLzReceiveOption(65000, 0);
         SendParam memory sendParam = SendParam({
             dstEid: KAIA_EID,
-            to: _addressToBytes32(address(KAIA_oappSupplyLiquidityUSDT)), //OAPP DST
+            to: _addressToBytes32(address(KAIA_OAPP_SUPPLY_LIQUIDITY_USDT)), //OAPP DST
             amountLD: 1e6,
             minAmountLD: 1e6, // 0% slippage tolerance
             extraOptions: extraOptions,
@@ -177,16 +177,16 @@ contract DstToOriginTest is Test, Helper {
         MessagingFee memory feeBridge = OFTUSDTadapter(BASE_OFT_SUSDT_ADAPTER).quoteSend(sendParam, false);
 
         MessagingFee memory feeMessage =
-            oappSupplyLiquidityUSDT.quoteSendString(KAIA_EID, KAIA_lendingPool, owner, KAIA_MOCK_USDT, 1e6, "", false);
+            oappSupplyLiquidityUsdt.quoteSendString(KAIA_EID, kaiaLendingPool, owner, KAIA_MOCK_USDT, 1e6, "", false);
 
-        IERC20(BASE_SUSDT).approve(BASE_oappAdapter, 1e6);
-        OAppAdapter(BASE_oappAdapter).sendBridge{value: feeBridge.nativeFee + feeMessage.nativeFee}(
-            address(oappSupplyLiquidityUSDT),
+        IERC20(BASE_SUSDT).approve(BASE_OAPP_ADAPTER, 1e6);
+        OAppAdapter(BASE_OAPP_ADAPTER).sendBridge{value: feeBridge.nativeFee + feeMessage.nativeFee}(
+            address(oappSupplyLiquidityUsdt),
             BASE_OFT_SUSDT_ADAPTER,
-            KAIA_lendingPool,
+            kaiaLendingPool,
             BASE_SUSDT,
             KAIA_MOCK_USDT,
-            address(oappSupplyLiquidityUSDT),
+            address(oappSupplyLiquidityUsdt),
             KAIA_EID,
             1e6,
             feeBridge.nativeFee,

@@ -51,16 +51,16 @@ contract DeployAllOFT is Script, Helper {
     // ============================================
 
     /// @notice Mock USDT token instance for testing purposes
-    MOCKUSDT public mockUSDT;
+    MOCKUSDT public mockUsdt;
 
     /// @notice Mock WKAIA token instance for testing purposes
-    MOCKWKAIA public mockWKAIA;
+    MOCKWKAIA public mockWkaia;
 
     /// @notice Mock WETH token instance for testing purposes
-    MOCKWETH public mockWETH;
+    MOCKWETH public mockWeth;
 
     /// @notice Generic mock token instance for flexible token deployment
-    MOCKTOKEN public mockTOKEN;
+    MOCKTOKEN public mockToken;
 
     /// @notice STOKEN (bridge token) instance for cross-chain token representation
     STOKEN public sToken;
@@ -76,11 +76,11 @@ contract DeployAllOFT is Script, Helper {
     ElevatedMinterBurner public elevatedMinterBurner;
 
     // ============================================
-    // STATE VARIABLES - TOKEN AND NETWORK CONFIG
+    // STATE VARIABLES - token AND NETWORK CONFIG
     // ============================================
 
     /// @notice The address of the token to be bridged via OFT
-    address public TOKEN;
+    address public token;
 
     /// @notice LayerZero endpoint address for the current chain
     address endpoint;
@@ -121,7 +121,7 @@ contract DeployAllOFT is Script, Helper {
     // ============================================
 
     /// @notice Shared decimals for token normalization across chains
-    uint8 public _SHAREDDECIMALS;
+    uint8 public sharedDecimals;
 
     /// @notice Endpoint ID for the source chain
     uint32 eid0;
@@ -166,7 +166,7 @@ contract DeployAllOFT is Script, Helper {
         // ******************************
         // *********** Step 1 ***********
         // ******************************
-        _deployOFT();
+        _deployOft();
         _setLibraries();
         _setSendConfig();
         _setReceiveConfig();
@@ -204,7 +204,7 @@ contract DeployAllOFT is Script, Helper {
             executor = KAIA_EXECUTOR;
             eid0 = KAIA_EID;
             eid1 = BASE_EID; // **
-            TOKEN = _deployMockToken("USD Tether", "USDT", 6); // **
+            token = _deployMockToken("USD Tether", "USDT", 6); // **
             oapp; // **
             oapp2; // **
         } else if (block.chainid == 8453) {
@@ -219,7 +219,7 @@ contract DeployAllOFT is Script, Helper {
             executor = BASE_EXECUTOR;
             eid0 = BASE_EID;
             eid1 = KAIA_EID; // **
-            TOKEN = _deployMockToken("USD Tether", "USDT", 6); // **
+            token = _deployMockToken("USD Tether", "USDT", 6); // **
             oapp; // **
             oapp2; // **
         } else if (block.chainid == 1284) {
@@ -234,18 +234,18 @@ contract DeployAllOFT is Script, Helper {
             executor = GLMR_EXECUTOR;
             eid0 = GLMR_EID;
             eid1 = BASE_EID; // **
-            TOKEN = _deployMockToken("USD Tether", "USDT", 6); // **
+            token = _deployMockToken("USD Tether", "USDT", 6); // **
             oapp; // **
             oapp2; // **
         }
         // TESTNET
         else if (block.chainid == 1001) {
-            TOKEN = _deployMockToken("USD Tether", "USDT", 6);
+            token = _deployMockToken("USD Tether", "USDT", 6);
         }
     }
 
     // ============================================
-    // INTERNAL FUNCTIONS - TOKEN DEPLOYMENT
+    // INTERNAL FUNCTIONS - token DEPLOYMENT
     // ============================================
 
     /**
@@ -257,8 +257,8 @@ contract DeployAllOFT is Script, Helper {
      * @return The address of the newly deployed mock token
      */
     function _deployMockToken(string memory _name, string memory _symbol, uint8 _decimals) internal returns (address) {
-        mockTOKEN = new MOCKTOKEN(_name, _symbol, _decimals);
-        return address(mockTOKEN);
+        mockToken = new MOCKTOKEN(_name, _symbol, _decimals);
+        return address(mockToken);
     }
 
     /**
@@ -269,7 +269,7 @@ contract DeployAllOFT is Script, Helper {
      * @param _decimals The number of decimals for the bridge token
      * @return The address of the newly deployed STOKEN
      */
-    function _deploySTOKEN(string memory _name, string memory _symbol, uint8 _decimals) internal returns (address) {
+    function _deployStoken(string memory _name, string memory _symbol, uint8 _decimals) internal returns (address) {
         sToken = new STOKEN(_name, _symbol, _decimals);
         return address(sToken);
     }
@@ -288,21 +288,21 @@ contract DeployAllOFT is Script, Helper {
      *      5. If on a destination chain, grants operator role to ElevatedMinterBurner on the STOKEN
      * @dev The console logs include chain ID and token symbol for easy identification
      */
-    function _deployOFT() internal {
-        elevatedMinterBurner = new ElevatedMinterBurner(TOKEN, owner);
-        oftadapter = new OFTadapter(TOKEN, address(elevatedMinterBurner), endpoint, owner, _getDecimals(TOKEN));
+    function _deployOft() internal {
+        elevatedMinterBurner = new ElevatedMinterBurner(token, owner);
+        oftadapter = new OFTadapter(token, address(elevatedMinterBurner), endpoint, owner, _getDecimals(token));
         oapp = address(oftadapter);
         elevatedMinterBurner.setOperator(oapp, true);
 
         console.log(
             "address public %s_%s_ELEVATED_MINTER_BURNER = %s;",
             block.chainid,
-            _getSymbol(TOKEN),
+            _getSymbol(token),
             address(elevatedMinterBurner)
         );
-        console.log("address public %s_%s_OFT_ADAPTER = %s;", block.chainid, _getSymbol(TOKEN), address(oapp));
+        console.log("address public %s_%s_OFT_ADAPTER = %s;", block.chainid, _getSymbol(token), address(oapp));
 
-        if (isDestination) STOKEN(TOKEN).setOperator(address(elevatedMinterBurner), true);
+        if (isDestination) STOKEN(token).setOperator(address(elevatedMinterBurner), true);
     }
 
     // ============================================
@@ -344,10 +344,10 @@ contract DeployAllOFT is Script, Helper {
         bytes memory encodedUln = abi.encode(uln);
         bytes memory encodedExec = abi.encode(exec);
         SetConfigParam[] memory params = new SetConfigParam[](4);
-        params[0] = SetConfigParam(eid0, EXECUTOR_CONFIG_TYPE, encodedExec);
-        params[1] = SetConfigParam(eid0, ULN_CONFIG_TYPE, encodedUln);
-        params[2] = SetConfigParam(eid1, EXECUTOR_CONFIG_TYPE, encodedExec);
-        params[3] = SetConfigParam(eid1, ULN_CONFIG_TYPE, encodedUln);
+        params[0] = SetConfigParam({eid: eid0, configType: EXECUTOR_CONFIG_TYPE, config: encodedExec});
+        params[1] = SetConfigParam({eid: eid0, configType: ULN_CONFIG_TYPE, config: encodedUln});
+        params[2] = SetConfigParam({eid: eid1, configType: EXECUTOR_CONFIG_TYPE, config: encodedExec});
+        params[3] = SetConfigParam({eid: eid1, configType: ULN_CONFIG_TYPE, config: encodedUln});
         ILayerZeroEndpointV2(endpoint).setConfig(oapp, sendLib, params);
     }
 
@@ -370,8 +370,8 @@ contract DeployAllOFT is Script, Helper {
         });
         bytes memory encodedUln = abi.encode(uln);
         SetConfigParam[] memory params = new SetConfigParam[](2);
-        params[0] = SetConfigParam(eid0, RECEIVE_CONFIG_TYPE, encodedUln);
-        params[1] = SetConfigParam(eid1, RECEIVE_CONFIG_TYPE, encodedUln);
+        params[0] = SetConfigParam({eid: eid0, configType: RECEIVE_CONFIG_TYPE, config: encodedUln});
+        params[1] = SetConfigParam({eid: eid1, configType: RECEIVE_CONFIG_TYPE, config: encodedUln});
 
         ILayerZeroEndpointV2(endpoint).setConfig(oapp, receiveLib, params);
     }
@@ -401,13 +401,13 @@ contract DeployAllOFT is Script, Helper {
      *      and execution on the destination chain
      */
     function _setEnforcedOptions() internal {
-        uint16 SEND = 1;
+        uint16 send = 1;
         bytes memory options1 = OptionsBuilder.newOptions().addExecutorLzReceiveOption(80000, 0);
         bytes memory options2 = OptionsBuilder.newOptions().addExecutorLzReceiveOption(100000, 0);
 
         EnforcedOptionParam[] memory enforcedOptions = new EnforcedOptionParam[](2);
-        enforcedOptions[0] = EnforcedOptionParam({eid: eid0, msgType: SEND, options: options1});
-        enforcedOptions[1] = EnforcedOptionParam({eid: eid1, msgType: SEND, options: options2});
+        enforcedOptions[0] = EnforcedOptionParam({eid: eid0, msgType: send, options: options1});
+        enforcedOptions[1] = EnforcedOptionParam({eid: eid1, msgType: send, options: options2});
 
         MyOApp(oapp).setEnforcedOptions(enforcedOptions);
     }

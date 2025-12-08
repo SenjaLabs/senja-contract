@@ -16,9 +16,9 @@ contract SendMessage is Script, Helper {
     using OptionsBuilder for bytes;
 
     address owner = vm.envAddress("PUBLIC_KEY");
-    OAppSupplyLiquidityUSDT public oappSupplyLiquidityUSDT;
+    OAppSupplyLiquidityUSDT public oappSupplyLiquidityUsdt;
     address token;
-    address KAIA_lendingPool = 0x3571b96b1418910FD03831d35730172e4d011B06;
+    address kaiaLendingPool = 0x3571b96b1418910FD03831d35730172e4d011B06;
     uint256 amount = 100e6;
     address oappAdapter;
 
@@ -28,19 +28,19 @@ contract SendMessage is Script, Helper {
         vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
         _getUtils();
         _sendMessageSupplyLiquidity();
-        // _checkTokenOFT();
+        // _checkTokenOft();
         vm.stopBroadcast();
     }
 
     function _sendMessageSupplyLiquidity() internal {
-        // MessagingFee memory feeMessage = OAppSupplyLiquidityUSDT(BASE_oappSupplyLiquidityUSDT).quoteSendString(
-        //     KAIA_EID, KAIA_lendingPool, owner, token, amount, "", false
+        // MessagingFee memory feeMessage = OAppSupplyLiquidityUSDT(BASE_OAPP_SUPPLY_LIQUIDITY_USDT).quoteSendString(
+        //     KAIA_EID, kaiaLendingPool, owner, token, amount, "", false
         // );
 
         // bytes memory extraOptions = OptionsBuilder.newOptions().addExecutorLzReceiveOption(65000, 0);
         // SendParam memory sendParam = SendParam({
         //     dstEid: KAIA_EID,
-        //     to: _addressToBytes32(address(KAIA_oappSupplyLiquidityUSDT)), //OAPP DST
+        //     to: _addressToBytes32(address(KAIA_OAPP_SUPPLY_LIQUIDITY_USDT)), //OAPP DST
         //     amountLD: amount,
         //     minAmountLD: amount, // 0% slippage tolerance
         //     extraOptions: extraOptions,
@@ -51,15 +51,15 @@ contract SendMessage is Script, Helper {
         // console.log("feeMessage", feeMessage.nativeFee);
         // console.log("feeBridge", feeBridge.nativeFee);
         // console.log("mix fee", feeMessage.nativeFee + feeBridge.nativeFee);
-        // IERC20(token).approve(address(BASE_oappSupplyLiquidityUSDT), amount);
-        // OAppSupplyLiquidityUSDT(BASE_oappSupplyLiquidityUSDT).sendString{
+        // IERC20(token).approve(address(BASE_OAPP_SUPPLY_LIQUIDITY_USDT), amount);
+        // OAppSupplyLiquidityUSDT(BASE_OAPP_SUPPLY_LIQUIDITY_USDT).sendString{
         //     value: feeMessage.nativeFee + feeBridge.nativeFee
-        // }(KAIA_EID, KAIA_lendingPool, owner, KAIA_MOCK_USDT, KAIA_oappSupplyLiquidityUSDT, amount, 0, "");
+        // }(KAIA_EID, kaiaLendingPool, owner, KAIA_MOCK_USDT, KAIA_OAPP_SUPPLY_LIQUIDITY_USDT, amount, 0, "");
 
         bytes memory extraOptions = OptionsBuilder.newOptions().addExecutorLzReceiveOption(65000, 0);
         SendParam memory sendParam = SendParam({
             dstEid: KAIA_EID,
-            to: _addressToBytes32(address(KAIA_oappSupplyLiquidityUSDT)), //OAPP DST
+            to: _addressToBytes32(address(KAIA_OAPP_SUPPLY_LIQUIDITY_USDT)), //OAPP DST
             amountLD: amount,
             minAmountLD: amount, // 0% slippage tolerance
             extraOptions: extraOptions,
@@ -68,17 +68,17 @@ contract SendMessage is Script, Helper {
         });
         MessagingFee memory feeBridge = OFTUSDTadapter(BASE_OFT_MOCK_USDT_ADAPTER).quoteSend(sendParam, false);
 
-        MessagingFee memory feeMessage = OAppSupplyLiquidityUSDT(BASE_oappSupplyLiquidityUSDT)
-            .quoteSendString(KAIA_EID, KAIA_lendingPool, owner, KAIA_MOCK_USDT, amount, "", false);
+        MessagingFee memory feeMessage = OAppSupplyLiquidityUSDT(BASE_OAPP_SUPPLY_LIQUIDITY_USDT)
+            .quoteSendString(KAIA_EID, kaiaLendingPool, owner, KAIA_MOCK_USDT, amount, "", false);
 
         IERC20(BASE_MOCK_USDT).approve(oappAdapter, amount);
         OAppAdapter(oappAdapter).sendBridge{value: feeBridge.nativeFee + feeMessage.nativeFee}(
-            address(BASE_oappSupplyLiquidityUSDT),
+            address(BASE_OAPP_SUPPLY_LIQUIDITY_USDT),
             BASE_OFT_MOCK_USDT_ADAPTER,
-            KAIA_lendingPool,
+            kaiaLendingPool,
             BASE_MOCK_USDT,
             KAIA_MOCK_USDT,
-            address(BASE_oappSupplyLiquidityUSDT),
+            address(BASE_OAPP_SUPPLY_LIQUIDITY_USDT),
             KAIA_EID,
             amount,
             feeBridge.nativeFee,
@@ -88,14 +88,14 @@ contract SendMessage is Script, Helper {
         console.log("SupplyLiquidityCrosschain");
     }
 
-    function _checkTokenOFT() internal view {
+    function _checkTokenOft() internal view {
         if (block.chainid == 8453) {
-            console.log("tokenOFT", OFTUSDTadapter(BASE_OFT_SUSDT_ADAPTER).tokenOFT());
+            console.log("tokenOFT", OFTUSDTadapter(BASE_OFT_SUSDT_ADAPTER).tokenOft());
             console.log("elevated", OFTUSDTadapter(BASE_OFT_SUSDT_ADAPTER).elevatedMinterBurner());
-            console.log("tokenOFT", OFTUSDTadapter(BASE_OFT_MOCK_USDT_ADAPTER).tokenOFT());
+            console.log("tokenOFT", OFTUSDTadapter(BASE_OFT_MOCK_USDT_ADAPTER).tokenOft());
             console.log("elevated", OFTUSDTadapter(BASE_OFT_MOCK_USDT_ADAPTER).elevatedMinterBurner());
         } else if (block.chainid == 8217) {
-            console.log("tokenOFT", OFTUSDTadapter(KAIA_OFT_MOCK_USDT_ADAPTER).tokenOFT());
+            console.log("tokenOFT", OFTUSDTadapter(KAIA_OFT_MOCK_USDT_ADAPTER).tokenOft());
             console.log("elevated", OFTUSDTadapter(KAIA_OFT_MOCK_USDT_ADAPTER).elevatedMinterBurner());
             console.log(
                 "elevated operator",
@@ -107,7 +107,7 @@ contract SendMessage is Script, Helper {
     function _getUtils() internal {
         if (block.chainid == 8453) {
             token = BASE_SUSDT;
-            oappAdapter = BASE_oappAdapter;
+            oappAdapter = BASE_OAPP_ADAPTER;
         } else if (block.chainid == 8217) {
             token = KAIA_MOCK_USDT;
         }

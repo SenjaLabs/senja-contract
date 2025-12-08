@@ -6,7 +6,6 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IWrappedNative} from "./interfaces/IWrappedNative.sol";
-import {IDexRouter} from "./interfaces/IDexRouter.sol";
 
 import {IFactory} from "./interfaces/IFactory.sol";
 
@@ -16,9 +15,9 @@ import {IFactory} from "./interfaces/IFactory.sol";
  * @dev Protocol contract for managing protocol fees, native token wrapping, and withdrawal operations.
  *      Inherits from ReentrancyGuard for protection against reentrancy attacks and Ownable for access control.
  *      The contract automatically wraps received native tokens to Wrapped Native tokens for consistent handling.
- * @author Senja Team
+ * @author Senja Labs
  * @custom:version 1.0.0
- * @custom:security-contact security@senja.io
+ * @custom:security-contact security@senja.finance
  */
 contract Protocol is ReentrancyGuard, Ownable {
     using SafeERC20 for IERC20;
@@ -82,6 +81,13 @@ contract Protocol is ReentrancyGuard, Ownable {
     event Withdraw(address token, uint256 amount);
 
     /**
+     * @notice Emitted when the protocol fee is set or updated
+     * @param token The address of the token that the protocol fee is set for
+     * @param fee The protocol fee
+     */
+    event ProtocolFeeSet(address token, uint256 fee);
+
+    /**
      * @notice Emitted when the lending pool factory address is set or updated
      * @param lendingPoolFactory The address of the new lending pool factory
      */
@@ -91,6 +97,9 @@ contract Protocol is ReentrancyGuard, Ownable {
 
     /// @notice The address of the lending pool factory contract used to retrieve wrapped native token address
     address public lendingPoolFactory;
+    /// @notice The mapping of protocol fees
+    /// @dev The key is the token address and the value is the protocol fee
+    mapping(address => uint256) public protocolFees;
 
     // ============ Constructor ============
 
@@ -112,7 +121,7 @@ contract Protocol is ReentrancyGuard, Ownable {
     receive() external payable {
         if (msg.value > 0) {
             // Always wrap native tokens to Wrapped Native for consistent handling
-            IWrappedNative(_WRAPPED_NATIVE()).deposit{value: msg.value}();
+            IWrappedNative(_wrappedNative()).deposit{value: msg.value}();
         }
     }
 
@@ -166,8 +175,18 @@ contract Protocol is ReentrancyGuard, Ownable {
      * @return The address of the wrapped native token
      * @custom:throws LendingPoolFactoryNotSet If the lending pool factory has not been configured
      */
-    function _WRAPPED_NATIVE() internal view returns (address) {
+    function _wrappedNative() internal view returns (address) {
         if (lendingPoolFactory == address(0)) revert LendingPoolFactoryNotSet();
-        return IFactory(lendingPoolFactory).WRAPPED_NATIVE();
+        return IFactory(lendingPoolFactory).wrappedNative();
+    }
+
+    function setProtocolFee(address _token, uint256 _fee) public onlyOwner {
+        protocolFees[_token] = _fee;
+        emit ProtocolFeeSet(_token, _fee);
+    }
+
+    function getProtocolFee(address _token) public view returns (uint256) {
+        if (protocolFees[_token] == 0) return 1e15;
+        return protocolFees[_token];
     }
 }

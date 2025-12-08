@@ -6,10 +6,11 @@ import {IPositionDeployer} from "./interfaces/IPositionDeployer.sol";
 import {IPosition} from "./interfaces/IPosition.sol";
 import {IIsHealthy} from "./interfaces/IIsHealthy.sol";
 import {IInterestRateModel} from "./interfaces/IInterestRateModel.sol";
+import {IProtocol} from "./interfaces/IProtocol.sol";
 
 /**
  * @title LendingPoolRouter
- * @author Senja Protocol
+ * @author Senja Labs
  * @notice Router contract that manages lending pool operations and state
  * @dev This contract handles the core logic for supply, borrow, repay, liquidation operations,
  *      and interest calculations. It maintains the state of all user positions and implements
@@ -82,6 +83,8 @@ contract LendingPoolRouter {
      */
     error MaxUtilizationReached(address borrowToken, uint256 newUtilization, uint256 maxUtilization);
 
+    event InterestAccrued(uint256 interest, uint256 supplyYield, uint256 reserveYield);
+
     /*//////////////////////////////////////////////////////////////
                             STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
@@ -97,6 +100,9 @@ contract LendingPoolRouter {
 
     /// @notice Total borrow shares issued
     uint256 public totalBorrowShares;
+
+    /// @notice Total reserve assets in the pool
+    uint256 public totalReserveAssets;
 
     /// @notice Mapping of user to their supply shares
     mapping(address => uint256) public userSupplyShares;
@@ -262,80 +268,6 @@ contract LendingPoolRouter {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Calculate dynamic borrow rate based on utilization rate
-     * @dev Implements a two-slope interest rate model:
-     *      - Below optimal utilization (80%): Linear increase from 2% to 10%
-     *      - Above optimal utilization: Sharp increase from 10% to 50%
-     *      This encourages borrowing up to optimal point and discourages over-borrowing
-     * @return borrowRate The annual borrow rate in percentage (scaled by 100, e.g., 1000 = 10%)
-     */
-    function calculateBorrowRate() public view returns (uint256 borrowRate) {
-        if (totalSupplyAssets == 0) {
-            return 500; // 5% base rate when no supply (scaled by 100)
-        }
-
-        // Calculate utilization rate (scaled by 10000 for precision)
-        uint256 utilizationRate = (totalBorrowAssets * 10000) / totalSupplyAssets;
-
-        // Interest rate model parameters
-        uint256 baseRate = 200; // 2% base rate (scaled by 100)
-        uint256 optimalUtilization = 8000; // 80% optimal utilization (scaled by 10000)
-        uint256 rateAtOptimal = 1000; // 10% rate at optimal utilization (scaled by 100)
-        uint256 maxRate = 5000; // 50% maximum rate (scaled by 100)
-
-        if (utilizationRate <= optimalUtilization) {
-            // Linear increase from base rate to optimal rate
-            // Rate = baseRate + (utilizationRate * (rateAtOptimal - baseRate)) / optimalUtilization
-            borrowRate = baseRate + ((utilizationRate * (rateAtOptimal - baseRate)) / optimalUtilization);
-        } else {
-            // Sharp increase after optimal utilization to discourage over-borrowing
-            uint256 excessUtilization = utilizationRate - optimalUtilization;
-            uint256 maxExcessUtilization = 10000 - optimalUtilization; // 20% (scaled by 10000)
-
-            // Rate = rateAtOptimal + (excessUtilization * (maxRate - rateAtOptimal)) / maxExcessUtilization
-            borrowRate = rateAtOptimal + ((excessUtilization * (maxRate - rateAtOptimal)) / maxExcessUtilization);
-        }
-
-        return borrowRate;
-    }
-
-    /**
-     * @notice Get current utilization rate of the pool
-     * @dev Utilization rate = (totalBorrowAssets / totalSupplyAssets) * 10000
-     * @return utilizationRate The utilization rate scaled by 10000 (e.g., 8000 = 80%)
-     */
-    function getUtilizationRate() public view returns (uint256 utilizationRate) {
-        if (totalSupplyAssets == 0) {
-            return 0;
-        }
-
-        // Return utilization rate scaled by 10000 (e.g., 8000 = 80.00%)
-        utilizationRate = (totalBorrowAssets * 10000) / totalSupplyAssets;
-        return utilizationRate;
-    }
-
-    /**
-     * @notice Calculate supply rate based on borrow rate and utilization
-     * @dev Supply rate = Borrow rate × Utilization rate × (1 - reserve factor)
-     *      Reserve factor is set at 10%, meaning 90% of interest goes to suppliers
-     * @return supplyRate The annual supply rate in percentage (scaled by 100, e.g., 500 = 5%)
-     */
-    function calculateSupplyRate() public view returns (uint256 supplyRate) {
-        if (totalSupplyAssets == 0) {
-            return 0;
-        }
-
-        uint256 borrowRate = calculateBorrowRate();
-        uint256 utilizationRate = (totalBorrowAssets * 10000) / totalSupplyAssets;
-        uint256 reserveFactor = 1000; // 10% reserve factor (scaled by 10000)
-
-        // supplyRate = borrowRate * utilizationRate * (1 - reserveFactor) / 10000
-        supplyRate = (borrowRate * utilizationRate * (10000 - reserveFactor)) / (10000 * 10000);
-
-        return supplyRate;
-    }
-
-    /**
      * @notice Accrues interest to the pool
      * @dev Calculates interest based on elapsed time since last accrual and adds it
      *      to both totalSupplyAssets and totalBorrowAssets. This increases the value
@@ -346,9 +278,12 @@ contract LendingPoolRouter {
         if (elapsedTime == 0) return; // No time elapsed, skip
         lastAccrued = block.timestamp;
         if (totalBorrowAssets == 0) return;
-        uint256 interest = IInterestRateModel(_interestRateModel()).calculateInterest(address(this), elapsedTime);
-        totalSupplyAssets += interest;
+        (uint256 interest, uint256 supplyYield, uint256 reserveYield) =
+            IInterestRateModel(_interestRateModel()).calculateInterest(address(this), elapsedTime);
         totalBorrowAssets += interest;
+        totalSupplyAssets += supplyYield;
+        totalReserveAssets += reserveYield;
+        emit InterestAccrued(interest, supplyYield, reserveYield);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -388,7 +323,7 @@ contract LendingPoolRouter {
             revert MaxUtilizationReached(borrowToken, newUtilization, _maxUtilization());
         }
 
-        protocolFee = (_amount * 1e15) / 1e18; // 0.1%
+        protocolFee = (_amount * _protocolFee(borrowToken)) / 1e18;
         userAmount = _amount - protocolFee;
 
         if (totalBorrowAssets > totalSupplyAssets) {
@@ -436,29 +371,17 @@ contract LendingPoolRouter {
      *      Liquidator receives most of the collateral while a portion goes to protocol.
      * @param _borrower The address of the borrower being liquidated
      * @return userBorrowAssets The total borrow assets of the borrower
-     * @return borrowerCollateral The total collateral of the borrower
-     * @return liquidationAllocation The amount allocated to protocol
-     * @return collateralToLiquidator The amount of collateral going to liquidator
+     * @return liquidationBonus The amount allocated to protocol
      * @return userPosition The address of the borrower's position contract
      */
-    function liquidation(address _borrower)
-        public
-        onlyLendingPool
-        returns (
-            uint256 userBorrowAssets,
-            uint256 borrowerCollateral,
-            uint256 liquidationAllocation,
-            uint256 collateralToLiquidator,
-            address userPosition
-        )
-    {
+    function liquidation(address _borrower) public onlyLendingPool returns (uint256, uint256, address) {
         // Check if borrower is authorized (has position)
         if (userBorrowShares[_borrower] == 0 && _userCollateral(_borrower) == 0) {
             revert NotLiquidable(_borrower);
         }
 
         // Check if position is liquidatable
-        (bool isLiquidatable, uint256 borrowValue, uint256 collateralValue, uint256 liquidationAllocationCalc) =
+        (bool isLiquidatable, uint256 borrowValue, uint256 collateralValue, uint256 liquidationBonus) =
             IIsHealthy(_isHealthy()).checkLiquidatable(_borrower, address(this));
 
         if (!isLiquidatable) {
@@ -469,17 +392,8 @@ contract LendingPoolRouter {
         accrueInterest();
 
         // Get borrower's state
-        borrowerCollateral = _userCollateral(_borrower);
-        userBorrowAssets = _borrowSharesToAmount(userBorrowShares[_borrower]);
-        liquidationAllocation = liquidationAllocationCalc;
-        userPosition = addressPositions[_borrower];
-
-        // Ensure liquidation allocation doesn't exceed borrower collateral
-        if (liquidationAllocation > borrowerCollateral) {
-            liquidationAllocation = 0;
-        }
-
-        collateralToLiquidator = borrowerCollateral - liquidationAllocation;
+        uint256 userBorrowAssets = _borrowSharesToAmount(userBorrowShares[_borrower]);
+        address userPosition = addressPositions[_borrower];
 
         // Update state: clear borrower's position
         totalBorrowAssets -= userBorrowAssets;
@@ -487,7 +401,7 @@ contract LendingPoolRouter {
         userBorrowShares[_borrower] = 0;
         addressPositions[_borrower] = address(0);
 
-        return (userBorrowAssets, borrowerCollateral, liquidationAllocation, collateralToLiquidator, userPosition);
+        return (userBorrowAssets, liquidationBonus, userPosition);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -520,6 +434,25 @@ contract LendingPoolRouter {
      */
     function _userCollateral(address _user) internal view returns (uint256) {
         return IPosition(addressPositions[_user]).totalCollateral();
+    }
+
+    /**
+     * @notice Gets the protocol contract address from factory
+     * @dev Internal view function that queries the factory for the protocol contract
+     * @return The address of the protocol contract
+     */
+    function _protocol() internal view returns (address) {
+        return IFactory(factory).protocol();
+    }
+
+    /**
+     * @notice Gets the protocol fee for a token from protocol contract
+     * @dev Internal view function that queries the protocol contract for the protocol fee
+     * @param _token The address of the token
+     * @return The protocol fee for the token
+     */
+    function _protocolFee(address _token) internal view returns (uint256) {
+        return IProtocol(_protocol()).getProtocolFee(_token);
     }
 
     /**

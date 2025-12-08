@@ -5,7 +5,7 @@ pragma solidity ^0.8.30;
  * @title IFactory
  * @notice Interface for lending pool factory functionality
  * @dev Defines the contract for creating and managing lending pools
- * @author Senja Team
+ * @author Senja Labs
  * @custom:version 1.0.0
  */
 interface IFactory {
@@ -77,7 +77,7 @@ interface IFactory {
      * @notice Returns the address of the wrapped native token
      * @return Address of the wrapped native token contract
      */
-    function WRAPPED_NATIVE() external view returns (address);
+    function wrappedNative() external view returns (address);
 
     /**
      * @notice Sets the token data stream contract address
@@ -119,12 +119,6 @@ interface IFactory {
     function protocol() external view returns (address);
 
     /**
-     * @notice Returns the total number of pools created
-     * @return Number of lending pools created by this factory
-     */
-    function poolCount() external view returns (uint256);
-
-    /**
      * @notice Sets the OFT address for a token
      * @param _token Address of the token
      * @param _oftAddress Address of the OFT contract
@@ -153,7 +147,7 @@ interface IFactory {
      * @notice Returns the address of the DEX router
      * @return Address of the DEX router contract
      */
-    function DEX_ROUTER() external view returns (address);
+    function dexRouter() external view returns (address);
 
     /**
      * @notice Returns the address of the interest rate model
@@ -167,4 +161,11 @@ interface IFactory {
      * @return The corresponding LayerZero endpoint ID
      */
     function chainIdToEid(uint256 _chainId) external view returns (uint32);
+
+    /**
+     * @notice Sets the LayerZero endpoint ID for a specific chain ID
+     * @param _chainId The blockchain chain ID
+     * @param _eid The LayerZero endpoint ID corresponding to the chain
+     */
+    function setChainIdToEid(uint256 _chainId, uint32 _eid) external;
 }

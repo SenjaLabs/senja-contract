@@ -6,13 +6,13 @@ import {IOrakl} from "./interfaces/IOrakl.sol";
 
 /**
  * @title Oracle
- * @author Senja Team
+ * @author Senja Labs
  * @notice Oracle price feed contract that interfaces with Orakl Network for price data
  * @dev This contract acts as an adapter between the Senja protocol and Orakl Network's price feeds,
  * providing Chainlink-compatible interface for price queries. It wraps Orakl's oracle functionality
  * and maintains round data for price tracking.
  * @custom:version 1.0.0
- * @custom:security-contact security@senja.io
+ * @custom:security-contact security@senja.finance
  */
 contract Oracle is Ownable {
     // ============ State Variables ============
@@ -75,6 +75,7 @@ contract Oracle is Ownable {
      */
     function latestRoundData() public view returns (uint80, uint256, uint256, uint256, uint80) {
         (uint80 idRound, int256 priceAnswer, uint256 updated) = IOrakl(oracle).latestRoundData();
+        // forge-lint: disable-next-line(unsafe-typecast)
         return (idRound, uint256(priceAnswer), startedAt, updated, answeredInRound);
     }
 

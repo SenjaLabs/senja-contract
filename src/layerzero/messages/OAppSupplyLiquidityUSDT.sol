@@ -117,7 +117,7 @@ contract OAppSupplyLiquidityUSDT is OApp, OAppOptionsType3 {
     ) external payable {
         bytes memory lzOptions = combineOptions(_dstEid, SEND, _options);
         bytes memory message = abi.encode(_lendingPoolDst, _user, _tokendst, _amount);
-        _lzSend(_dstEid, message, lzOptions, MessagingFee(_oappFee, 0), payable(_user));
+        _lzSend(_dstEid, message, lzOptions, MessagingFee({nativeFee: _oappFee, lzTokenFee: 0}), payable(_user));
         emit SendLiquidityFromSrc(_lendingPoolDst, _user, _tokendst, _amount);
     }
 
@@ -165,7 +165,7 @@ contract OAppSupplyLiquidityUSDT is OApp, OAppOptionsType3 {
      * @param _oftaddress Address of the OFT adapter
      * @dev Only callable by contract owner
      */
-    function setOFTaddress(address _oftaddress) public onlyOwner {
+    function setOftAddress(address _oftaddress) public onlyOwner {
         oftaddress = _oftaddress;
     }
 

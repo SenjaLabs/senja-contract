@@ -17,7 +17,7 @@ contract OFTadapter is OFTAdapter, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     /// @notice Address of the OFT token being bridged
-    address public tokenOFT;
+    address public tokenOft;
 
     /// @notice Address of the elevated minter/burner contract
     address public elevatedMinterBurner;
@@ -53,7 +53,7 @@ contract OFTadapter is OFTAdapter, ReentrancyGuard {
         address _owner,
         uint8 _sharedDecimals
     ) OFTAdapter(_token, _lzEndpoint, _owner) Ownable(_owner) {
-        tokenOFT = _token;
+        tokenOft = _token;
         elevatedMinterBurner = _elevatedMinterBurner;
         _SHAREDDECIMALS = _sharedDecimals;
     }
@@ -69,52 +69,52 @@ contract OFTadapter is OFTAdapter, ReentrancyGuard {
     /**
      * @notice Internal function to credit tokens to recipient on destination chain
      * @param _to Recipient address
-     * @param _amountLD Amount in local decimals
-     * @return amountReceivedLD Amount actually received
+     * @param _amountLd Amount in local decimals
+     * @return amountReceivedLd Amount actually received
      * @dev On chain 8217 (Klaytn), transfers from adapter. On other chains, mints tokens.
      */
-    function _credit(address _to, uint256 _amountLD, uint32)
+    function _credit(address _to, uint256 _amountLd, uint32)
         internal
         virtual
         override
-        returns (uint256 amountReceivedLD)
+        returns (uint256 amountReceivedLd)
     {
         if (_to == address(0x0)) _to = address(0xdead);
         if (block.chainid == 8217) {
-            if (IERC20(tokenOFT).balanceOf(address(this)) < _amountLD) revert InsufficientBalance();
-            IERC20(tokenOFT).safeTransfer(_to, _amountLD);
+            if (IERC20(tokenOft).balanceOf(address(this)) < _amountLd) revert InsufficientBalance();
+            IERC20(tokenOft).safeTransfer(_to, _amountLd);
         } else {
-            IElevatedMintableBurnable(elevatedMinterBurner).mint(_to, _amountLD);
+            IElevatedMintableBurnable(elevatedMinterBurner).mint(_to, _amountLd);
         }
-        emit Credit(_to, _amountLD);
-        return _amountLD;
+        emit Credit(_to, _amountLd);
+        return _amountLd;
     }
 
     /**
      * @notice Internal function to debit tokens from sender on source chain
      * @param _from Sender address
-     * @param _amountLD Amount in local decimals
-     * @param _minAmountLD Minimum amount to receive
+     * @param _amountLd Amount in local decimals
+     * @param _minAmountLd Minimum amount to receive
      * @param _dstEid Destination endpoint ID
-     * @return amountSentLD Amount sent
-     * @return amountReceivedLD Amount to be received on destination
+     * @return amountSentLd Amount sent
+     * @return amountReceivedLd Amount to be received on destination
      * @dev On chain 8217 (Klaytn), locks tokens in adapter. On other chains, burns tokens.
      */
-    function _debit(address _from, uint256 _amountLD, uint256 _minAmountLD, uint32 _dstEid)
+    function _debit(address _from, uint256 _amountLd, uint256 _minAmountLd, uint32 _dstEid)
         internal
         virtual
         override
-        returns (uint256 amountSentLD, uint256 amountReceivedLD)
+        returns (uint256 amountSentLd, uint256 amountReceivedLd)
     {
-        (amountSentLD, amountReceivedLD) = _debitView(_amountLD, _minAmountLD, _dstEid);
+        (amountSentLd, amountReceivedLd) = _debitView(_amountLd, _minAmountLd, _dstEid);
         if (block.chainid == 8217) {
-            IERC20(tokenOFT).safeTransferFrom(_from, address(this), amountSentLD);
+            IERC20(tokenOft).safeTransferFrom(_from, address(this), amountSentLd);
         } else {
-            IERC20(tokenOFT).safeTransferFrom(_from, address(this), amountSentLD);
-            IERC20(tokenOFT).approve(elevatedMinterBurner, amountSentLD);
-            IElevatedMintableBurnable(elevatedMinterBurner).burn(_from, amountSentLD);
+            IERC20(tokenOft).safeTransferFrom(_from, address(this), amountSentLd);
+            IERC20(tokenOft).approve(elevatedMinterBurner, amountSentLd);
+            IElevatedMintableBurnable(elevatedMinterBurner).burn(_from, amountSentLd);
         }
-        emit Debit(_from, _amountLD);
+        emit Debit(_from, _amountLd);
     }
 
     /**

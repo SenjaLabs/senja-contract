@@ -52,9 +52,9 @@ contract HelperUtils {
         address borrowToken = _borrowToken(_lendingPool);
         uint256 totalLiquidity;
 
-        if (borrowToken == _WRAPPED_NATIVE()) {
+        if (borrowToken == _wrappedNative()) {
             // Handle Wrapped Native token
-            totalLiquidity = IERC20(_WRAPPED_NATIVE()).balanceOf(_lendingPool);
+            totalLiquidity = IERC20(_wrappedNative()).balanceOf(_lendingPool);
         } else {
             // Handle ERC20 tokens
             totalLiquidity = IERC20(borrowToken).balanceOf(_lendingPool);
@@ -129,9 +129,9 @@ contract HelperUtils {
             uint256 tokenBalance;
             uint256 tokenDecimals;
 
-            if (token == _WRAPPED_NATIVE()) {
+            if (token == _wrappedNative()) {
                 // Handle Wrapped Native token
-                tokenBalance = IERC20(_WRAPPED_NATIVE()).balanceOf(userPosition);
+                tokenBalance = IERC20(_wrappedNative()).balanceOf(userPosition);
                 tokenDecimals = 18; // Wrapped Native uses 18 decimals
             } else {
                 // Handle ERC20 tokens
@@ -147,7 +147,7 @@ contract HelperUtils {
 
         // Calculate borrowed value
         uint256 borrowAssets = ((userBorrowShares * totalBorrowAssets) / totalBorrowShares);
-        uint256 borrowDecimals = borrowToken == _WRAPPED_NATIVE() ? 18 : IERC20Metadata(borrowToken).decimals();
+        uint256 borrowDecimals = borrowToken == _wrappedNative() ? 18 : IERC20Metadata(borrowToken).decimals();
         uint256 borrowValue = getTokenValue(borrowToken) * borrowAssets / 10 ** borrowDecimals;
         // Health Factor = (Collateral Value * LTV) / Borrowed Value
         uint256 ltv = _ltv(_lendingPool);
@@ -188,120 +188,6 @@ contract HelperUtils {
     }
 
     /**
-     * @notice Get the supply APY (Annual Percentage Yield) for a lending pool
-     * @param _lendingPool The address of the lending pool
-     * @return supplyAPY The supply APY scaled by 1e18 (e.g., 5% = 5e16)
-     * @dev APY accounts for daily compounding: APY = (1 + rate/365)^365 - 1
-     */
-    function getSupplyAPY(address _lendingPool) public view returns (uint256 supplyAPY) {
-        ILPRouter router = _router(_lendingPool);
-        uint256 supplyRate = router.calculateSupplyRate(); // Rate scaled by 100 (e.g., 500 = 5%)
-
-        if (supplyRate == 0) {
-            return 0;
-        }
-
-        // Convert rate from percentage to decimal: supplyRate / 10000
-        // Then calculate daily rate: rate / 365
-        // APY = (1 + dailyRate)^365 - 1
-        // Using approximation for gas efficiency: APY ≈ rate + (rate^2 / 2) for small rates
-
-        uint256 rateDecimal = (supplyRate * 1e18) / 10000; // Convert to 1e18 scale
-        uint256 compoundEffect = (rateDecimal * rateDecimal) / (2 * 1e18); // rate^2 / 2
-        supplyAPY = rateDecimal + compoundEffect;
-
-        return supplyAPY;
-    }
-
-    /**
-     * @notice Get the borrow APY (Annual Percentage Yield) for a lending pool
-     * @param _lendingPool The address of the lending pool
-     * @return borrowAPY The borrow APY scaled by 1e18 (e.g., 10% = 1e17)
-     * @dev APY accounts for daily compounding: APY = (1 + rate/365)^365 - 1
-     */
-    function getBorrowAPY(address _lendingPool) public view returns (uint256 borrowAPY) {
-        ILPRouter router = _router(_lendingPool);
-        uint256 borrowRate = router.calculateBorrowRate(); // Rate scaled by 100 (e.g., 1000 = 10%)
-
-        if (borrowRate == 0) {
-            return 0;
-        }
-
-        // Convert rate from percentage to decimal: borrowRate / 10000
-        // Then calculate APY with compounding effect
-        uint256 rateDecimal = (borrowRate * 1e18) / 10000; // Convert to 1e18 scale
-        uint256 compoundEffect = (rateDecimal * rateDecimal) / (2 * 1e18); // rate^2 / 2
-        borrowAPY = rateDecimal + compoundEffect;
-
-        return borrowAPY;
-    }
-
-    /**
-     * @notice Get both supply and borrow APY for a lending pool
-     * @param _lendingPool The address of the lending pool
-     * @return supplyAPY The supply APY scaled by 1e18
-     * @return borrowAPY The borrow APY scaled by 1e18
-     * @return utilizationRate The utilization rate scaled by 1e18
-     */
-    function getAPY(address _lendingPool)
-        public
-        view
-        returns (uint256 supplyAPY, uint256 borrowAPY, uint256 utilizationRate)
-    {
-        supplyAPY = getSupplyAPY(_lendingPool);
-        borrowAPY = getBorrowAPY(_lendingPool);
-        utilizationRate = getUtilizationRate(_lendingPool);
-
-        return (supplyAPY, borrowAPY, utilizationRate);
-    }
-
-    /**
-     * @notice Get the utilization rate for a lending pool
-     * @param _lendingPool The address of the lending pool
-     * @return utilizationRate The utilization rate scaled by 1e18 (e.g., 80% = 8e17)
-     */
-    function getUtilizationRate(address _lendingPool) public view returns (uint256 utilizationRate) {
-        ILPRouter router = _router(_lendingPool);
-        uint256 utilization = router.getUtilizationRate(); // Rate scaled by 10000 (e.g., 8000 = 80%)
-
-        // Convert from 10000 scale to 1e18 scale
-        utilizationRate = (utilization * 1e18) / 10000;
-
-        return utilizationRate;
-    }
-
-    /**
-     * @notice Get detailed lending pool metrics
-     * @param _lendingPool The address of the lending pool
-     * @return supplyAPY The supply APY scaled by 1e18
-     * @return borrowAPY The borrow APY scaled by 1e18
-     * @return utilizationRate The utilization rate scaled by 1e18
-     * @return totalSupplyAssets Total supply assets in the pool
-     * @return totalBorrowAssets Total borrow assets in the pool
-     */
-    function getLendingPoolMetrics(address _lendingPool)
-        public
-        view
-        returns (
-            uint256 supplyAPY,
-            uint256 borrowAPY,
-            uint256 utilizationRate,
-            uint256 totalSupplyAssets,
-            uint256 totalBorrowAssets
-        )
-    {
-        ILPRouter router = _router(_lendingPool);
-
-        supplyAPY = getSupplyAPY(_lendingPool);
-        borrowAPY = getBorrowAPY(_lendingPool);
-        utilizationRate = getUtilizationRate(_lendingPool);
-        totalSupplyAssets = router.totalSupplyAssets();
-        totalBorrowAssets = router.totalBorrowAssets();
-
-        return (supplyAPY, borrowAPY, utilizationRate, totalSupplyAssets, totalBorrowAssets);
-    }
-
-    /**
      * @notice Gets the total available liquidity in a lending pool
      * @param _lendingPool Address of the lending pool
      * @return totalLiquidity Available liquidity amount
@@ -309,7 +195,7 @@ contract HelperUtils {
     function getTotalLiquidity(address _lendingPool) public view returns (uint256 totalLiquidity) {
         address borrowToken = ILPRouter(_router(_lendingPool)).borrowToken();
         if (borrowToken == address(1)) {
-            totalLiquidity = IERC20(_WRAPPED_NATIVE()).balanceOf(_lendingPool);
+            totalLiquidity = IERC20(_wrappedNative()).balanceOf(_lendingPool);
         } else {
             totalLiquidity = IERC20(borrowToken).balanceOf(_lendingPool);
         }
@@ -326,7 +212,7 @@ contract HelperUtils {
         address collateralToken = ILPRouter(_router(_lendingPool)).collateralToken();
         address addressPosition = ILPRouter(_router(_lendingPool)).addressPositions(_user);
         if (collateralToken == address(1)) {
-            collateralBalance = IERC20(_WRAPPED_NATIVE()).balanceOf(addressPosition);
+            collateralBalance = IERC20(_wrappedNative()).balanceOf(addressPosition);
         } else {
             collateralBalance = IERC20(collateralToken).balanceOf(addressPosition);
         }
@@ -357,9 +243,9 @@ contract HelperUtils {
         address _tokenOutPrice = _oracleAddress(borrowToken);
 
         uint256 collateralBalance;
-        if (collateralToken == _WRAPPED_NATIVE()) {
+        if (collateralToken == _wrappedNative()) {
             // Handle Wrapped Native token
-            collateralBalance = IERC20(_WRAPPED_NATIVE()).balanceOf(addressPosition);
+            collateralBalance = IERC20(_wrappedNative()).balanceOf(addressPosition);
         } else {
             // Handle ERC20 tokens
             collateralBalance = IERC20(collateralToken).balanceOf(addressPosition);
@@ -487,7 +373,7 @@ contract HelperUtils {
      * @notice Internal function to get the wrapped native token address
      * @return Address of the wrapped native token
      */
-    function _WRAPPED_NATIVE() internal view returns (address) {
-        return IFactory(factory).WRAPPED_NATIVE();
+    function _wrappedNative() internal view returns (address) {
+        return IFactory(factory).wrappedNative();
     }
 }

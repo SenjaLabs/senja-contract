@@ -27,28 +27,28 @@ contract GrantRole is Script, Helper {
     // ================================================================
 
     /// @notice Address of the sUSDT bridge token contract
-    address SUSDT;
+    address susdt;
 
     /// @notice Address of the sWKAIA bridge token contract
-    address SWKAIA;
+    address swkaia;
 
     /// @notice Address of the sWBTC bridge token contract
-    address SWBTC;
+    address swbtc;
 
     /// @notice Address of the sWETH bridge token contract
-    address SWETH;
+    address sweth;
 
     /// @notice Address of the elevated minter/burner contract for sUSDT
-    address SUSDT_ELEVATED_MINTER_BURNER;
+    address susdtElevatedMinterBurner;
 
     /// @notice Address of the elevated minter/burner contract for sWKAIA
-    address SWKAIA_ELEVATED_MINTER_BURNER;
+    address swkaiaElevatedMinterBurner;
 
     /// @notice Address of the elevated minter/burner contract for sWBTC
-    address SWBTC_ELEVATED_MINTER_BURNER;
+    address swbtcElevatedMinterBurner;
 
     /// @notice Address of the elevated minter/burner contract for sWETH
-    address SWETH_ELEVATED_MINTER_BURNER;
+    address swethElevatedMinterBurner;
 
     // ================================================================
     // MAIN FUNCTIONS
@@ -73,13 +73,13 @@ contract GrantRole is Script, Helper {
     function run() public {
         vm.createSelectFork(vm.rpcUrl("base_mainnet"));
         vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
-        sUSDT(SUSDT).setOperator(SUSDT_ELEVATED_MINTER_BURNER, true);
+        sUSDT(susdt).setOperator(susdtElevatedMinterBurner, true);
         console.log("sUSDT operator set");
-        sWKAIA(SWKAIA).setOperator(SWKAIA_ELEVATED_MINTER_BURNER, true);
+        sWKAIA(swkaia).setOperator(swkaiaElevatedMinterBurner, true);
         console.log("sWKAIA operator set");
-        sWBTC(SWBTC).setOperator(SWBTC_ELEVATED_MINTER_BURNER, true);
+        sWBTC(swbtc).setOperator(swbtcElevatedMinterBurner, true);
         console.log("sWBTC operator set");
-        sWETH(SWETH).setOperator(SWETH_ELEVATED_MINTER_BURNER, true);
+        sWETH(sweth).setOperator(swethElevatedMinterBurner, true);
         console.log("sWETH operator set");
         vm.stopBroadcast();
     }
@@ -102,14 +102,14 @@ contract GrantRole is Script, Helper {
      */
     function _getUtils() internal {
         if (block.chainid == 8453) {
-            SUSDT = BASE_SUSDT;
-            SWKAIA = BASE_SWKAIA;
-            SWBTC = BASE_SWBTC;
-            SWETH = BASE_SWETH;
-            SUSDT_ELEVATED_MINTER_BURNER = BASE_SUSDT_ELEVATED_MINTER_BURNER;
-            SWKAIA_ELEVATED_MINTER_BURNER = BASE_SWKAIA_ELEVATED_MINTER_BURNER;
-            SWBTC_ELEVATED_MINTER_BURNER = BASE_SWBTC_ELEVATED_MINTER_BURNER;
-            SWETH_ELEVATED_MINTER_BURNER = BASE_SWETH_ELEVATED_MINTER_BURNER;
+            susdt = BASE_SUSDT;
+            swkaia = BASE_SWKAIA;
+            swbtc = BASE_SWBTC;
+            sweth = BASE_SWETH;
+            susdtElevatedMinterBurner = BASE_SUSDT_ELEVATED_MINTER_BURNER;
+            swkaiaElevatedMinterBurner = BASE_SWKAIA_ELEVATED_MINTER_BURNER;
+            swbtcElevatedMinterBurner = BASE_SWBTC_ELEVATED_MINTER_BURNER;
+            swethElevatedMinterBurner = BASE_SWETH_ELEVATED_MINTER_BURNER;
         }
     }
 }

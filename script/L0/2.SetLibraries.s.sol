@@ -71,8 +71,8 @@ contract SetLibraries is Script, Helper {
      *      configurations are commented out for future implementation.
      */
     function run() external {
-        deployBASE();
-        deployKAIA();
+        deployBase();
+        deployKaia();
         // optimism
         // hyperevm
     }
@@ -137,7 +137,7 @@ contract SetLibraries is Script, Helper {
      *      - Executes on BASE mainnet
      *      - Sets critical messaging infrastructure
      */
-    function deployBASE() public {
+    function deployBase() public {
         vm.createSelectFork(vm.rpcUrl("base_mainnet"));
         vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
         _getUtils();
@@ -180,7 +180,7 @@ contract SetLibraries is Script, Helper {
      *      - Sets critical messaging infrastructure
      *      - Note: KAIA has 5 adapters vs BASE's 4 due to dual USDT implementations
      */
-    function deployKAIA() public {
+    function deployKaia() public {
         vm.createSelectFork(vm.rpcUrl("kaia_mainnet"));
         vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
         _getUtils();

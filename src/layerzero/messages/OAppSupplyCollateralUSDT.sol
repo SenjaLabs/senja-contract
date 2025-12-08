@@ -235,9 +235,9 @@ contract OAppSupplyCollateralUSDT is OApp, OAppOptionsType3 {
             composeMsg: "",
             oftCmd: ""
         });
-        IERC20(oft.tokenOFT()).safeTransferFrom(_user, address(this), _amount);
-        IERC20(oft.tokenOFT()).approve(oftaddress, _amount);
-        oft.send{value: _oftNativeFee}(sendParam, MessagingFee(_oftNativeFee, 0), _user);
+        IERC20(oft.tokenOft()).safeTransferFrom(_user, address(this), _amount);
+        IERC20(oft.tokenOft()).approve(oftaddress, _amount);
+        oft.send{value: _oftNativeFee}(sendParam, MessagingFee({nativeFee: _oftNativeFee, lzTokenFee: 0}), _user);
     }
 
     /**
@@ -262,7 +262,7 @@ contract OAppSupplyCollateralUSDT is OApp, OAppOptionsType3 {
     ) internal {
         bytes memory lzOptions = combineOptions(_dstEid, SEND, _options);
         bytes memory payload = abi.encode(_lendingPool, _user, _tokendst, _amount);
-        _lzSend(_dstEid, payload, lzOptions, MessagingFee(_lzNativeFee, 0), payable(_user));
+        _lzSend(_dstEid, payload, lzOptions, MessagingFee({nativeFee: _lzNativeFee, lzTokenFee: 0}), payable(_user));
     }
 
     /**
@@ -279,7 +279,7 @@ contract OAppSupplyCollateralUSDT is OApp, OAppOptionsType3 {
      * @param _oftaddress Address of the OFT adapter
      * @dev Only callable by contract owner. Used on both source and destination chains.
      */
-    function setOFTaddress(address _oftaddress) public onlyOwner {
+    function setOftAddress(address _oftaddress) public onlyOwner {
         oftaddress = _oftaddress;
     }
 

@@ -20,7 +20,7 @@ contract ConvertToWrappedToken is Script, Helper {
      *      This function is automatically called when the script is executed via forge script command.
      */
     function run() public {
-        deployKAIA();
+        deployKaia();
     }
 
     /**
@@ -45,7 +45,7 @@ contract ConvertToWrappedToken is Script, Helper {
      *      - The script deposits exactly 1 KAIA (hardcoded as 1e18 wei)
      *      - Verify sufficient native token balance exists before execution
      */
-    function deployKAIA() public {
+    function deployKaia() public {
         vm.createSelectFork(vm.rpcUrl("kaia_mainnet"));
         vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
         console.log("balance before deposit: ", vm.envAddress("PUBLIC_KEY"));

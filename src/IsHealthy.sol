@@ -3,17 +3,14 @@ pragma solidity ^0.8.20;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {ILendingPool} from "./interfaces/ILendingPool.sol";
 import {ILPRouter} from "./interfaces/ILPRouter.sol";
 import {IFactory} from "./interfaces/IFactory.sol";
-import {IOracle} from "./interfaces/IOracle.sol";
 import {ITokenDataStream} from "./interfaces/ITokenDataStream.sol";
 import {IPosition} from "./interfaces/IPosition.sol";
 
 /**
  * @title IsHealthy
- * @author Senja Protocol Team
+ * @author Senja Labs
  * @notice Contract that validates the health of borrowing positions based on collateral ratios
  * @dev This contract implements health checks for lending positions by comparing the value
  *      of a user's collateral against their borrowed amount and the loan-to-value (LTV) ratio.
@@ -48,10 +45,17 @@ contract IsHealthy is Ownable {
     /// @param threshold The liquidation threshold
     error LtvMustBeLessThanThreshold(address lendingPool, uint256 ltv, uint256 threshold);
 
-    /// @notice Thrown when a position is at risk of liquidation
+    /// @notice Thrown when user tries to borrow more than allowed by LTV ratio
+    /// @param borrowValue Total value user is trying to borrow
+    /// @param maxBorrowValue Maximum borrow value allowed by LTV
+    /// @param ltv The loan-to-value ratio (e.g., 0.6e18 = 60%)
+    error ExceedsMaxLTV(uint256 borrowValue, uint256 maxBorrowValue, uint256 ltv);
+
+    /// @notice Thrown when a position is at risk of liquidation (exceeds liquidation threshold)
     /// @param borrowValue Total value of borrowed assets
-    /// @param collateralValue Total value of collateral
-    error LiquidationAlert(uint256 borrowValue, uint256 collateralValue);
+    /// @param maxCollateralValue Maximum collateral value at liquidation threshold
+    /// @param liquidationThreshold The liquidation threshold (e.g., 0.85e18 = 85%)
+    error LiquidationAlert(uint256 borrowValue, uint256 maxCollateralValue, uint256 liquidationThreshold);
 
     /// @notice Thrown when liquidation threshold is not set for a lending pool
     /// @param lendingPool The lending pool address
@@ -122,18 +126,28 @@ contract IsHealthy is Ownable {
     // =============================================================
 
     /// @notice Validates whether a user's borrowing position is healthy
-    /// @dev Calculates the total USD value of user's collateral across all supported tokens
-    ///      and compares it against their borrowed amount and the liquidation threshold.
-    ///      Reverts if the position is unhealthy (over-leveraged).
+    /// @dev Checks both LTV ratio (for borrowing) and liquidation threshold (for position health).
+    ///      First validates against LTV to prevent over-borrowing, then checks liquidation threshold.
     /// @param _user The user address whose position is being checked
     /// @param _router The lending pool contract address
     function isHealthy(address _user, address _router) public view {
         uint256 borrowValue = _userBorrowValue(_router, _borrowToken(_router), _user);
         if (borrowValue == 0) return; // No borrows = always healthy
 
-        uint256 maxCollateralValue = _userCollateralStats(_router, _collateralToken(_router), _user);
-        // If user has borrows but insufficient collateral, revert
-        if (borrowValue > maxCollateralValue) revert LiquidationAlert(borrowValue, maxCollateralValue);
+        _checkLiquidation(_router); // Ensure liquidation settings are configured
+
+        (uint256 maxBorrowValueLtv, uint256 maxBorrowValueLiquidation) =
+            _userCollateralStats(_router, _collateralToken(_router), _user);
+
+        // Check LTV first (stricter limit for borrowing)
+        if (borrowValue > maxBorrowValueLtv) {
+            revert ExceedsMaxLTV(borrowValue, maxBorrowValueLtv, _ltv(_router));
+        }
+
+        // Check liquidation threshold (position health)
+        if (borrowValue > maxBorrowValueLiquidation) {
+            revert LiquidationAlert(borrowValue, maxBorrowValueLiquidation, liquidationThreshold[_router]);
+        }
     }
 
     /**
@@ -153,9 +167,8 @@ contract IsHealthy is Ownable {
     {
         uint256 borrowValue = _userBorrowValue(lendingPool, _borrowToken(lendingPool), user);
         if (borrowValue == 0) return (true, 0, 0, 0);
-        uint256 maxCollateralValue = _userCollateralStats(lendingPool, _collateralToken(lendingPool), user);
-        uint256 liquidationAllocation = _userCollateral(lendingPool, user) * liquidationBonus[lendingPool] / 1e18;
-        return (borrowValue > maxCollateralValue, borrowValue, maxCollateralValue, liquidationAllocation);
+        (, uint256 maxCollateralValue) = _userCollateralStats(lendingPool, _collateralToken(lendingPool), user);
+        return (borrowValue > maxCollateralValue, borrowValue, maxCollateralValue, liquidationBonus[lendingPool]);
     }
 
     // =============================================================
@@ -207,13 +220,18 @@ contract IsHealthy is Ownable {
      * @return Maximum borrow value considering liquidation threshold
      * @dev Checks liquidation settings, calculates collateral value, and applies liquidation threshold
      */
-    function _userCollateralStats(address _router, address _token, address _user) internal view returns (uint256) {
+    function _userCollateralStats(address _router, address _token, address _user)
+        internal
+        view
+        returns (uint256, uint256)
+    {
         _checkLiquidation(_router);
         uint256 userCollateral = _userCollateral(_router, _user);
         uint256 collateralAdjustedPrice = (_tokenPrice(_token) * 1e18) / (10 ** _oracleDecimal(_token));
         uint256 userCollateralValue = (userCollateral * collateralAdjustedPrice) / (10 ** _tokenDecimals(_token));
-        uint256 maxBorrowValue = (userCollateralValue * liquidationThreshold[_router]) / 1e18;
-        return maxBorrowValue;
+        uint256 maxBorrowValueLtv = (userCollateralValue * _ltv(_router)) / 1e18;
+        uint256 maxBorrowValueLiquidation = (userCollateralValue * liquidationThreshold[_router]) / 1e18;
+        return (maxBorrowValueLtv, maxBorrowValueLiquidation);
     }
 
     /**
@@ -343,7 +361,7 @@ contract IsHealthy is Ownable {
     /// @param _token The token address to get decimals for
     /// @return The number of decimals used by the ERC20 token
     function _tokenDecimals(address _token) internal view returns (uint256) {
-        if (_token == address(1) || _token == IFactory(factory).WRAPPED_NATIVE()) {
+        if (_token == address(1) || _token == IFactory(factory).wrappedNative()) {
             return 18;
         }
         return IERC20Metadata(_token).decimals();

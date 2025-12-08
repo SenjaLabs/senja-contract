@@ -5,7 +5,7 @@ pragma solidity ^0.8.30;
  * @title IDexRouter
  * @dev Interface for DexRouter router functionality
  * @notice This interface defines the contract for token swapping operations on DexRouter
- * @author Senja Team
+ * @author Senja Labs
  * @custom:security-contact security@senja.com
  * @custom:version 1.0.0
  */
